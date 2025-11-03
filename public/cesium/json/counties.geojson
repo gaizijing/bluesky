@@ -1,0 +1,85 @@
+{
+"type": "FeatureCollection",
+"name": "qingdao_airport",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"xy_coordinate_resolution": 1e-06,
+"features": [
+  {
+    "type": "Feature",
+    "properties": {
+      "NAME": "青岛胶东国际机场",
+      "CLASS": "0XFF84"
+    },
+    "geometry": {
+      "type": "Point",
+      "coordinates": [120.0515, 36.2142]
+    }
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "NAME": "凤凰岛地铁站停机坪",
+      "CLASS": "0XFF84"
+    },
+    "geometry": {
+      "type": "Point",
+      "coordinates": [120.1545, 35.9389]
+    }
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "NAME": "莱西店埠通用机场",
+      "CLASS": "0XFF84"
+    },
+    "geometry": {
+      "type": "Point",
+      "coordinates": [120.3614, 36.7121]
+    }
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "NAME": "青岛即墨通用机场",
+      "CLASS": "0XFF84"
+    },
+    "geometry": {
+      "type": "Point",
+      "coordinates": [120.5353, 36.5254]
+    }
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "NAME": "青岛慈航通用机场",
+      "CLASS": "0XFF84"
+    },
+    "geometry": {
+      "type": "Point",
+      "coordinates": [120.2678, 36.9836]
+    }
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "NAME": "青岛奥帆中心直升机起降点",
+      "CLASS": "0XFF84"
+    },
+    "geometry": {
+      "type": "Point",
+      "coordinates": [120.3417, 36.0650]
+    }
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "NAME": "青岛金沙滩临时起降点",
+      "CLASS": "0XFF84"
+    },
+    "geometry": {
+      "type": "Point",
+      "coordinates": [120.2667, 35.9333]
+    }
+  }
+]
+}
