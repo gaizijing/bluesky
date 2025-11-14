@@ -148,7 +148,7 @@
             <div class="panel-header">
               <span class="panel-title">实时风象</span>
             </div>
-            <div class="panel-content"><LandingPointCard /></div>
+            <div class="panel-content"><MonitoringPointWeather /></div>
           </div>
            <div class="main-panel left_bg">
             <div class="panel-header">
@@ -253,8 +253,8 @@ const WeatherWarnings = defineAsyncComponent(() =>
 const RouteList = defineAsyncComponent(() =>
   import("@/components/business/RouteList/index.vue")
 );
-const LandingPointCard = defineAsyncComponent(() =>
-  import("@/components/business/LandingPointCard/index.vue")
+const MonitoringPointWeather = defineAsyncComponent(() =>
+  import("@/components/business/MonitoringPointWeather/index.vue")
 );
 const WindTrend = defineAsyncComponent(() =>
   import("@/components/business/WindTrend/index.vue")
@@ -286,7 +286,7 @@ import mockRegionWeatherData, {
   FLIGHT_CONDITIONS_THRESHOLD,
 } from "@/mock/regionWeatherData.js";
 
-const { isLoading: cesiumLoading } = useCesium("cesiumContainer"); // 启用Cesium
+// const { isLoading: cesiumLoading } = useCesium("cesiumContainer"); // 启用Cesium
 // 使用dashboard store
 const dashboardStore = useDashboardStore();
 
@@ -331,7 +331,6 @@ const selectedRegion = computed(() => regionStore.selectedRegion);
 
 // 修改切换模块的方法
 const switchModule = (moduleKey) => {
-  console.log(moduleKey == currentModule.value);
   if (moduleKey === currentModule.value) {
     dashboardStore.switchModule("");
   } else {

@@ -64,10 +64,11 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted, watch, nextTick,onUnmounted  } from "vue";
+import { ref, computed, onMounted, watch, nextTick, onUnmounted } from "vue";
 import * as echarts from "echarts";
 import { useDashboardStore } from "@/store/modules/dashboard";
 const dashboardStore = useDashboardStore();
+
 // 气象要素配置
 const params = ref([
   {
@@ -167,7 +168,7 @@ const generateProfileData = () => {
   return { timeLabels, heightLabels, data };
 };
 
-// 初始化图表（修复核心：将visualMap移到根级别）
+// 初始化图表
 const initChart = () => {
   if (!chartRef.value) return;
   
@@ -177,14 +178,16 @@ const initChart = () => {
   if (chartInstance) chartInstance.dispose();
   chartInstance = echarts.init(chartRef.value);
   
-  // 关键修复：visualMap配置在option根级别，与heatmap关联
+  // 修复：移除不正确的 contour 类型，使用正确的配置
   const option = {
     backgroundColor: "transparent",
     tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "cross" },
-      formatter: ({ value }) => {
-        const [timeIdx, heightIdx] = value;
+      trigger: "item", // 改为 item 触发
+      formatter: (params) => {
+        const { dataIndex } = params;
+        // 计算原始数据索引
+        const timeIdx = dataIndex % timeLabels.length;
+        const heightIdx = Math.floor(dataIndex / timeLabels.length);
         const valueVal = data[heightIdx][timeIdx];
         return `
           <div>时间：${timeLabels[timeIdx]}</div>
@@ -227,13 +230,12 @@ const initChart = () => {
         lineStyle: { color: "rgba(255,255,255,0.05)" }
       }
     },
-    // 关键：visualMap配置在根级别，用于热力图的颜色映射
     visualMap: {
-      show: false, // 不显示默认控件（使用自定义图例）
+      show: false,
       min: minValue.value,
       max: maxValue.value,
       calculable: true,
-      dimension: 2, // 关联数据的第三个维度（数值）
+      dimension: 2,
       inRange: {
         color: currentParam.value.colorStops.map(stop => stop.color)
       }
@@ -242,36 +244,23 @@ const initChart = () => {
       {
         type: "heatmap",
         data: data.flatMap((row, hIdx) => 
-          row.map((val, tIdx) => [tIdx, hIdx, val]) // 格式：[x轴索引, y轴索引, 数值]
-        ),
-        label: { show: false },
-        emphasis: { itemStyle: { borderColor: "#fff", borderWidth: 1 } },
-        // 移除series内部的visualMap，使用根级别配置
-      },
-      {
-        type: "contour",
-        zlevel: 1,
-        data: data.flatMap((row, hIdx) => 
           row.map((val, tIdx) => [tIdx, hIdx, val])
         ),
-        symbolSize: 0,
-        lineStyle: {
-          color: "#fff",
-          width: 1,
-          type: "dashed"
-        },
-        levels: [
-          {
-            value: maxValue.value * 0.7,
-            lineStyle: { color: "#ffc107", width: 1.5 }
-          }
-        ],
-        label: { show: false }
+        label: { show: false },
+        emphasis: { 
+          itemStyle: { 
+            borderColor: "#fff", 
+            borderWidth: 1,
+            shadowBlur: 10,
+            shadowColor: "rgba(0, 0, 0, 0.5)"
+          } 
+        }
       }
+      // 移除了 contour 系列，因为这不是有效的 ECharts 类型
     ]
   };
   
-  chartInstance?.setOption(option);
+  chartInstance.setOption(option);
   isLoading.value = false;
 };
 
@@ -295,19 +284,20 @@ onUnmounted(() => {
   chartInstance?.dispose();
   window.removeEventListener("resize", () => {});
 });
+
 // 监听dashboard模块变化
 watch(
   () => dashboardStore.currentModule,
   (newVal) => {
     nextTick(() => {
       if (chartInstance) {
-        chartInstance.resize()
+        chartInstance.resize();
       } else {
-        initChart()
+        initChart();
       }
-    })
+    });
   }
-)
+);
 </script>
 <style scoped lang="scss">
 .wind-profile-chart {

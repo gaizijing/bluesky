@@ -1,0 +1,94 @@
+{
+  "points": [
+    {
+      "id": "point-1",
+      "name": "中心起降坪",
+      "weather": {
+        "windSpeed": 5.2,
+        "windShearLevel": "low",
+        "stabilityIndex": "C"
+      }
+    },
+    {
+      "id": "point-2",
+      "name": "东区起降点",
+      "weather": {
+        "windSpeed": 4.8,
+        "windShearLevel": "low",
+        "stabilityIndex": "B"
+      }
+    },
+    {
+      "id": "point-3",
+      "name": "西区作业点",
+      "weather": {
+        "windSpeed": 8.5,
+        "windShearLevel": "high",
+        "stabilityIndex": "S"
+      }
+    },
+    {
+      "id": "point-4",
+      "name": "南区起降坪",
+      "weather": {
+        "windSpeed": 6.3,
+        "windShearLevel": "medium",
+        "stabilityIndex": "C"
+      }
+    },
+    {
+      "id": "point-5",
+      "name": "北区作业点",
+      "weather": {
+        "windSpeed": 9.1,
+        "windShearLevel": "high",
+        "stabilityIndex": "S"
+      }
+    },
+    {
+      "id": "point-6",
+      "name": "机场专用起降点",
+      "weather": {
+        "windSpeed": 7.4,
+        "windShearLevel": "medium",
+        "stabilityIndex": "B"
+      }
+    },
+    {
+      "id": "point-7",
+      "name": "工业区作业点",
+      "weather": {
+        "windSpeed": 3.9,
+        "windShearLevel": "low",
+        "stabilityIndex": "A"
+      }
+    },
+    {
+      "id": "point-8",
+      "name": "商业区起降点",
+      "weather": {
+        "windSpeed": 5.7,
+        "windShearLevel": "medium",
+        "stabilityIndex": "C"
+      }
+    },
+    {
+      "id": "point-9",
+      "name": "住宅区作业点",
+      "weather": {
+        "windSpeed": 4.2,
+        "windShearLevel": "low",
+        "stabilityIndex": "A"
+      }
+    },
+    {
+      "id": "point-10",
+      "name": "港口起降坪",
+      "weather": {
+        "windSpeed": 10.3,
+        "windShearLevel": "high",
+        "stabilityIndex": "S"
+      }
+    }
+  ]
+}

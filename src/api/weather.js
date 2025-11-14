@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import monitoringPointWeatherData from '@/mock/monitoringPointWeater.json'
 
 /**
  * 气象数据API封装（模拟后端接口，返回模拟数据）
@@ -237,4 +238,33 @@ export const getWeatherDetails = async (params) => {
       status: value > (element === 'temperature' ? 28 : element === 'precipitation' ? 10 : element === 'wind' ? 10 : 1025) ? 'abnormal' : 'normal'
     }
   })
+}
+
+
+// 获取当前选中监测点的天气数据
+export const fetchCurrentPointWeather = async (currentPoint) => {
+  try {
+    if (!currentPoint) {
+      throw new Error('未选择监测点')
+    }
+    
+    // 在实际项目中，这里会是真实的API调用:
+    // const response = await axios.get(`/api/weather/point/${currentPoint.id}`)
+    // return response.data
+    
+    // 使用mock数据
+    console.log("fetchCurrentPointWeather");
+    
+    const weatherData = monitoringPointWeatherData.points.find(p => p.id === currentPoint.id);
+    
+    return {
+      ...weatherData,
+      timestamp: Date.now(),
+      pointId: currentPoint.id,
+      pointName: currentPoint.name
+    }
+  } catch (error) {
+    console.error('获取当前监测点天气数据失败:', error)
+    throw error
+  }
 }

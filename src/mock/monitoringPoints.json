@@ -1,0 +1,102 @@
+[
+  {
+    "id": "point-1",
+    "name": "中心起降坪",
+    "type": "takeoff",
+    "location": "中部区域-1号区域",
+    "coordinates": [116.3975, 39.9085],
+    "status": "available",
+    "warningReason": "",
+    "lastUpdate": 1640995200000
+  },
+  {
+    "id": "point-2",
+    "name": "东区起降点",
+    "type": "takeoff",
+    "location": "东部区域-3号区域",
+    "coordinates": [116.45, 39.92],
+    "status": "available",
+    "warningReason": "",
+    "lastUpdate": 1640996400000
+  },
+  {
+    "id": "point-3",
+    "name": "西区作业点",
+    "type": "operation",
+    "location": "西部区域-5号区域",
+    "coordinates": [116.35, 39.91],
+    "status": "warning",
+    "warningReason": "信号强度不稳定",
+    "lastUpdate": 1640997300000
+  },
+  {
+    "id": "point-4",
+    "name": "南区起降坪",
+    "type": "takeoff",
+    "location": "南部区域-2号区域",
+    "coordinates": [116.40, 39.85],
+    "status": "available",
+    "warningReason": "",
+    "lastUpdate": 1640988000000
+  },
+  {
+    "id": "point-5",
+    "name": "北区作业点",
+    "type": "operation",
+    "location": "北部区域-4号区域",
+    "coordinates": [116.38, 39.98],
+    "status": "unavailable",
+    "warningReason": "设备维护中",
+    "lastUpdate": 1640916000000
+  },
+  {
+    "id": "point-6",
+    "name": "机场专用起降点",
+    "type": "takeoff",
+    "location": "中部区域-7号区域",
+    "coordinates": [116.41, 39.90],
+    "status": "warning",
+    "warningReason": "温度异常",
+    "lastUpdate": 1640998200000
+  },
+  {
+    "id": "point-7",
+    "name": "工业区作业点",
+    "type": "operation",
+    "location": "南部区域-8号区域",
+    "coordinates": [116.43, 39.83],
+    "status": "available",
+    "warningReason": "",
+    "lastUpdate": 1640996800000
+  },
+  {
+    "id": "point-8",
+    "name": "商业区起降点",
+    "type": "takeoff",
+    "location": "东部区域-1号区域",
+    "coordinates": [116.47, 39.93],
+    "status": "available",
+    "warningReason": "",
+    "lastUpdate": 1640998500000
+  },
+  {
+    "id": "point-9",
+    "name": "住宅区作业点",
+    "type": "operation",
+    "location": "北部区域-2号区域",
+    "coordinates": [116.36, 39.96],
+    "status": "available",
+    "warningReason": "",
+    "lastUpdate": 1640994300000
+  },
+  {
+    "id": "point-10",
+    "name": "港口起降坪",
+    "type": "takeoff",
+    "location": "西部区域-9号区域",
+    "coordinates": [116.32, 39.90],
+    "status": "unavailable",
+    "warningReason": "强风天气",
+    "lastUpdate": 1640998440000
+  }
+]

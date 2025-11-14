@@ -97,8 +97,9 @@ body {
   z-index: 10;
 
 }
-.left-long-panel{
-   width: 400px;
+
+.left-long-panel {
+  width: 400px;
   position: absolute;
   top: 72px;
   left: 35px;
@@ -188,6 +189,18 @@ body {
   justify-content: center;
   align-items: center;
   z-index: 1000; // 最高层级
+  transition: opacity 0.3s ease;
+
+  .dialog-container {
+    transform: scale(0.95);
+    transition: transform 0.3s ease;
+  }
+
+  &.fade-in {
+    .dialog-container {
+      transform: scale(1);
+    }
+  }
 }
 
 // 弹窗容器
@@ -293,12 +306,17 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
   background: rgba(0, 0, 0, 0.2);
+  font-family: 'aideepFont';
+  font-style: normal;
 }
 
 .table-body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  font-family: 'aideepFont';
+  font-style: normal;
+
 }
 
 .table-body::-webkit-scrollbar {
