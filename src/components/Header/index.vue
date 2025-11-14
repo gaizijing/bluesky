@@ -2,10 +2,29 @@
   <header class="layout-header">
     <div class="logo-text">{{ appTitle }}</div>
     <div class="header-right">
+      <div class="weather-info">
+        <div class="weather-item">
+          <img src="@/assets/icons/ic_temperature.png" class="weather-icon" />
+          <span class="weather-value">25°C</span>
+        </div>
+        <div class="weather-item">
+          <img src="@/assets/icons/ic_windspeed.png" class="weather-icon" />
+          <span class="weather-value">3.5m/s</span>
+        </div>
+        <div class="weather-item">
+          <img src="@/assets/icons/ic_visibility.png" class="weather-icon" />
+          <span class="weather-value">10km</span>
+        </div>
+        <div class="weather-item">
+          <img src="@/assets/icons/ic_humidity.png" class="weather-icon" />
+          <span class="weather-value">0mm</span>
+        </div>
+      </div>
       <div class="current-time">{{ currentTime }}</div>
       <el-dropdown trigger="click">
         <div class="user-info">
-          <el-avatar :icon="UserFilled" class="user-avatar" />
+          <!-- 将原来的 el-avatar 替换为使用 ic_user.png 图片 -->
+          <img src="@/assets/icons/ic_user.png" class="user-avatar" />
         </div>
         <template #dropdown>
           <el-dropdown-menu>
@@ -72,6 +91,7 @@ const handleLogout = () => {
     width: auto;
   }
 }
+
 .logo-text {
   font-size: $font-size-title;
   margin: 0 auto;
@@ -87,11 +107,40 @@ const handleLogout = () => {
   gap: 20px;
   text-shadow: 0 0 6px rgba(34, 101, 255, 0.3), 0 0 12px #182e3f;
   font-size: $font-size-medium;
-  .user-avatar {
-    background-color: $primary;
-  }
 }
+
+.weather-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 0 15px;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.weather-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.weather-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.weather-value {
+  font-size: $font-size-small;
+}
+
 .custom-icon {
   width: 30px; /* 图标宽度（根据实际图标大小调整） */
+}
+
+// 在原有的样式部分添加或修改
+.user-avatar {
+  width: 40px;  
+}
+.current-time{
+  width: 150px;
 }
 </style>

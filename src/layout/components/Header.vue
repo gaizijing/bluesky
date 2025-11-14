@@ -109,9 +109,6 @@ onMounted(() => {
     cursor: pointer;
     color: #fff;
 
-    .user-avatar {
-      background-color: $primary;
-    }
   }
 }
 </style>

@@ -6,14 +6,6 @@
       :key="groupIndex"
       class="element-group"
     >
-      <!-- <div class="element-type">
-        <img
-          src="@/assets/icons/ic_weater_type.png"
-          alt=""
-          class="element-type-icon"
-        />
-        {{ group.title }}
-      </div> -->
 
       <div class="selector-group">
         <div
@@ -29,12 +21,12 @@
           @mouseleave="handleHover(groupIndex, index, false)"
         >
           <span class="btn-text">{{ item.label }}</span>
+          <div v-if="isSelected(item.value)" class="active-indicator"></div>
         </div>
       </div>
     </div>
   </div>
 </template>
-
 <script setup>
 import { ref, defineProps, defineEmits, computed } from "vue";
 import {
@@ -67,11 +59,13 @@ const optionGroups = computed(() => [
     title: "单要素气象",
     options: props.commonOptions,
     isLongBtn: false,
+    icon: "icon-single-weather"
   },
   {
     title: "精细化气象",
     options: props.fineOptions,
     isLongBtn: true,
+    icon: "icon-fine-weather"
   },
 ]);
 
@@ -104,63 +98,148 @@ const handleSelect = (value) => {
   emit("update:modelValue", newSelected);
 };
 </script>
-
 <style scoped lang="scss">
 .weather-element-selector {
   box-sizing: border-box;
-  font-family: "AiDeepFont";
-  margin-left: 10px;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+
 }
 
 .element-group {
   &:not(:first-child) {
-    margin-top: 10px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
   }
 }
 
 .element-type {
-  font-size: 16px;
-  height: 30px;
   display: flex;
   align-items: center;
-  color: #40ecff;
-
-  &-icon {
-    width: 30px;
+  margin-bottom: 15px;
+  
+  &-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #00c6ff, #0072ff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     margin-right: 10px;
+    box-shadow: 0 2px 8px rgba(0, 114, 255, 0.3);
+  }
+  
+  .type-icon {
+    font-size: 14px;
+    color: white;
+  }
+  
+  &-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #40ecff;
+    letter-spacing: 1px;
+    text-shadow: 0 0 8px rgba(64, 236, 255, 0.3);
   }
 }
 
 .selector-group {
-  // display: flex;
-  // flex-wrap: wrap;
-  // gap: 12px;
-  // align-content: center;
-  // justify-content: center;
+  display: grid;
+  gap: 8px;
 }
 
 .element-btn {
+  position: relative;
   display: flex;
-  margin-top: 10px;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  border: 1px solid #637274;
-  transition: all 0.2s ease;
-  color: #637274;
-  font-family: "heitiFont";
-  font-size: 18px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #8aa0b8;
+  font-family: "Microsoft YaHei", sans-serif;
+  font-size: 14px;
   text-align: center;
+  border-radius: 8px;
+  background: rgba(30, 40, 70, 0.6);
+  border: 1px solid rgba(100, 150, 200, 0.3);
+  min-height: 30px;
+  
   &:hover {
-    transform: scale(1.05);
-    filter: brightness(1.1);
-    box-shadow: 0 0 8px rgba(64, 158, 255, 0.3);
+    transform: translateY(-2px);
+    background: rgba(40, 100, 180, 0.4);
+    border-color: rgba(100, 180, 255, 0.5);
+    box-shadow: 0 4px 15px rgba(0, 150, 255, 0.2);
+    color: #a0d0ff;
   }
 
   &--active {
+    background: linear-gradient(135deg, rgba(0, 198, 255, 0.2), rgba(0, 114, 255, 0.3));
     color: #40ecff;
-    border: 1px solid #40ecff;
-    filter: brightness(0.8) contrast(1.1);
+    border: 1px solid rgba(64, 236, 255, 0.6);
+    box-shadow: 0 0 15px rgba(64, 236, 255, 0.3);
+    
+    .btn-text {
+      font-weight: 600;
+      text-shadow: 0 0 8px rgba(64, 236, 255, 0.5);
+    }
+  }
+  
+  &.element-long-btn {
+    grid-column: span 2;
+  }
+  
+  .btn-text {
+    position: relative;
+    z-index: 2;
+    transition: all 0.2s ease;
+  }
+}
+
+.active-indicator {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  background: #00c6ff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #00c6ff;
+  border: 2px solid rgba(15, 23, 51, 0.8);
+  z-index: 3;
+  
+  &::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    bottom: 2px;
+    background: white;
+    border-radius: 50%;
+  }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+  .weather-element-selector {
+    padding: 15px 10px;
+    margin-left: 5px;
+  }
+  
+  .selector-group {
+    grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+    gap: 8px;
+  }
+  
+  .element-btn {
+    padding: 10px 6px;
+    font-size: 13px;
+    min-height: 38px;
+  }
+  
+  .element-type-text {
+    font-size: 15px;
   }
 }
 </style>

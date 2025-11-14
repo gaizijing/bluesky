@@ -1,0 +1,97 @@
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "updateTime": "2025-11-03 10:40:00",
+    "warnings": [
+      {
+        "id": "RW20251103001",
+        "level": "danger",
+        "type": "强风",
+        "area": "A机场周边10km",
+        "startTime": "10:05:00",
+        "endTime": "11:30:00",
+        "detail": "当前风速14.8m/s，预计10:30后增至18m/s，超过多数机型限制",
+        "suggestion": "暂停该区域所有飞行任务，已起飞的立即返航",
+        "handleStatus": "unhandled"
+      },
+      {
+        "id": "RW20251103002",
+        "level": "warning",
+        "type": "低能见度",
+        "area": "B货运站至C工业园区航线",
+        "startTime": "11:00:00",
+        "endTime": "13:00:00",
+        "detail": "预计能见度将从5.2km降至2.5km，接近小型无人机限制阈值",
+        "suggestion": "小型无人机暂停飞行，大型飞行器需开启辅助导航",
+        "handleStatus": "unhandled"
+      },
+      {
+        "id": "RW20251103003",
+        "level": "info",
+        "type": "温度骤降",
+        "area": "D变电站周边5km",
+        "startTime": "14:00:00",
+        "endTime": "15:00:00",
+        "detail": "14时后温度将下降5℃，可能导致电池性能下降10%-15%",
+        "suggestion": "提前更换满电电池，缩短单次飞行时间",
+        "handleStatus": "handled"
+      },
+      {
+        "id": "RW20251103004",
+        "level": "danger",
+        "type": "湍流",
+        "area": "沿海搜救点附近",
+        "startTime": "10:30:00",
+        "endTime": "12:00:00",
+        "detail": "监测到中度湍流，垂直气流速度达3.5m/s，对低空飞行器有显著影响",
+        "suggestion": "救援任务调整航线，绕行湍流区域，高度提升至600m以上",
+        "handleStatus": "unhandled"
+      },
+      {
+        "id": "RW20251103005",
+        "level": "warning",
+        "type": "湿度超标",
+        "area": "G农场至H仓库航线",
+        "startTime": "09:00:00",
+        "endTime": "11:00:00",
+        "detail": "当前湿度85%，超过农业无人机安全阈值（80%）",
+        "suggestion": "暂停农药喷洒等作业，仅执行必要运输任务",
+        "handleStatus": "handled"
+      },
+      {
+        "id": "RW20251103006",
+        "level": "info",
+        "type": "云底高度下降",
+        "area": "I桥梁站周边3km",
+        "startTime": "13:30:00",
+        "endTime": "16:00:00",
+        "detail": "云底高度将从800m降至500m，不影响多数巡检任务",
+        "suggestion": "保持通信畅通，避开浓云区域",
+        "handleStatus": "handled"
+      },
+      {
+        "id": "RW20251103007",
+        "level": "warning",
+        "type": "风切变",
+        "area": "J飞行学院训练空域",
+        "startTime": "10:15:00",
+        "endTime": "11:45:00",
+        "detail": "监测到轻度风切变（水平风速变化4m/s），对新手训练有一定风险",
+        "suggestion": "暂停新手训练，仅安排熟练飞行员执行任务",
+        "handleStatus": "unhandled"
+      },
+      {
+        "id": "RW20251103008",
+        "level": "danger",
+        "type": "短时强降雨",
+        "area": "山区救援点周边8km",
+        "startTime": "11:00:00",
+        "endTime": "11:30:00",
+        "detail": "预计11时将出现短时强降雨，能见度骤降至0.5km",
+        "suggestion": "救援任务需在11前撤离该区域，待降雨结束后再进入",
+        "handleStatus": "unhandled"
+      }
+    ]
+  }
+}

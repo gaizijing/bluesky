@@ -25,7 +25,11 @@ export const routes = [
         }
       }
     ]
-  },
+  },{
+     path: '/test',
+    name: 'test',
+    component: () => import('@/pages/test.vue'),
+  }
 //   {
 //     path: '/error',
 //     name: 'Error',

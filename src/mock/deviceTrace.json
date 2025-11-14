@@ -1,0 +1,30 @@
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "updateTime": "2025-11-03 10:20:00",
+    "devices": [
+      {
+        "id": "DEV001",
+        "name": "机场东超声风速仪",
+        "status": "normal", 
+        "lastCalibration": "2025-10-15 09:30:00", 
+        "blockchainHash": "0x7a3f...8d2e", 
+        "faultRecord": null 
+      },
+      {
+        "id": "DEV002",
+        "name": "毫米波测云仪（城郊）",
+        "status": "fault",
+        "lastCalibration": "2025-10-20 14:15:00",
+        "blockchainHash": "0x2b9c...5a7d",
+        "faultRecord": {
+          "time": "2025-11-03 08:45:00",
+          "reason": "激光发射器故障",
+          "handler": "运维组-张三",
+          "repairStatus": "处理中"
+        }
+      }
+    ]
+  }
+}

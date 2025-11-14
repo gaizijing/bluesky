@@ -1,0 +1,63 @@
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "updateTime": "2025-11-03 10:00:00",
+    "indicators": [
+      {
+        "id": "temp",
+        "name": "气温",
+        "value": 25.6,
+        "unit": "℃",
+        "precision": "±0.2℃",
+        "status": "normal",
+        "threshold": { "warning": 30, "danger": 35 }
+      },
+      {
+        "id": "humidity",
+        "name": "湿度",
+        "value": 68,
+        "unit": "%RH",
+        "precision": "±3%",
+        "status": "normal",
+        "threshold": { "warning": 85, "danger": 95 }
+      },
+      {
+        "id": "windSpeed",
+        "name": "风速",
+        "value": 14.8,
+        "unit": "m/s",
+        "precision": "±0.1m/s",
+        "status": "warning",
+        "threshold": { "warning": 15, "danger": 20 }
+      },
+      {
+        "id": "visibility",
+        "name": "能见度",
+        "value": 5.2,
+        "unit": "km",
+        "precision": "1km分辨率",
+        "status": "normal",
+        "threshold": { "warning": 3, "danger": 1 }
+      },
+      {
+        "id": "cloudBase",
+        "name": "云底高度",
+        "value": 800,
+        "unit": "m",
+        "precision": "±10m",
+        "status": "normal",
+        "threshold": { "warning": 500, "danger": 300 }
+      },
+      {
+        "id": "precipitation",
+        "name": "降水量",
+        "value": 0.0,
+        "unit": "mm",
+        "precision": "±1%",
+        "status": "normal",
+        "threshold": { "warning": 5, "danger": 10 }
+      }
+    ]
+  }
+}

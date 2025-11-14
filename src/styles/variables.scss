@@ -51,13 +51,15 @@ $shadow-enhanced: 0 6px 20px rgba(15, 23, 51, 0.5);  // 增强阴影效果
 $border-radius-unified: 8px;              // 统一圆角
 
 
-// 左侧面板各模块高度百分比
+// 左侧面板各模块
+$left-panel-width: 25%;
 $left-panel-core-elements-height: 20%;           // 核心要素模块高度
 $left-panel-micro-weather-height: 30%;           // 微尺度天气模块高度
 $left-panel-vertical-profile-height: 30%;       // 垂直剖面模块高度
 $left-panel-device-traceability-height: 20%;    // 设备溯源模块高度
 
 // 右侧面板各模块高度百分比
+$right-panel-width: 25%;
 $right-panel-flight-mission-height: 35%;         // 飞行任务模块高度
 $right-panel-aircraft-weather-height: 35%;      // 飞行器气象适配模块高度
 $right-panel-risk-warning-height: 30%;          // 风险预警模块高度

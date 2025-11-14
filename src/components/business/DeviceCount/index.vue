@@ -1,8 +1,6 @@
 <template>
   <div>
-    <div class="panel-header">
-      <span class="panel-title">设备运行状态</span>
-    </div>
+   
     <div class="panel-subtitle">设备标题</div>
     <div class="device-count-content">
       <div
@@ -142,6 +140,6 @@ const deviceStatus = ref([
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
-  height: 60px;
+  height: 70px;
 }
 </style>

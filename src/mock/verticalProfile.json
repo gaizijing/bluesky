@@ -1,0 +1,30 @@
+{
+  "code": 200,
+  "data": {
+    "updateTime": "2025-11-03 10:35:22",
+    "heightLayers": [ 
+      { "height": 0, "windSpeed": 5.2, "temperature": 25.3, "humidity": 65, "visibility": 8.5 },
+      { "height": 100, "windSpeed": 6.8, "temperature": 24.8, "humidity": 62, "visibility": 8.2 },
+      { "height": 200, "windSpeed": 7.5, "temperature": 24.1, "humidity": 60, "visibility": 8.0 },
+      { "height": 300, "windSpeed": 8.5, "temperature": 23.5, "humidity": 58, "visibility": 7.8 },
+      { "height": 400, "windSpeed": 8.2, "temperature": 23.0, "humidity": 56, "visibility": 7.5 },
+      { "height": 500, "windSpeed": 7.9, "temperature": 22.5, "humidity": 55, "visibility": 7.2 },
+      { "height": 600, "windSpeed": 14.3, "temperature": 21.8, "humidity": 53, "visibility": 6.8 }, 
+      { "height": 700, "windSpeed": 15.7, "temperature": 21.0, "humidity": 50, "visibility": 6.5 }, 
+      { "height": 800, "windSpeed": 16.2, "temperature": 20.2, "humidity": 48, "visibility": 6.0 }, 
+      { "height": 900, "windSpeed": 12.5, "temperature": 19.5, "humidity": 45, "visibility": 5.8 },
+      { "height": 1000, "windSpeed": 10.8, "temperature": 18.8, "humidity": 42, "visibility": 5.5 }
+    ],
+    "safetyThresholds": { 
+      "windSpeed": 12, 
+      "temperature": [-10, 35], 
+      "humidity": 90, 
+      "visibility": 1.5 
+    },
+    "currentTask": { 
+      "taskId": "FT20251103001",
+      "requiredHeightRange": [200, 500], 
+      "taskType": "救援"
+    }
+  }
+}

@@ -1,17 +1,12 @@
 <template>
-  <div class="panel-header">
-          <span class="panel-title">区域监测</span>
-        </div>
-  <div class="dot-indicator">
+  <div class="region-main"> 
+     <div class="dot-indicator">
     <span
       class="score-dot-indicator"
       :class="`score-dot-indicator--green`"
     ></span
     >适飞
-    <span
-      class="score-dot-indicator"
-      :class="`score-dot-indicator--red`"
-    ></span
+    <span class="score-dot-indicator" :class="`score-dot-indicator--red`"></span
     >不适飞
   </div>
   <div
@@ -48,6 +43,8 @@
       </div>
     </div>
   </div>
+  </div>
+ 
 </template>
 
 <script setup>
@@ -71,7 +68,7 @@ const props = defineProps({
 
 // 使用store
 const regionStore = useRegionStore();
-regionStore.setSelectedRegion(mockRegionMonitorData[0],0)
+regionStore.setSelectedRegion(mockRegionMonitorData[0], 0);
 // 响应式数据
 const activeIndex = ref(-1);
 const next12Hours = ref([]);
@@ -110,6 +107,9 @@ const getScoreColorClass = (score) => {
 </script>
 
 <style scoped lang="scss">
+.region-main{height: 400px;
+ 
+}
 .region-container {
   font-family: "AiDeepFont";
   color: $text-light;
@@ -132,7 +132,7 @@ const getScoreColorClass = (score) => {
   }
 }
 .dot-indicator {
-  position: absolute;
+  position: relative;
   top: 10px;
   color: #fff;
   left: 250px;
@@ -140,6 +140,8 @@ const getScoreColorClass = (score) => {
   font-family: "AiDeepFont";
   display: flex;
   align-items: center;
+  top: 0px;
+  height: 25px;
 }
 .region-title {
   display: flex;

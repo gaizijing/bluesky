@@ -1,7 +1,5 @@
 <template>
-   <div class="panel-header">
-          <span class="panel-title">{{ regionDetail.regionName }}详情</span>
-        </div>
+
   <div class="region-weather-detail">
     <el-collapse
       v-model="activeName"
@@ -83,9 +81,6 @@ const props = defineProps({
     default: () => ({}),
   },
 });
-watch((regionDetail) => {
-  console.log(regionDetail);
-});
 const next12Hours = ref([]);
 // 添加一个函数来获取时间标签
 const getTimeLabel = (index) => {
@@ -107,8 +102,7 @@ onMounted(() => {
 .region-weather-detail {
   color: $text-light;
   font-family: "AiDeepFont";
-  padding: 10px 24px 10px 10px;
-
+  height: 350px;
   :deep(.region-weather-detail__collapse) {
     background: transparent;
 

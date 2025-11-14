@@ -1,0 +1,124 @@
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "updateTime": "2025-11-03 10:35:00",
+    "currentMeteorology": {
+      "windSpeed": 14.8,
+      "visibility": 5.2,
+      "cloudBase": 800
+    },
+    "aircrafts": [
+      {
+        "id": "AC001",
+        "type": "贝尔407",
+        "limits": {
+          "maxWindSpeed": 15,
+          "minVisibility": 1.5,
+          "minCloudBase": 300
+        },
+        "adaptResult": "适配",
+        "adaptReason": "所有气象参数均符合限制"
+      },
+      {
+        "id": "AC002",
+        "type": "大疆M600",
+        "limits": {
+          "maxWindSpeed": 8,
+          "minVisibility": 0.5,
+          "minCloudBase": 50
+        },
+        "adaptResult": "不适配",
+        "adaptReason": "当前风速14.8m/s＞限制8m/s"
+      },
+      {
+        "id": "AC003",
+        "type": "亿航EH216",
+        "limits": {
+          "maxWindSpeed": 12,
+          "minVisibility": 3,
+          "minCloudBase": 100
+        },
+        "adaptResult": "不适配",
+        "adaptReason": "当前风速14.8m/s＞限制12m/s"
+      },
+      {
+        "id": "AC004",
+        "type": "罗宾逊R44",
+        "limits": {
+          "maxWindSpeed": 14,
+          "minVisibility": 2,
+          "minCloudBase": 200
+        },
+        "adaptResult": "不适配",
+        "adaptReason": "当前风速14.8m/s＞限制14m/s"
+      },
+      {
+        "id": "AC005",
+        "type": "空客H135",
+        "limits": {
+          "maxWindSpeed": 20,
+          "minVisibility": 1,
+          "minCloudBase": 150
+        },
+        "adaptResult": "适配",
+        "adaptReason": "所有气象参数均符合限制"
+      },
+      {
+        "id": "AC006",
+        "type": "极飞P100",
+        "limits": {
+          "maxWindSpeed": 6,
+          "minVisibility": 0.8,
+          "minCloudBase": 30
+        },
+        "adaptResult": "不适配",
+        "adaptReason": "当前风速14.8m/s＞限制6m/s"
+      },
+      {
+        "id": "AC007",
+        "type": "中直AC311",
+        "limits": {
+          "maxWindSpeed": 16,
+          "minVisibility": 2,
+          "minCloudBase": 250
+        },
+        "adaptResult": "适配",
+        "adaptReason": "所有气象参数均符合限制"
+      },
+      {
+        "id": "AC008",
+        "type": "赛斯纳172",
+        "limits": {
+          "maxWindSpeed": 18,
+          "minVisibility": 5,
+          "minCloudBase": 500
+        },
+        "adaptResult": "适配",
+        "adaptReason": "所有气象参数均符合限制"
+      },
+      {
+        "id": "AC009",
+        "type": "波音CH-47",
+        "limits": {
+          "maxWindSpeed": 25,
+          "minVisibility": 3,
+          "minCloudBase": 400
+        },
+        "adaptResult": "适配",
+        "adaptReason": "所有气象参数均符合限制"
+      },
+      {
+        "id": "AC010",
+        "type": "彩虹-4无人机",
+        "limits": {
+          "maxWindSpeed": 10,
+          "minVisibility": 1,
+          "minCloudBase": 100
+        },
+        "adaptResult": "不适配",
+        "adaptReason": "当前风速14.8m/s＞限制10m/s"
+      }
+    ]
+  }
+}

@@ -76,20 +76,33 @@ export const BASE_LAYER_TYPES = {
   SATELLITE: 'satellite',      // 卫星地图
   TERRAIN: 'terrain'           // 地形地图
 }
-export const MODULES = {
-  DEVICE_MONITOR: 'deviceMonitor',
-  REGION_MONITOR: 'regionMonitor',
-  FLIGHT_ANALYSIS: 'flightAnalysis'
-};
 
-export const MODULE_LABELS = {
-  [MODULES.DEVICE_MONITOR]: '设备监控',
-  [MODULES.REGION_MONITOR]: '感知分析',
-  [MODULES.FLIGHT_ANALYSIS]: '飞行分析'
-};
+
 // src/constants/dashboardModules.js
 export const DASHBOARD_MODULES = {
   DEVICE_MONITOR: 'deviceMonitor',
   REGION_MONITOR: 'regionMonitor',
-  FLIGHT_ANALYSIS: 'flightAnalysis'
+  FLIGHT_ANALYSIS: 'flightAnalysis',
+  LANDING_MONITOR: 'mapController'
+
 };
+export const MODULE_LIST = [
+  {
+    key: DASHBOARD_MODULES.DEVICE_MONITOR,
+    name: "设备监测",
+  },
+  {
+    key: DASHBOARD_MODULES.LANDING_MONITOR,
+    name: "低空气象态势",
+  },
+  // {
+  //   key: DASHBOARD_MODULES.REGION_MONITOR,
+  //   name: "空域气象",
+  // },
+
+  {
+    key: DASHBOARD_MODULES.FLIGHT_ANALYSIS,
+    name: "飞行分析",
+  },
+  
+];

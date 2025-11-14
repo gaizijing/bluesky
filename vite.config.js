@@ -17,25 +17,25 @@ export default defineConfig(({ mode }) => {
       cesium(),
       // 自动导入 Element Plus 工具类（如 ElMessage、ElMessageBox 等）
       AutoImport({
-      resolvers: [
-        // 自动导入 Element Plus 组件和图标
-        ElementPlusResolver({
-          importStyle: 'css',
-          // 关键：开启自动导入图标
-          directives: true,
-          version: '^2.3.0'
-        })
-      ]
-    }),
-    Components({
-      resolvers: [
-        ElementPlusResolver({
-          importStyle: 'css',
-          // 关键：开启图标自动注册
-          include: [/^El[A-Z]/, /^ElIcon/], // 包含图标组件
-        })
-      ]
-    })
+        resolvers: [
+          // 自动导入 Element Plus 组件和图标
+          ElementPlusResolver({
+            importStyle: 'css',
+            // 关键：开启自动导入图标
+            directives: true,
+            version: '^2.3.0'
+          })
+        ]
+      }),
+      Components({
+        resolvers: [
+          ElementPlusResolver({
+            importStyle: 'css',
+            // 关键：开启图标自动注册
+            include: [/^El[A-Z]/, /^ElIcon/], // 包含图标组件
+          })
+        ]
+      })
     ],
     resolve: {
       alias: {
@@ -88,7 +88,7 @@ export default defineConfig(({ mode }) => {
           // 全局引入变量文件，使用路径别名 @ 表示 src 目录
           additionalData: `@use "@/styles/variables.scss" as *;`,
         },
-      },
+      }
     },
   }
 })

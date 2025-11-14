@@ -9,6 +9,8 @@
       </div>
     </div>
 
+    <!-- 2. 蒙版背景图（新增） -->
+    <div class="mask-overlay"></div>
     <!-- 2. 顶部面板 -->
     <div class="top-panel">
       <Header />
@@ -18,78 +20,180 @@
     <div class="control-panel">
       <div
         class="control-item"
-        @click="currentModule = DASHBOARD_MODULES.DEVICE_MONITOR"
-        :class="{
-          selected: currentModule === DASHBOARD_MODULES.DEVICE_MONITOR,
-        }"
+        v-for="module in MODULE_LIST"
+        :key="module.key"
+        @click="switchModule(module.key)"
+        :class="{ selected: currentModule === module.key }"
       >
-        设备监控
-      </div>
-      <div
-        class="control-item"
-        @click="currentModule = DASHBOARD_MODULES.REGION_MONITOR"
-        :class="{
-          selected: currentModule === DASHBOARD_MODULES.REGION_MONITOR,
-        }"
-      >
-        感知分析
-      </div>
-      <div
-        class="control-item"
-        @click="currentModule = DASHBOARD_MODULES.FLIGHT_ANALYSIS"
-        :class="{
-          selected: currentModule === DASHBOARD_MODULES.FLIGHT_ANALYSIS,
-        }"
-      >
-        飞行分析
+        <i :class="module.icon" class="module-icon"></i>
+        <span class="module-text">{{ module.name }}</span>
       </div>
     </div>
 
     <!-- 4. 模块显示区域 -->
-    <!-- 感知分析模块 -->
-    <div v-show="currentModule === DASHBOARD_MODULES.REGION_MONITOR">
-      <div class="main-panel left-panel">
-        <div class="panel-content">
-          <region-moniter-list />
+    <!-- 区域监测模块 -->
+    <transition name="module-fade" mode="out-in">
+      <div v-show="currentModule === DASHBOARD_MODULES.REGION_MONITOR">
+        <div class="left-panel">
+          <div class="main-panel left_bg">
+            <div class="panel-header">
+              <span class="panel-title">核心区域</span>
+            </div>
+            <div class="panel-content">
+              <region-moniter-list />
+            </div>
+          </div>
+          <div class="main-panel left_bg">
+            <div class="panel-header">
+              <span class="panel-title"
+                >{{ selectedRegionDetail.regionName }}详情</span
+              >
+            </div>
+            <div class="panel-content">
+              <region-detail :regionDetail="selectedRegionDetail" />
+              <!-- <div class="weather-panel">
+                <weather-element-selector v-model="currentElement" />
+              </div> -->
+            </div>
+          </div>
         </div>
-      </div>
+        <div class="right-panel">
+          <div class="main-panel right_bg">
+            <div class="panel-header">
+              <span class="panel-title">垂直</span>
+            </div>
+            <div class="panel-content"><WeatherFlightHeatmap /></div>
+          </div>
 
-      <div class="main-panel right-panel">
-        <!-- 面板标题栏-->
-       
-        <!-- 面板内容（收起时隐藏） -->
-        <div class="panel-content">
-          <region-detail :regionDetail="selectedRegionDetail" />
+          <div class="main-panel right_bg">
+            <div class="panel-header">
+              <span class="panel-title">微尺度天气</span>
+            </div>
+            <div class="panel-content"><MicroscaleWeather /></div>
+          </div>
         </div>
       </div>
-    </div>
+    </transition>
 
     <!-- 飞行分析模块 -->
-    <div v-show="currentModule === DASHBOARD_MODULES.FLIGHT_ANALYSIS">
-      <div class="main-panel weather-panel">
-        <weather-element-selector v-model="currentElement" />
+    <transition name="module-fade" mode="out-in">
+      <div v-show="currentModule === DASHBOARD_MODULES.FLIGHT_ANALYSIS">
+        <div class="left-panel">
+          <div class="main-panel left_bg">
+            <div class="panel-header">
+              <span class="panel-title">航路预警</span>
+            </div>
+            <div class="panel-content"><RouteList /></div>
+          </div>
+        </div>
+        <!-- <div class="right-panel">
+          <div class="main-panel right_bg">
+            <div class="panel-header">
+              <span class="panel-title">飞行任务监测</span>
+            </div>
+            <div class="panel-content">
+              <FlightTasks />
+            </div>
+          </div>
+          <div class="main-panel right_bg">
+            <div class="panel-header">
+              <span class="panel-title">飞行器适配</span>
+            </div>
+            <div class="panel-content"><AircraftAdapt /></div>
+          </div>
+        </div> -->
       </div>
-    </div>
-
+    </transition>
     <!-- 设备监控模块 -->
-    <div v-show="currentModule === DASHBOARD_MODULES.DEVICE_MONITOR">
-      <div class="main-panel left-panel">
-        <div class="panel-content">
-          <DeviceCount />
-          <EquipmentAlarm />
-          <SurveillanceFootage />
+    <transition name="module-fade" mode="out-in">
+      <div v-show="currentModule === DASHBOARD_MODULES.DEVICE_MONITOR">
+        <div class="left-panel">
+          <div class="main-panel left_bg">
+            <div class="panel-header">
+              <span class="panel-title">设备运行状态</span>
+            </div>
+            <div class="panel-content">
+              <DeviceCount />
+            </div>
+          </div>
+          <div class="main-panel left_bg">
+            <div class="panel-header">
+              <span class="panel-title">报警情况</span>
+            </div>
+            <div class="panel-content">
+              <EquipmentAlarm />
+            </div>
+          </div>
+        </div>
+        <div class="right-panel">
+          <!-- <div class="main-panel left_bg">
+            <div class="panel-header">
+              <span class="panel-title">设备列表</span>
+            </div>
+            <div class="panel-content"><DeviceTrace /></div>
+          </div> -->
+          <div class="main-panel right_bg">
+            <div class="panel-header">
+              <span class="panel-title">历史42h实况监测数据</span>
+            </div>
+            <div class="panel-content"><HistoryData /></div>
+          </div>
         </div>
       </div>
-      <div class="main-panel right-panel">
-        <div class="panel-content"><HistoryData /></div>
+    </transition>
+    <transition name="module-fade" mode="out-in">
+      <div v-show="currentModule === DASHBOARD_MODULES.LANDING_MONITOR">
+        <div class="left-panel">
+          <div class="main-panel left_bg">
+            <div class="panel-header">
+              <span class="panel-title">实时风象</span>
+            </div>
+            <div class="panel-content"><LandingPointCard /></div>
+          </div>
+           <div class="main-panel left_bg">
+            <div class="panel-header">
+              <span class="panel-title">未来风势预测</span>
+            </div>
+            <div class="panel-content">
+              <!-- <div style="display: flex;">
+<WindTrend /><WindProfileChart/>
+              </div> -->
+              <Wind />
+            </div>
+          </div>
+          <div class="main-panel left_bg">
+            <div class="panel-header">
+              <span class="panel-title">未来3h适飞分析</span>
+            </div>
+            <div class="panel-content"><WeatherFlightHeatmap /></div>
+          </div>
+         
+        </div>
+        <div class="right-panel">
+          <div class="main-panel right_bg">
+            <div class="panel-header">
+              <span class="panel-title">预警记录</span>
+            </div>
+            <div class="panel-content">
+              <RiskWarnings />
+            </div>
+          </div>
+
+          <div class="main-panel right_bg">
+            <div class="panel-header">
+              <span class="panel-title">实时监控</span>
+            </div>
+            <div class="panel-content"><SurveillanceFootage /></div>
+          </div>
+        </div>
       </div>
-    </div>
+    </transition>
   </div>
 </template>
-
 <script setup>
 import { ref, onMounted, watch, computed } from "vue";
-import { DASHBOARD_MODULES } from "@/config/constants.js";
+import { DASHBOARD_MODULES, MODULE_LIST } from "@/config/constants.js";
+import { useDashboardStore } from "@/store/modules/dashboard"; // 新增导入
 
 // 原有逻辑保留
 import { useWeatherStore } from "@/store/modules/weather";
@@ -104,27 +208,87 @@ import {
 
 // 组件导入
 import WeatherElementSelector from "@/components/business/WeatherElementSelector/index.vue";
-import RegionMoniterList from "@/components/business/RegionMoniterList/index.vue";
-import RegionDetail from "@/components/business/RegionDetail/index.vue";
-import Header from "@/components/Header/index.vue";
-import DeviceCount from "@/components/business/DeviceCount/index.vue";
-import EquipmentAlarm from "@/components/business/EquipmentAlarm/index.vue";
-import SurveillanceFootage from "@/components/business/SurveillanceFootage/index.vue";
-import HistoryData from "@/components/business/HistoryData/index.vue";
+// 在组件导入部分替换为异步导入
+import { defineAsyncComponent } from "vue";
+
+const RegionMoniterList = defineAsyncComponent(() =>
+  import("@/components/business/RegionMoniterList/index.vue")
+);
+const RegionDetail = defineAsyncComponent(() =>
+  import("@/components/business/RegionDetail/index.vue")
+);
+const DeviceCount = defineAsyncComponent(() =>
+  import("@/components/business/DeviceCount/index.vue")
+);
+const EquipmentAlarm = defineAsyncComponent(() =>
+  import("@/components/business/EquipmentAlarm/index.vue")
+);
+const SurveillanceFootage = defineAsyncComponent(() =>
+  import("@/components/business/SurveillanceFootage/index.vue")
+);
+const HistoryData = defineAsyncComponent(() =>
+  import("@/components/business/HistoryData/index.vue")
+);
+const CoreIndicators = defineAsyncComponent(() =>
+  import("@/components/business/CoreIndicators/index.vue")
+);
+const MicroscaleWeather = defineAsyncComponent(() =>
+  import("@/components/business/MicroscaleWeather/index.vue")
+);
+const FlightTasks = defineAsyncComponent(() =>
+  import("@/components/business/FlightTasks/index.vue")
+);
+const AircraftAdapt = defineAsyncComponent(() =>
+  import("@/components/business/AircraftAdapt/index.vue")
+);
+const WeatherFlightHeatmap = defineAsyncComponent(() =>
+  import("@/components/business/WeatherFlightHeatmap/index.vue")
+);
+const RiskWarnings = defineAsyncComponent(() =>
+  import("@/components/business/RiskWarnings/index.vue")
+);
+const WeatherWarnings = defineAsyncComponent(() =>
+  import("@/components/business/WeatherWarnings/index.vue")
+);
+const RouteList = defineAsyncComponent(() =>
+  import("@/components/business/RouteList/index.vue")
+);
+const LandingPointCard = defineAsyncComponent(() =>
+  import("@/components/business/LandingPointCard/index.vue")
+);
+const WindTrend = defineAsyncComponent(() =>
+  import("@/components/business/WindTrend/index.vue")
+);
+const Wind = defineAsyncComponent(() =>
+  import("@/components/business/Wind/index.vue")
+);
+const SystemMessage = defineAsyncComponent(() =>
+  import("@/components/business/SystemMessage/index.vue")
+);
+const MonitoringPoints = defineAsyncComponent(() =>
+  import("@/components/business/MonitoringPoints/index.vue")
+);
+const DeviceTrace = defineAsyncComponent(() =>
+  import("@/components/business/DeviceTrace/index.vue")
+);
+const WindProfileChart = defineAsyncComponent(() =>
+  import("@/components/business/WindProfileChart/index.vue")
+);
+const IndicatorPanel = defineAsyncComponent(() =>
+  import("@/components/map/IndicatorPanel/index.vue")
+);
+const LayerControl = defineAsyncComponent(() =>
+  import("@/components/map/LayerControl/index.vue")
+);
 import { useRegionStore } from "@/store/modules/region";
 import mockRegionWeatherData, {
   WEATHER_TYPE_LABELS,
   FLIGHT_CONDITIONS_THRESHOLD,
 } from "@/mock/regionWeatherData.js";
-const { isLoading: cesiumLoading } = useCesium("cesiumContainer"); // 修改这一行
 
-// 当前活动模块
-const currentModule = ref(DASHBOARD_MODULES.REGION_MONITOR);
-
-// 面板收起状态（默认收起）
-const isRegionCollapsed = ref(true);
-const isDeviceCollapsed = ref(true);
-const isWeatherCollapsed = ref(true);
+const { isLoading: cesiumLoading } = useCesium("cesiumContainer"); // 启用Cesium
+// 使用dashboard store
+const dashboardStore = useDashboardStore();
 
 // 原有状态保留
 const weatherStore = useWeatherStore();
@@ -138,11 +302,46 @@ const currentElement = ref(["temperature"]);
 const regionStore = useRegionStore();
 const selectedRegionDetail = ref([]);
 
+// 使用store中的currentModule
+const currentModule = computed({
+  get: () => dashboardStore.currentModule,
+  set: (value) => dashboardStore.switchModule(value),
+});
+
+// 面板收起状态（默认收起）
+const isRegionCollapsed = ref(true);
+const isDeviceCollapsed = ref(true);
+const isWeatherCollapsed = ref(true);
+
+// 左右面板显隐状态
+const isLeftPanelVisible = ref(true);
+const isRightPanelVisible = ref(true);
+
+// 切换左右面板显隐的方法
+const toggleLeftPanel = () => {
+  isLeftPanelVisible.value = !isLeftPanelVisible.value;
+};
+
+const toggleRightPanel = () => {
+  isRightPanelVisible.value = !isRightPanelVisible.value;
+};
+
 // 访问选中的区域数据
 const selectedRegion = computed(() => regionStore.selectedRegion);
 
+// 修改切换模块的方法
+const switchModule = (moduleKey) => {
+  console.log(moduleKey == currentModule.value);
+  if (moduleKey === currentModule.value) {
+    dashboardStore.switchModule("");
+  } else {
+    dashboardStore.switchModule(moduleKey);
+  }
+};
+
 // 原有业务方法保留
 const fetchWeatherData = async () => {
+
   try {
     const stats = await getWeatherStatistics({
       element: currentElement.value,
@@ -175,6 +374,7 @@ const fetchWeatherData = async () => {
 const fetchRegionWeatherDetail = (id) => {
   return mockRegionWeatherData.find((region) => region.regionId === id);
 };
+
 // 在 watch(currentModule...) 之前添加
 const initializeModuleState = (module) => {
   switch (module) {
@@ -197,9 +397,13 @@ const initializeModuleState = (module) => {
 };
 
 // 修改模块切换监听器
-watch(currentModule, (newModule) => {
-  initializeModuleState(newModule);
-});
+watch(
+  () => dashboardStore.currentModule,
+  (newModule) => {
+    initializeModuleState(newModule);
+  }
+);
+
 // 监听目标区域变化
 watch(
   () => regionStore.selectedRegion,
@@ -220,34 +424,36 @@ watch(
 watch(() => weatherStore.currentTime, fetchWeatherData);
 
 // 监听模块切换
-watch(currentModule, (newModule) => {
-  // 切换到感知分析模块时展开面板
-  if (newModule === DASHBOARD_MODULES.REGION_MONITOR) {
-    isRegionCollapsed.value = false;
-  } else {
-    isRegionCollapsed.value = true;
-  }
+watch(
+  () => dashboardStore.currentModule,
+  (newModule) => {
+    // 切换到区域监测模块时展开面板
+    if (newModule === DASHBOARD_MODULES.REGION_MONITOR) {
+      isRegionCollapsed.value = false;
+    } else {
+      isRegionCollapsed.value = true;
+    }
 
-  // 切换到飞行分析模块时展开面板
-  if (newModule === DASHBOARD_MODULES.FLIGHT_ANALYSIS) {
-    isWeatherCollapsed.value = false;
-  } else {
-    isWeatherCollapsed.value = true;
-  }
+    // 切换到飞行分析模块时展开面板
+    if (newModule === DASHBOARD_MODULES.FLIGHT_ANALYSIS) {
+      isWeatherCollapsed.value = false;
+    } else {
+      isWeatherCollapsed.value = true;
+    }
 
-  // 切换到设备监控模块时展开面板
-  if (newModule === DASHBOARD_MODULES.DEVICE_MONITOR) {
-    isDeviceCollapsed.value = false;
-  } else {
-    isDeviceCollapsed.value = true;
+    // 切换到设备监控模块时展开面板
+    if (newModule === DASHBOARD_MODULES.DEVICE_MONITOR) {
+      isDeviceCollapsed.value = false;
+    } else {
+      isDeviceCollapsed.value = true;
+    }
   }
-});
+);
 
 onMounted(() => {
   fetchWeatherData();
 });
 </script>
-
 <style scoped lang="scss">
 .dashboard-container {
   width: 100vw;
@@ -255,7 +461,19 @@ onMounted(() => {
   position: relative;
   overflow: hidden;
 }
-
+.mask-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5; /* 位于地图上方，其他面板下方 */
+  background: url("@/assets/images/bg_container.png");
+  background-size: cover;
+  background-position: center;
+  opacity: 0.7; /* 可调节透明度 */
+  pointer-events: none; /* 不阻挡鼠标事件 */
+}
 /* 地图容器（底层） */
 .map-container {
   position: absolute;
@@ -311,46 +529,72 @@ onMounted(() => {
 }
 
 /* 控制面板 */
+/* 替换原有的控制面板样式 */
 .control-panel {
   display: flex;
-  font-size: 18px;
-  font-family: "AiDeepFont";
+  gap: 12px;
   position: absolute;
-  top: 15px;
-  left: 12px;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 10;
+  padding: 8px;
 }
 
 .control-item {
-  width: 160px;
-  text-align: center;
-  background-image: url("@/assets/images/bg_control_pannel_item.png");
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: center;
-  color: $text-light;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 20px;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  color: #c0cde0;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: "jingangFont";
+
+  &:hover {
+    background: linear-gradient(135deg, #2a5298, #3a6bc0);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
 
   &.selected {
-    background-image: url("@/assets/images/bg_control_pannel_item_selected.png");
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-position: center;
-    color: #e0e8f0;
-    transform: scale(1.03);
-    filter: brightness(1.15);
+    background: linear-gradient(135deg, #00c6ff, #0072ff);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 114, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .module-icon {
+    font-size: 16px;
+  }
+
+  .module-text {
+    font-size: 16px;
+    font-weight: 500;
   }
 }
 
-
 .weather-panel {
-  right: 415px;
-  width: 76px;
-  height: 365px;
-  padding: 14px;
-  background-image: url(/src/assets/images/bg_weather_panel.png);
-  background-repeat: no-repeat;
+  position: absolute;
+  left: -100px;
+}
+/* 在样式部分添加动画样式 */
+.module-fade-enter-active,
+.module-fade-leave-active {
+  transition: all 0.3s ease;
 }
 
+.module-fade-enter-from {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+.module-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-30px);
+}
 </style>

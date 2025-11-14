@@ -1,9 +1,7 @@
 <!-- src/components/business/SurveillanceFootage/index.vue -->
 <template>
   <div class="surveillance-footage">
-    <div class="panel-header">
-      <span class="panel-title">实时监控画面</span>
-    </div>
+   
     
     <div class="camera-grid">
       <div 

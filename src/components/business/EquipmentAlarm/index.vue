@@ -1,10 +1,8 @@
 <!-- src/components/business/EquipmentAlarm/index.vue -->
 <template>
   <div>
-    <div class="panel-header">
-      <span class="panel-title">近七日设备报警情况</span>
-    </div>
-    <div ref="chart" style="width: 100%; height: 180px;"></div>
+  
+    <div ref="chart" style="width: 100%; height: 280px;"></div>
     
     <!-- 报警详情表格 -->
     <div class="alarm-details-container">
@@ -37,9 +35,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch,nextTick  } from "vue";
+
 // 导入 ECharts
 import * as echarts from 'echarts';
+import { useDashboardStore } from "@/store/modules/dashboard"; 
+const dashboardStore = useDashboardStore();
 
 const chart = ref(null); // 绑定 DOM 容器
 let myChart = null;
@@ -68,35 +69,32 @@ onMounted(() => {
   myChart = echarts.init(chart.value);
   
   // 配置图表选项
-  const option = {
-    xAxis: {
-      type: 'category',
-      data: ['10-29', '10-30', '10-31', '11-01', '11-02', '11-03', '11-04'], // 更实际的日期
-      axisLine: {
-        show: true,
-        lineStyle: {
-          color: '#ffffff'
-        }
-      },
-      axisTick: {
-        show: true,
-        lineStyle: {
-          color: '#ffffff'
-        }
-      },
-      axisLabel: {
+const option = {
+  xAxis: {
+    type: 'category',
+    data: ['10-29', '10-30', '10-31', '11-01', '11-02', '11-03', '11-04'],
+    axisLine: {
+      show: true,
+      lineStyle: {
         color: '#ffffff'
       }
     },
-    yAxis: {
+    axisTick: {
+      show: true,
+      lineStyle: {
+        color: '#ffffff'
+      }
+    },
+    axisLabel: {
+      color: '#ffffff'
+    }
+  },
+  yAxis: [
+    {
       type: 'value',
+      name: '报警次数',
+      position: 'left',
       axisLine: {
-        show: true, // 显示Y轴线
-        lineStyle: {
-          color: '#ffffff'
-        }
-      },
-      axisTick: {
         show: true,
         lineStyle: {
           color: '#ffffff'
@@ -106,47 +104,152 @@ onMounted(() => {
         color: '#ffffff'
       },
       splitLine: {
-        show: false // 取消横向分割线
+        show: false
       }
     },
-    series: [
-      {
-        data: [3, 1, 3, 1, 1, 1, 3], // 对应报警详情数据的统计
-        type: 'bar',
-        barWidth: '30%', // 调整柱子宽度
-        itemStyle: {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: '#3dd1ffba' }, // 上部颜色
-              { offset: 1, color: '#3dd1ff52' }  // 下部颜色
-            ]
-          },
-          borderRadius: [4, 4, 0, 0] // 柱子顶部圆角
-        },
-        barGap: '50%', // 柱子之间的间距
-        barCategoryGap: '30%', // 类别之间的间距
-        label: { // 修正属性名：label 而不是 Label
-          show: true,
-          position: 'top',
-          color: '#FFFFFF',
-          fontSize: 12,
-          fontWeight: 'bold'
+    {
+      type: 'value',
+      name: '在线率(%)',
+      position: 'right',
+      axisLine: {
+        show: true,
+        lineStyle: {
+          color: '#ffffff'
         }
-      }
-    ],
-    grid: {
-      left: '3%',
-      right: '3%',
-      top: '20%',
-      bottom: '0%',
-      containLabel: true
+      },
+      axisLabel: {
+        color: '#ffffff'
+      },
+      splitLine: {
+        show: false
+      },
+      min: 0,
+      max: 100
     }
-  };
+  ],
+  series: [
+    {
+      name: '报警次数',
+      data: [3, 1, 3, 1, 1, 1, 3],
+      type: 'bar',
+      barWidth: '20%',
+      itemStyle: {
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: '#3dd1ff' },
+            { offset: 1, color: '#3dd1ff' }
+          ]
+        },
+        borderRadius: [4, 4, 0, 0]
+      },
+      label: {
+        show: true,
+        position: 'top',
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold'
+      }
+    },
+    {
+      name: '设备在线率',
+      type: 'line',
+      yAxisIndex: 1,
+      data: [95, 98, 92, 96, 97, 99, 94],
+      smooth: true,
+      symbolSize: 8,
+      symbol: 'circle',
+      itemStyle: {
+        color: '#FFD700'
+      },
+      lineStyle: {
+        width: 1,
+        type: 'solid'
+      },
+      areaStyle: {
+        opacity: 0.1,
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: '#FFD700' },
+          { offset: 1, color: 'transparent' }
+        ])
+      },
+      label: {
+        show: true,
+        position: 'top',
+        color: '#FFD700',
+        fontSize: 12,
+        formatter: '{c}%'
+      }
+    },
+    {
+      name: '故障设备数',
+      type: 'line',
+      data: [1, 0, 2, 1, 0, 1, 2],
+      smooth: true,
+      symbolSize: 8,
+      symbol: 'diamond',
+      itemStyle: {
+        color: '#FF6347'
+      },
+      lineStyle: {
+        width: 1,
+        type: 'dashed'
+      },
+      areaStyle: {
+        opacity: 0.1,
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: '#FF6347' },
+          { offset: 1, color: 'transparent' }
+        ])
+      },
+      label: {
+        show: true,
+        position: 'top',
+        color: '#FF6347',
+        fontSize: 12
+      }
+    }
+  ],
+  grid: {
+    left: '3%',
+    right: '3%',
+    top: '30%',
+    bottom: '0%',
+    containLabel: true
+  },
+  tooltip: {
+    trigger: 'axis',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderColor: '#3dd1ff',
+    borderWidth: 1,
+    textStyle: {
+      color: '#ffffff'
+    },
+    formatter: function(params) {
+      let tooltipText = params[0].axisValueLabel + '<br/>';
+      params.forEach(item => {
+        if (item.seriesName === '设备在线率') {
+          tooltipText += `<span style="display:inline-block;margin-right:5px;border-radius:10px;width:10px;height:10px;background-color:${item.color};"></span>${item.seriesName}: ${item.value}%<br/>`;
+        } else {
+          tooltipText += `<span style="display:inline-block;margin-right:5px;border-radius:10px;width:10px;height:10px;background-color:${item.color};"></span>${item.seriesName}: ${item.value}<br/>`;
+        }
+      });
+      return tooltipText;
+    }
+  },
+  legend: {
+    show: true,
+    top: 'top',
+    textStyle: {
+      color: '#ffffff'
+    },
+    data: ['报警次数', '设备在线率', '故障设备数']
+  }
+};
   
   myChart.setOption(option);
 
@@ -196,13 +299,28 @@ const resetBarHighlight = () => {
 const selectRow = (index) => {
   selectedRowIndex.value = index;
 };
+watch(
+  () => dashboardStore.currentModule,
+  (newVal) => {
+    // 等待 DOM 更新
+    nextTick(() => {
+      // 如果图表已初始化，直接 resize；否则初始化图表
+      if (myChart) {
+        myChart.resize();
+      } else {
+        initChart();
+      }
+    });
+  }
+);
+
 </script>
 
 <style scoped lang="scss">
 
 
 .alarm-details-container {
-  height: 120px; // 固定高度
+  height: 250px; // 固定高度
   overflow: hidden;
   backdrop-filter: blur(10px);
   margin-left: 10px;
