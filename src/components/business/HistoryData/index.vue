@@ -46,7 +46,9 @@
 <script setup>
 import { ref, onMounted, watch, nextTick,onUnmounted } from "vue";
 import * as echarts from "echarts";
+import { useDashboardStore } from "@/store/modules/dashboard";
 
+const dashboardStore = useDashboardStore();
 // 测点配置
 const points = ref(["测点A", "测点B", "测点C", "测点D"]);
 const activePoint = ref(0);
@@ -259,6 +261,18 @@ const initCharts = () => {
 
 // 监听测点切换
 watch(activePoint, initCharts);
+watch(
+  () => dashboardStore.currentModule,
+  (newVal) => {
+    nextTick(() => {
+       timelineChart?.resize();
+       radarChart?.resize();
+       weatherRadar?.resize();
+       trendChart?.resize();
+
+    });
+  }
+);
 
 // 组件挂载后初始化
 onMounted(() => {

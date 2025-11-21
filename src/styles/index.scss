@@ -205,16 +205,15 @@ body {
 
 // 弹窗容器
 .dialog-container {
-  background-color: #0f1733;
   // border: 1px solid #3b82f6;
-
+  background-color: #0f1733;
   border-radius: 8px;
   background-image: url("@/assets/images/bg_dialog.png");
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
-  overflow-y: auto;
-
+  width: 750px;
+  height: 500px;
   padding: 35px;
 
   .dialog-header {
@@ -243,9 +242,30 @@ body {
     color: #e2e8f0;
     font-size: 14px;
     line-height: 1.8; // 行高，增强可读性
+    overflow-y: auto; // 内容超出时显示滚动条
+    padding-right: 5px; // 为滚动条预留空间
 
     p {
       margin: 5px 0;
+    }
+
+    // 自定义滚动条样式
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
     }
   }
 }
@@ -377,4 +397,56 @@ body {
   &:last-child {
     flex: 1.2;
   }
+}
+
+/* 监测点弹窗样式 */
+.monitor-info {
+  font-family: sans-serif;
+  padding: 8px;
+}
+
+.monitor-info h3 {
+  margin: 0 0 8px 0;
+  color: #333;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 4px;
+}
+
+.monitor-info table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+.monitor-info td {
+  padding: 4px 6px;
+  font-size: 14px;
+}
+
+.monitor-info td:first-child {
+  font-weight: bold;
+  color: #666;
+}
+
+.status-online {
+  color: #4CAF50;
+}
+
+.status-offline {
+  color: #F44336;
+}
+
+.fly-to-btn {
+  background-color: #1E88E5;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  width: 100%;
+}
+
+.fly-to-btn:hover {
+  background-color: #1976D2;
 }

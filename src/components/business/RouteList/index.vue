@@ -126,7 +126,7 @@
     </div>
     
     <!-- 航线分析弹窗 -->
-    <div v-if="showAnalysisModal" class="modal-overlay" @click="closeModal">
+    <div v-if="showAnalysisModal" class="dialog-overlay" @click="closeModal">
       <div class="dialog-container" @click.stop>
         <div class="dialog-header">
           <h3>航线分析 - {{ currentRoute.name }}</h3>
@@ -138,9 +138,9 @@
             :route-data="currentRouteData"
           />
         </div>
-        <div class="modal-footer">
+        <div class="dialog-footer">
           <button class="export-btn" @click="exportAnalysis">导出分析报告</button>
-          <button class="close-modal-btn" @click="closeModal">关闭</button>
+          <button class="close-dialog-btn" @click="closeModal">关闭</button>
         </div>
       </div>
     </div>
@@ -599,19 +599,19 @@ onMounted(() => {
   padding: 40px 0;
   color: #94a3b8;
 }
-.modal-overlay {
+.dialog-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background-color: rgba(0, 0, 0, 0.7);
   display: flex; align-items: center; justify-content: center;
   z-index: 1000; padding: 20px;
 }
-.modal-content {
+.dialog-content {
   background-color: #0f1733; border-radius: 8px;
   width: 100%; max-width: 1000px; max-height: 90vh;
   display: flex; flex-direction: column;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
 }
-.modal-header {
+.dialog-header {
   display: flex; justify-content: space-between; align-items: center;
   padding: 15px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   h3 { margin: 0; font-size: 18px; color: #ffffff; }
@@ -620,8 +620,8 @@ onMounted(() => {
   background: none; border: none; color: #94a3b8; font-size: 20px;
   cursor: pointer; transition: color 0.2s; &:hover { color: #ffffff; }
 }
-.modal-body { flex: 1; overflow-y: auto; padding: 20px; }
-.modal-footer {
+.dialog-body { flex: 1; overflow-y: auto; padding: 20px; }
+.dialog-footer {
   padding: 15px 20px; border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex; justify-content: flex-end; gap: 10px;
 }
@@ -632,7 +632,7 @@ onMounted(() => {
   border-radius: 4px; cursor: pointer; transition: all 0.2s;
   &:hover { background-color: rgba(59, 130, 246, 0.2); }
 }
-.close-modal-btn {
+.close-dialog-btn {
   padding: 8px 16px; background-color: #3b82f6; color: white;
   border: none; border-radius: 4px; cursor: pointer;
   transition: background-color 0.2s; &:hover { background-color: #2563eb; }

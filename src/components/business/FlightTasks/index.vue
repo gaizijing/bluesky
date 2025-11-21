@@ -379,30 +379,6 @@ const closeTaskDetail = () => {
 }
 
 
-.dialog-container {
-  .dialog-content {
-    .detail-row {
-      display: flex;
-      margin-bottom: 10px;
-      line-height: 1.5;
-
-      .label {
-        width: 80px;
-        color: #94a3b8;
-        flex-shrink: 0;
-      }
-
-      .normal {
-        color: #06b6d4;
-      }
-
-      .danger {
-        color: #ef4444;
-      }
-    }
-  }
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);

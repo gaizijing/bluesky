@@ -7,6 +7,7 @@ export const useCesiumStore = defineStore('cesium', {
     viewer: null,
     // 当前相机位置（用于保存/恢复视角）
     cameraPosition: null,
+    modelLoadProgress: 0,// 新增模型加载进度状态
     // 图层可见性配置
     layerVisibility: {
       baseLayer: true,    // 基础地图
@@ -30,11 +31,13 @@ export const useCesiumStore = defineStore('cesium', {
     setViewer(viewer) {
       this.viewer = viewer
     },
+    setModelLoadProgress(progress) {
+      this.modelLoadProgress = progress;
+    },
     // 更新相机位置
     updateCameraPosition(position) {
-      console.log(333333333);
       if (position) {
-        
+
         this.cameraPosition = position
       }
     },

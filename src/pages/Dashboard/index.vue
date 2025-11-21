@@ -3,28 +3,29 @@
     <!-- 1. 全屏地图（底层） -->
     <div class="map-container">
       <div id="cesiumContainer" class="cesium-container"></div>
+      <!-- 模型加载进度条 -->
+      <!-- <div class="cesium-loading" v-if="cesiumLoading || modelLoadProgress > 0">
+        
+
+        <div class="progress-container" >
+          <div class="progress-text">地图加载中: {{ modelLoadProgress }}%</div>
+          <el-progress :percentage="modelLoadProgress" stroke-width="6" stroke-color="#00c6ff"></el-progress>
+        </div>
+      </div> -->
       <div class="cesium-loading" v-if="cesiumLoading">
-        <ElLoading size="large"></ElLoading>
         <div class="loading-text">地图加载中...</div>
+
       </div>
     </div>
 
     <!-- 2. 蒙版背景图（新增） -->
-    <div class="mask-overlay"></div>
-    <!-- 2. 顶部面板 -->
-    <div class="top-panel">
-      <Header />
-    </div>
+    <!-- <div class="mask-overlay"></div> -->
+
 
     <!-- 3. 控制面板 -->
     <div class="control-panel">
-      <div
-        class="control-item"
-        v-for="module in MODULE_LIST"
-        :key="module.key"
-        @click="switchModule(module.key)"
-        :class="{ selected: currentModule === module.key }"
-      >
+      <div class="control-item" v-for="module in MODULE_LIST" :key="module.key" @click="switchModule(module.key)"
+        :class="{ selected: currentModule === module.key }">
         <i :class="module.icon" class="module-icon"></i>
         <span class="module-text">{{ module.name }}</span>
       </div>
@@ -45,9 +46,7 @@
           </div>
           <div class="main-panel left_bg">
             <div class="panel-header">
-              <span class="panel-title"
-                >{{ selectedRegionDetail.regionName }}详情</span
-              >
+              <span class="panel-title">{{ selectedRegionDetail.regionName }}详情</span>
             </div>
             <div class="panel-content">
               <region-detail :regionDetail="selectedRegionDetail" />
@@ -62,14 +61,18 @@
             <div class="panel-header">
               <span class="panel-title">垂直</span>
             </div>
-            <div class="panel-content"><WeatherFlightHeatmap /></div>
+            <div class="panel-content">
+              <FlightSuitableAnalysisPanel />
+            </div>
           </div>
 
           <div class="main-panel right_bg">
             <div class="panel-header">
               <span class="panel-title">微尺度天气</span>
             </div>
-            <div class="panel-content"><MicroscaleWeather /></div>
+            <div class="panel-content">
+              <MicroscaleWeather />
+            </div>
           </div>
         </div>
       </div>
@@ -83,7 +86,9 @@
             <div class="panel-header">
               <span class="panel-title">航路预警</span>
             </div>
-            <div class="panel-content"><RouteList /></div>
+            <div class="panel-content">
+              <RouteList />
+            </div>
           </div>
         </div>
         <!-- <div class="right-panel">
@@ -136,7 +141,9 @@
             <div class="panel-header">
               <span class="panel-title">历史42h实况监测数据</span>
             </div>
-            <div class="panel-content"><HistoryData /></div>
+            <div class="panel-content">
+              <HistoryData />
+            </div>
           </div>
         </div>
       </div>
@@ -148,26 +155,31 @@
             <div class="panel-header">
               <span class="panel-title">实时风象</span>
             </div>
-            <div class="panel-content"><MonitoringPointWeather /></div>
+            <div class="panel-content">
+              <RealTimeWeatherPanel />
+            </div>
           </div>
-           <div class="main-panel left_bg">
+          <div class="main-panel left_bg">
             <div class="panel-header">
               <span class="panel-title">未来风势预测</span>
             </div>
             <div class="panel-content">
-              <!-- <div style="display: flex;">
-<WindTrend /><WindProfileChart/>
-              </div> -->
-              <Wind />
+              <div class="dashboard-content">
+                <div class="analysis-panel">
+                  <WeatherForecastPanel />
+                </div>
+              </div>
             </div>
           </div>
           <div class="main-panel left_bg">
             <div class="panel-header">
               <span class="panel-title">未来3h适飞分析</span>
             </div>
-            <div class="panel-content"><WeatherFlightHeatmap /></div>
+
+            <div class="panel-content">
+              <FlightSuitableAnalysisPanel />
+            </div>
           </div>
-         
         </div>
         <div class="right-panel">
           <div class="main-panel right_bg">
@@ -183,17 +195,21 @@
             <div class="panel-header">
               <span class="panel-title">实时监控</span>
             </div>
-            <div class="panel-content"><SurveillanceFootage /></div>
+            <div class="panel-content">
+              <SurveillanceFootage />
+            </div>
           </div>
         </div>
       </div>
     </transition>
+
   </div>
 </template>
 <script setup>
 import { ref, onMounted, watch, computed } from "vue";
 import { DASHBOARD_MODULES, MODULE_LIST } from "@/config/constants.js";
 import { useDashboardStore } from "@/store/modules/dashboard"; // 新增导入
+import { ElLoading } from "element-plus";
 
 // 原有逻辑保留
 import { useWeatherStore } from "@/store/modules/weather";
@@ -223,6 +239,9 @@ const DeviceCount = defineAsyncComponent(() =>
 const EquipmentAlarm = defineAsyncComponent(() =>
   import("@/components/business/EquipmentAlarm/index.vue")
 );
+const ThresholdManagement = defineAsyncComponent(() =>
+  import("@/pages/Setting/views/ThresholdManagement.vue")
+);
 const SurveillanceFootage = defineAsyncComponent(() =>
   import("@/components/business/SurveillanceFootage/index.vue")
 );
@@ -241,8 +260,8 @@ const FlightTasks = defineAsyncComponent(() =>
 const AircraftAdapt = defineAsyncComponent(() =>
   import("@/components/business/AircraftAdapt/index.vue")
 );
-const WeatherFlightHeatmap = defineAsyncComponent(() =>
-  import("@/components/business/WeatherFlightHeatmap/index.vue")
+const FlightSuitableAnalysisPanel = defineAsyncComponent(() =>
+  import("@/components/business/FlightSuitableAnalysisPanel/index.vue")
 );
 const RiskWarnings = defineAsyncComponent(() =>
   import("@/components/business/RiskWarnings/index.vue")
@@ -253,14 +272,11 @@ const WeatherWarnings = defineAsyncComponent(() =>
 const RouteList = defineAsyncComponent(() =>
   import("@/components/business/RouteList/index.vue")
 );
-const MonitoringPointWeather = defineAsyncComponent(() =>
-  import("@/components/business/MonitoringPointWeather/index.vue")
+const RealTimeWeatherPanel = defineAsyncComponent(() =>
+  import("@/components/business/Real-timeWeatherPanel/index.vue")
 );
 const WindTrend = defineAsyncComponent(() =>
   import("@/components/business/WindTrend/index.vue")
-);
-const Wind = defineAsyncComponent(() =>
-  import("@/components/business/Wind/index.vue")
 );
 const SystemMessage = defineAsyncComponent(() =>
   import("@/components/business/SystemMessage/index.vue")
@@ -274,6 +290,9 @@ const DeviceTrace = defineAsyncComponent(() =>
 const WindProfileChart = defineAsyncComponent(() =>
   import("@/components/business/WindProfileChart/index.vue")
 );
+const WeatherForecastPanel = defineAsyncComponent(() =>
+  import("@/components/business/WeatherForecastPanel/index.vue")
+);
 const IndicatorPanel = defineAsyncComponent(() =>
   import("@/components/map/IndicatorPanel/index.vue")
 );
@@ -285,14 +304,15 @@ import mockRegionWeatherData, {
   WEATHER_TYPE_LABELS,
   FLIGHT_CONDITIONS_THRESHOLD,
 } from "@/mock/regionWeatherData.js";
-
-// const { isLoading: cesiumLoading } = useCesium("cesiumContainer"); // 启用Cesium
+const { isLoading: cesiumLoading } = useCesium("cesiumContainer"); // 启用Cesium
 // 使用dashboard store
 const dashboardStore = useDashboardStore();
 
 // 原有状态保留
 const weatherStore = useWeatherStore();
 const cesiumStore = useCesiumStore();
+const modelLoadProgress = computed(() => cesiumStore.modelLoadProgress);
+
 const timeRange = ref(weatherStore.timeRange);
 const statisticsData = ref(null);
 const trendData = ref(null);
@@ -340,7 +360,6 @@ const switchModule = (moduleKey) => {
 
 // 原有业务方法保留
 const fetchWeatherData = async () => {
-
   try {
     const stats = await getWeatherStatistics({
       element: currentElement.value,
@@ -460,19 +479,38 @@ onMounted(() => {
   position: relative;
   overflow: hidden;
 }
+
 .mask-overlay {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 5; /* 位于地图上方，其他面板下方 */
+  z-index: 5;
+  /* 位于地图上方，其他面板下方 */
   background: url("@/assets/images/bg_container.png");
   background-size: cover;
   background-position: center;
-  opacity: 0.7; /* 可调节透明度 */
-  pointer-events: none; /* 不阻挡鼠标事件 */
+  opacity: 0.7;
+  /* 可调节透明度 */
+  pointer-events: none;
+  /* 不阻挡鼠标事件 */
+  // 背景图片（2D地图）
+  // background: url(/src/assets/images/bg_2d.png);
+  // background-size: contain;
+  // background-repeat: no-repeat;
+  // background-position: center;
+  // 背景图片（3D风场）
+  // background: url(/src/assets/images/bg_wind.gif);
+  // background-size: 106%;
+  // background-repeat: no-repeat;
+  // background-position: 0px -103px;
+  opacity: 0.7;
+  /* 可调节透明度 */
+  pointer-events: none;
+  /* 不阻挡鼠标事件 */
 }
+
 /* 地图容器（底层） */
 .map-container {
   position: absolute;
@@ -500,32 +538,23 @@ onMounted(() => {
     padding: 20px 30px;
     border-radius: 8px;
     z-index: 2;
+    min-width: 300px; // 确保进度条有足够宽度
 
-    .loading-text {
-      margin-top: 10px;
-      color: #fff;
-      font-size: 16px;
+    .progress-container {
+      width: 100%;
+      padding: 10px 0;
+
+      .progress-text {
+        color: #fff;
+        margin-bottom: 8px;
+        text-align: center;
+        font-size: 14px;
+      }
     }
   }
 }
 
 /* 顶部面板 */
-.top-panel {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: $header-height;
-  padding: 0 20px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: rgba(15, 23, 51, 0.7);
-  z-index: 10;
-  background: url("@/assets/images/bg_header.png");
-  background-size: cover;
-  background-position: center;
-}
 
 /* 控制面板 */
 /* 替换原有的控制面板样式 */
@@ -581,6 +610,7 @@ onMounted(() => {
   position: absolute;
   left: -100px;
 }
+
 /* 在样式部分添加动画样式 */
 .module-fade-enter-active,
 .module-fade-leave-active {
@@ -595,5 +625,30 @@ onMounted(() => {
 .module-fade-leave-to {
   opacity: 0;
   transform: translateX(-30px);
+}
+
+.dashboard-content {
+  display: flex;
+  flex-direction: column;
+  /* 改为上下布局 */
+  width: 100%;
+}
+
+.analysis-panel {
+  width: 100%;
+  height: 100%;
+}
+
+// 添加进度条样式
+.progress-container {
+  width: 300px;
+  padding: 10px 0;
+
+  .progress-text {
+    color: #fff;
+    margin-bottom: 8px;
+    text-align: center;
+    font-size: 14px;
+  }
 }
 </style>

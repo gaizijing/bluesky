@@ -83,7 +83,9 @@ export const DASHBOARD_MODULES = {
   DEVICE_MONITOR: 'deviceMonitor',
   REGION_MONITOR: 'regionMonitor',
   FLIGHT_ANALYSIS: 'flightAnalysis',
-  LANDING_MONITOR: 'mapController'
+  LANDING_MONITOR: 'mapController',
+
+
 
 };
 export const MODULE_LIST = [
@@ -104,5 +106,6 @@ export const MODULE_LIST = [
     key: DASHBOARD_MODULES.FLIGHT_ANALYSIS,
     name: "飞行分析",
   },
+ 
   
 ];

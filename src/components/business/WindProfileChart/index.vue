@@ -1,8 +1,17 @@
 
 <template>
   <div class="wind-profile-chart">
-    <!-- 控制区：要素切换 + 时间范围 -->
-    <div class="chart-controls">
+   
+    
+    <!-- 图表容器 -->
+    <div class="chart-container">
+      <div v-if="isLoading" class="loading-state">
+        <div class="spinner"></div>
+        <p>加载风廓线数据...</p>
+      </div>
+      <div ref="chartRef" class="chart"></div>
+    </div>
+     <div class="chart-controls">
       <div class="param-selector">
         <span class="control-label">气象要素：</span>
         <div class="button-group">
@@ -39,26 +48,6 @@
             6小时
           </button>
         </div>
-      </div>
-    </div>
-    
-    <!-- 图表容器 -->
-    <div class="chart-container">
-      <div v-if="isLoading" class="loading-state">
-        <div class="spinner"></div>
-        <p>加载风廓线数据...</p>
-      </div>
-      <div ref="chartRef" class="chart"></div>
-    </div>
-    
-    <!-- 色阶图例 -->
-    <div class="color-legend">
-      <div class="legend-label">{{ currentParam.name }} ({{ currentParam.unit }})</div>
-      <div class="color-bar" :style="{ background: colorGradient }"></div>
-      <div class="legend-values">
-        <span>{{ minValue }}</span>
-        <span>{{ midValue }}</span>
-        <span>{{ maxValue }}</span>
       </div>
     </div>
   </div>
@@ -300,20 +289,12 @@ watch(
 );
 </script>
 <style scoped lang="scss">
-.wind-profile-chart {
-  width: 100%;
-  position: relative;
-}
+
 
 .chart-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 15px;
   align-items: center;
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
 }
 
 .control-label {

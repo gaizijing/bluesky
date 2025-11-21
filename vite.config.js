@@ -53,7 +53,20 @@ export default defineConfig(({ mode }) => {
         [env.VITE_API_BASE_URL]: {
           target: 'https://dev-api.meteorological.com',
           changeOrigin: true,
-          rewrite: (path) => path.replace(new RegExp(`^${env.VITE_API_BASE_URL}`), '')
+          rewrite: (path) => path.replace(new RegExp(`^${env.VITE_API_BASE_URL}`), ''),
+          secure: false, // 允许https
+          headers: {
+            'Access-Control-Allow-Origin': '*'
+          }
+        },
+        '/api/weather': {
+          target: 'https://devapi.qweather.com/v7',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/weather/, ''),
+          secure: false, // 允许https
+          headers: {
+            'Access-Control-Allow-Origin': '*'
+          }
         }
       }
     },

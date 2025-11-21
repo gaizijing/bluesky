@@ -1,4 +1,3 @@
-import { has } from 'lodash';
 import { defineStore } from 'pinia';
 
 export const useMonitoringPointStore = defineStore('monitoringPoint', {

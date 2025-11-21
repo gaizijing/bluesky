@@ -6,28 +6,27 @@
           <span>实时风速</span>
         </div>
         <div class="panel-value">
-          <span class="value">{{ weatherData.windSpeed }}</span>
-          <span class="unit">m/s</span>
+          <span class="value">{{ weatherStore.currentPointWeather.windSpeed.value }}</span>
+          <span class="unit">{{ weatherStore.currentPointWeather.windSpeed.unit }}</span>
         </div>
-        <div class="panel-desc">{{ WIND_SPEED_DESC[getWindSpeedLevel(weatherData.windSpeed)] }}</div>
+        <div class="panel-desc">
+          {{ WIND_SPEED_DESC[getWindSpeedLevel(weatherStore.currentPointWeather.windSpeed.value)] }}
+        </div>
       </div>
-      <div
-        class="data-panel wind-shear-panel"
-        :class="`level-${weatherData.windShearLevel}`"
-      >
+      <div class="data-panel wind-shear-panel" :class="`level-${weatherStore.currentPointWeather.windShearLevel}`">
         <div class="panel-label">
           <span>风切变等级</span>
         </div>
         <div class="panel-value">
           <span class="value">{{
-            WIND_SHEAR_MAP[weatherData.windShearLevel]
+            WIND_SHEAR_MAP[weatherStore.currentPointWeather.windShearLevel]
           }}</span>
-          <span class="level-tag" :class="`tag-${weatherData.windShearLevel}`">
-            {{ weatherData.windShearLevel.toUpperCase() }}
+          <span class="level-tag" :class="`tag-${weatherStore.currentPointWeather.windShearLevel}`">
+            {{ weatherStore.currentPointWeather.windShearLevel }}
           </span>
         </div>
-        <div class="panel-desc" :class="`desc-${weatherData.windShearLevel}`">
-          {{ WIND_SHEAR_DESC[weatherData.windShearLevel] }}
+        <div class="panel-desc" :class="`desc-${weatherStore.currentPointWeather.windShearLevel}`">
+          {{ WIND_SHEAR_DESC[weatherStore.currentPointWeather.windShearLevel] }}
         </div>
       </div>
       <div class="data-panel stability-panel">
@@ -35,10 +34,12 @@
           <span>稳定度指数</span>
         </div>
         <div class="panel-value">
-          <span class="value">{{ weatherData.stabilityIndex }}</span>
+          <span class="value">{{ weatherStore.currentPointWeather.stabilityIndex }}</span>
           <span class="unit">类</span>
         </div>
-        <div class="panel-desc"> {{ STABILITY_DESC[weatherData.stabilityIndex] }}</div>
+        <div class="panel-desc">
+          {{ STABILITY_DESC[weatherStore.currentPointWeather.stabilityIndex] }}
+        </div>
       </div>
     </div>
   </div>
@@ -46,13 +47,13 @@
 
 <script setup>
 import { onMounted, ref, watch } from "vue";
-import { fetchCurrentPointWeather } from "@/api/weather";
-
+import { fetchCurrentPointWeather } from "@/api";
+import { useWeatherStore } from "@/store/modules/weather";
+const weatherStore = useWeatherStore();
 import { useMonitoringPointStore } from "@/store/modules/monitoringPoints";
 const monitoringPointStore = useMonitoringPointStore();
 const isRefreshing = ref(false);
 
-const weatherData = ref(null);
 const WIND_SHEAR_MAP = {
   low: "低",
   medium: "中",
@@ -76,65 +77,62 @@ const WIND_SPEED_DESC = {
   low: "当前风速微弱，起降条件优秀",
   medium: "当前风速适中，适合起降",
   high: "当前风速较强，需谨慎操作",
-  extreme: "当前风速过强，不建议起降"
+  extreme: "当前风速过强，不建议起降",
 };
 
 // 风速等级判断函数
 const getWindSpeedLevel = (windSpeed) => {
   const speed = parseFloat(windSpeed);
-  if (speed < 5) return 'low';
-  if (speed < 10) return 'medium';
-  if (speed < 15) return 'high';
-  return 'extreme';
+  if (speed < 5) return "low";
+  if (speed < 10) return "medium";
+  if (speed < 15) return "high";
+  return "extreme";
 };
-const refreshData = async () => {
-  // 如果没有选中的监测点，不执行刷新
-  if (!monitoringPointStore.hasSelectedPoint) {
-    return;
-  }
+// const refreshData = async () => {
+//   // 如果没有选中的监测点，不执行刷新
+//   if (!monitoringPointStore.hasSelectedPoint) {
+//     return;
+//   }
 
-  isRefreshing.value = true;
-  try {
-    // 从API获取天气数据
-    const data = await fetchCurrentPointWeather(
-      monitoringPointStore.selectedPoint
-    );
-    console.log(data);
-    // 更新天气数据
-    weatherData.value = data.weather;
-  } catch (err) {
-    console.error("数据刷新失败", err);
-    // 可以设置默认值或显示错误信息
-  } finally {
-    isRefreshing.value = false;
-  }
-};
-
-watch(
-  () => monitoringPointStore.selectedPoint,
-  (newPoint) => {
-    if (newPoint) {
-      refreshData();
-      console.log("切换");
-      
-    }
-  }
-);
-onMounted(() => {
-  refreshData();
-});
+//   isRefreshing.value = true;
+//   try {
+//     // 从API获取天气数据
+//     const data = await fetchCurrentPointWeather(
+//       monitoringPointStore.selectedPoint
+//     );
+//     console.log(data);
+//     // 更新天气数据
+//     weatherStore.currentPointWeather.value = data.weather;
+//   } catch (err) {
+//     console.error("数据刷新失败", err);
+//     // 可以设置默认值或显示错误信息
+//   } finally {
+//     isRefreshing.value = false;
+//   }
+// };
+//监听监测点的变化修改数据
+// watch(
+//   () => monitoringPointStore.selectedPoint,
+//   (newPoint) => {
+//     if (newPoint) {
+//       refreshData();
+//     }
+//   }
+// );
+// onMounted(() => {
+//   refreshData();
+// });
 // 对外暴露方法,传入点的id获取点的实时气象
 // defineExpose({
 //   updateLandingPoint: (pointName, newData) => {
 //     currentLandingPoint.value = pointName;
-//     if (newData) weatherData.value = newData;
+//     if (newData) weatherStore.currentPointWeather.value = newData;
 //   },
 // });
 </script>
 
 <style scoped lang="scss">
-.landing-point-card {
-}
+.landing-point-card {}
 
 // 核心数据区（三列布局）
 .card-body {

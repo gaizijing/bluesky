@@ -127,6 +127,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeMount } from "vue";
 import { useMonitoringPoints } from "@/composables/useMonitoringPoints";
+import { updateSelectedPoint } from "@/api";
 
 // 使用组合函数
 const {
@@ -187,11 +188,19 @@ const resetFilters = () => {
   statusFilter.value = "all";
 };
 
-const switchPoint = (point) => {
+const switchPoint = async (point) => {
   currentPoint.value = { ...point };
 
   // 保存到全局状态
   monitoringPointStore.setSelectedPoint(point);
+
+  try {
+    // 调用API保存到后台
+    await updateSelectedPoint(point);
+  } catch (error) {
+    console.error('保存监测点信息失败:', error);
+    // 即使保存失败，也继续执行后续操作
+  }
 
   // 触发事件通知父组件
   emit("point-selected", point);

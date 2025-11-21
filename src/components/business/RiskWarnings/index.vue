@@ -6,35 +6,21 @@
     </div>
     <div class="header-bar">
       <div class="stats-cards">
-        <div
-          class="stat-card all"
-          :class="{ active: selectedLevel === 'all' }"
-          @click="selectLevel('all')"
-        >
+        <div class="stat-card all" :class="{ active: selectedLevel === 'all' }" @click="selectLevel('all')">
           <div class="stat-value">{{ totalWarnings }}</div>
           <div class="stat-label">全部预警</div>
         </div>
-        <div
-          class="stat-card level-danger"
-          :class="{ active: selectedLevel === 'danger' }"
-          @click="selectLevel('danger')"
-        >
+        <div class="stat-card level-danger" :class="{ active: selectedLevel === 'danger' }"
+          @click="selectLevel('danger')">
           <div class="stat-value">{{ dangerCount }}</div>
           <div class="stat-label">危险预警</div>
         </div>
-        <div
-          class="stat-card level-warning"
-          :class="{ active: selectedLevel === 'warning' }"
-          @click="selectLevel('warning')"
-        >
+        <div class="stat-card level-warning" :class="{ active: selectedLevel === 'warning' }"
+          @click="selectLevel('warning')">
           <div class="stat-value">{{ warningCount }}</div>
           <div class="stat-label">警告预警</div>
         </div>
-        <div
-          class="stat-card level-info"
-          :class="{ active: selectedLevel === 'info' }"
-          @click="selectLevel('info')"
-        >
+        <div class="stat-card level-info" :class="{ active: selectedLevel === 'info' }" @click="selectLevel('info')">
           <div class="stat-value">{{ infoCount }}</div>
           <div class="stat-label">一般预警</div>
         </div>
@@ -55,22 +41,14 @@
       </div>
 
       <!-- 按时间分组渲染 -->
-      <div
-        v-for="(group, time) in groupedWarnings"
-        :key="time"
-        class="time-group"
-      >
+      <div v-for="(group, time) in groupedWarnings" :key="time" class="time-group">
         <!-- 时间标题（截图核心要素） -->
         <div class="time-title">{{ time }}</div>
 
         <!-- 该时间下的所有预警 -->
         <div class="warning-list">
-          <div
-            v-for="(warning, idx) in group"
-            :key="idx"
-            class="warning-item"
-            :class="`type-${warning.targetType} level-${warning.level}`"
-          >
+          <div v-for="(warning, idx) in group" :key="idx" class="warning-item"
+            :class="`type-${warning.targetType} level-${warning.level}`">
             <!-- 预警类型标签（起降点/航线/空域） -->
             <span class="target-type-tag">{{
               getTargetTypeText(warning.targetType)
@@ -98,15 +76,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, defineAsyncComponent } from "vue";
-import { getRiskWarnings } from "@/api/meteorology";
-import { useDashboardStore } from "@/store/modules/dashboard";
+import { ref, onMounted, computed, defineAsyncComponent,watch  } from "vue";
+import { getRiskWarnings } from "@/api";
+import { useMonitoringPoints } from "@/composables/useMonitoringPoints";
 
+const {monitoringPointStore} = useMonitoringPoints();
 const WeatherWarnings = defineAsyncComponent(() =>
   import("@/components/business/WeatherWarnings/index.vue")
 );
-const dashboardStore = useDashboardStore();
-
 // 响应式数据
 const isLoading = ref(true);
 const warnings = ref([]);
@@ -116,7 +93,6 @@ const showHistory = ref(false);
 // 初始化加载数据
 onMounted(() => {
   fetchData();
-  // setInterval(fetchData, 30000) // 可选：30秒刷新一次
 });
 
 // 获取预警数据
@@ -124,21 +100,20 @@ const fetchData = async () => {
   isLoading.value = true;
   try {
     const result = await getRiskWarnings();
-    if (result.code === 200) {
-      // 适配截图数据结构：添加 targetType（目标类型：takeoff/route/airspace）
-      warnings.value = result.data.warnings.map((w) => ({
-        ...w,
-        targetType:
-          w.targetType ||
-          ["takeoff", "route", "airspace"][Math.floor(Math.random() * 3)],
-        // 确保detail为截图式具体描述（如："【中科大起降点】风速超过8m/s,飞行存在严重风险"）
-        detail:
-          w.detail ||
-          `${w.area ? `【${w.area}】` : ""}${
-            w.riskReason || "飞行存在严重风险"
-          }`,
-      }));
-    }
+
+    // 适配截图数据结构：添加 targetType（目标类型：takeoff/route/airspace）
+    warnings.value = result.warnings.map((w) => ({
+      ...w,
+      targetType:
+        w.targetType ||
+        ["takeoff", "route", "airspace"][Math.floor(Math.random() * 3)],
+      // 确保detail为截图式具体描述（如："【中科大起降点】风速超过8m/s,飞行存在严重风险"）
+      detail:
+        w.detail ||
+        `${w.area ? `【${w.area}】` : ""}${w.riskReason || "飞行存在严重风险"
+        }`,
+    }));
+
   } catch (err) {
     console.error("获取风险预警数据失败：", err);
   } finally {
@@ -207,9 +182,18 @@ const openHistoryDialog = (e) => {
 const closeHistoryDialog = () => {
   showHistory.value = false;
 };
+
+watch(
+  () => monitoringPointStore.selectedPoint,
+  (newPoint) => {
+    if (newPoint) {
+      fetchData();
+    }
+  }
+);
 </script>
 
-<style  lang="scss">
+<style lang="scss">
 .risk-warnings-container {
   height: 560px;
 }
@@ -259,60 +243,60 @@ const closeHistoryDialog = () => {
   }
 
   &.all {
-    background: linear-gradient(
-      135deg,
-      rgba(100, 116, 139, 0.2),
-      rgba(100, 116, 139, 0.1)
-    );
+    background: linear-gradient(135deg,
+        rgba(100, 116, 139, 0.2),
+        rgba(100, 116, 139, 0.1));
+
     .stat-value {
       color: #f1f5f9;
       text-shadow: 0 0 8px rgba(100, 116, 139, 0.4);
     }
+
     .stat-label {
       color: #cbd5e1;
     }
   }
 
   &.level-danger {
-    background: linear-gradient(
-      135deg,
-      rgba(239, 68, 68, 0.2),
-      rgba(239, 68, 68, 0.1)
-    );
+    background: linear-gradient(135deg,
+        rgba(239, 68, 68, 0.2),
+        rgba(239, 68, 68, 0.1));
+
     .stat-value {
       color: rgba(239, 68, 68, 0.8);
       text-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
     }
+
     .stat-label {
       color: rgba(239, 68, 68, 1);
     }
   }
 
   &.level-warning {
-    background: linear-gradient(
-      135deg,
-      rgba(245, 158, 11, 0.2),
-      rgba(245, 158, 11, 0.1)
-    );
+    background: linear-gradient(135deg,
+        rgba(245, 158, 11, 0.2),
+        rgba(245, 158, 11, 0.1));
+
     .stat-value {
       color: #fce78a;
       text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
     }
+
     .stat-label {
       color: #fce78a;
     }
   }
 
   &.level-info {
-    background: linear-gradient(
-      135deg,
-      rgba(6, 182, 212, 0.2),
-      rgba(6, 182, 212, 0.1)
-    );
+    background: linear-gradient(135deg,
+        rgba(6, 182, 212, 0.2),
+        rgba(6, 182, 212, 0.1));
+
     .stat-value {
       color: #67e8f9;
       text-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
     }
+
     .stat-label {
       color: #67e8f9;
     }
@@ -340,6 +324,7 @@ const closeHistoryDialog = () => {
   &::-webkit-scrollbar {
     width: 4px;
   }
+
   &::-webkit-scrollbar-thumb {
     background: rgba(59, 130, 246, 0.3);
     border-radius: 2px;
@@ -383,10 +368,12 @@ const closeHistoryDialog = () => {
     background: #ef444420;
     color: #ef4444;
   }
+
   &.type-route .target-type-tag {
     background: #f59e0b20;
     color: #f59e0b;
   }
+
   &.type-airspace .target-type-tag {
     background: #00b4ff20;
     color: #00b4ff;
@@ -396,9 +383,11 @@ const closeHistoryDialog = () => {
   &.level-danger .warning-content {
     color: #fca5a5;
   }
+
   &.level-warning .warning-content {
     color: #fde68a;
   }
+
   &.level-info .warning-content {
     color: #93c5fd;
   }
@@ -509,6 +498,7 @@ const closeHistoryDialog = () => {
     .stat-value {
       font-size: 16px;
     }
+
     .stat-label {
       font-size: 10px;
     }

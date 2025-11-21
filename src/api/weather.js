@@ -1,5 +1,7 @@
 import request from '@/utils/request'
 import monitoringPointWeatherData from '@/mock/monitoringPointWeater.json'
+import  mockWindTrendData  from '@/mock/windTrendData.json'
+import weatherAnalysisData from '@/mock/weatherAnalysisData.json'
 
 /**
  * 气象数据API封装（模拟后端接口，返回模拟数据）
@@ -241,30 +243,39 @@ export const getWeatherDetails = async (params) => {
 }
 
 
-// 获取当前选中监测点的天气数据
-export const fetchCurrentPointWeather = async (currentPoint) => {
+// 获取当前选中监测点的风向趋势数据 gzj
+export const fetchCurrentPointWindTrend = async (currentPoint) => {
   try {
     if (!currentPoint) {
       throw new Error('未选择监测点')
     }
     
+      try {
+    // 模拟网络请求延迟
+    
     // 在实际项目中，这里会是真实的API调用:
-    // const response = await axios.get(`/api/weather/point/${currentPoint.id}`)
+    // const response = await axios.get(`/api/wind-trend/${pointId}`)
     // return response.data
     
     // 使用mock数据
-    console.log("fetchCurrentPointWeather");
+    const trendData = mockWindTrendData[currentPoint.id] 
     
-    const weatherData = monitoringPointWeatherData.points.find(p => p.id === currentPoint.id);
-    
-    return {
-      ...weatherData,
-      timestamp: Date.now(),
-      pointId: currentPoint.id,
-      pointName: currentPoint.name
-    }
+    // 为mock数据添加一些随机性以模拟实时变化
+    return trendData.map(item => ({
+      ...item,
+      // 添加小幅度随机波动
+      windSpeed: parseFloat((item.windSpeed + (Math.random() - 0.5) * 0.5).toFixed(1)),
+      windDir: (item.windDir + Math.floor(Math.random() * 10) - 5) % 360,
+      upper: parseFloat((item.upper + Math.random() * 0.3).toFixed(1)),
+      lower: parseFloat((item.lower - Math.random() * 0.3).toFixed(1)),
+      deviation: parseFloat(((item.upper - item.lower) / 2).toFixed(1))
+    }))
   } catch (error) {
-    console.error('获取当前监测点天气数据失败:', error)
+    console.error(`获取监测点${currentPoint.id}风向趋势数据失败:`, error)
+    throw error
+  }
+  } catch (error) {
+    console.error('获取当前监测点风向趋势数据失败:', error)
     throw error
   }
 }

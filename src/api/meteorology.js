@@ -69,16 +69,7 @@ export const getAircraftAdapt = async () => {
     return { code: 500, message: '获取数据失败' }
   }
 }
-// 获取风险预警数据
-export const getRiskWarnings = async () => {
-  try {
-    const response = await import('@/mock/riskWarnings.json')
-    return response.default
-  } catch (error) {
-    console.error('获取风险预警数据失败：', error)
-    return { code: 500, message: '获取数据失败' }
-  }
-}
+
 // 模拟获取垂直剖面数据
 export const getVerticalProfileData = async (timeType = 'current') => {
   // 模拟不同时间的数据差异（仅风速变化）

@@ -369,7 +369,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  pause();
+ 
   window.removeEventListener("resize", onResize);
   chart?.dispose();
 });

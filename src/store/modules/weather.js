@@ -19,6 +19,8 @@ export const useWeatherStore = defineStore('weather', {
       [WEATHER_ELEMENTS.HUMIDITY]: null,
       [WEATHER_ELEMENTS.CLOUD]: null
     },
+    // 当前监测点的实时天气数据
+    currentPointWeather: null,
     // 统计数据（最大值、最小值、平均值等）
     statistics: {
       max: null,
@@ -43,6 +45,29 @@ export const useWeatherStore = defineStore('weather', {
         [WEATHER_ELEMENTS.CLOUD]: '云量'
       }
       return labelMap[state.currentElement] || '气象要素'
+    },
+    // 获取Header组件需要的天气信息
+    headerWeatherInfo(state) {      
+      if (!state.currentPointWeather) {
+        return {
+          temperature: '25°C',
+          windSpeed: '3.5m/s',
+          visibility: '10km',
+          humidity: '0mm'
+        }
+      }
+      
+      // 适配API返回的数据格式
+      const weatherData = state.currentPointWeather
+      
+      return {
+        temperature: weatherData.temperature ? `${weatherData.temperature.value}${weatherData.temperature.unit}` : '25°C',
+        windSpeed: weatherData.windSpeed ? `${weatherData.windSpeed.value}${weatherData.windSpeed.unit}` : '3.5m/s',
+        // 由于API可能没有返回能见度数据，暂时使用默认值
+        visibility:weatherData.visibility ? `${weatherData.visibility.value}${weatherData.visibility.unit}`: '10km',
+        // API返回的是relativeHumidity
+        humidity: weatherData.relativeHumidity ? `${weatherData.relativeHumidity.value}${weatherData.relativeHumidity.unit}` : '0%'
+      }
     }
   },
   actions: {
@@ -73,6 +98,11 @@ export const useWeatherStore = defineStore('weather', {
     updateStatistics(data) {
       this.statistics = { ...this.statistics, ...data }
     },
+    // 设置当前监测点的实时天气数据
+    setCurrentPointWeather(weatherData) {
+      this.currentPointWeather = weatherData
+    },
+    
     // 重置所有气象数据
     resetWeatherData() {
       this.weatherData = {
@@ -84,6 +114,7 @@ export const useWeatherStore = defineStore('weather', {
         [WEATHER_ELEMENTS.CLOUD]: null
       }
       this.statistics = { max: null, min: null, average: null, trend: 'stable' }
+      this.currentPointWeather = null
     }
   }
 })

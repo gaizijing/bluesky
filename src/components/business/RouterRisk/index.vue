@@ -16,45 +16,60 @@
         <div v-else class="loading-spinner"></div>
       </button>
     </div>
-
-    <!-- 图表区域 -->
-    <div class="chart-container">
-      <div ref="chartRef" class="risk-chart"></div>
+    
+    <!-- 全局选项卡导航 -->
+    <div class="global-tabs">
+      <div 
+        v-for="tab in tabs" 
+        :key="tab.key"
+        class="tab-item"
+        :class="{ active: globalActiveTab === tab.key }"
+        @click="globalActiveTab = tab.key"
+      >
+        <span class="tab-icon">{{ tab.icon }}</span>
+        <span class="tab-label">{{ tab.label }}</span>
+      </div>
     </div>
 
-    <!-- 控制区与图例 -->
-    <div class="chart-controls">
-      <!-- 风险维度切换 -->
-      <div class="dimension-controls">
-        <span class="control-label">风险维度：</span>
-        <div class="dimension-buttons">
-          <button
-            v-for="dim in riskDimensions"
-            :key="dim.value"
-            :class="{ 'dim-btn': true, active: activeDimensions.includes(dim.value) }"
-            @click="toggleDimension(dim.value)"
-          >
-            <span class="dim-icon">{{ dim.icon }}</span>
-            <span class="dim-text">{{ dim.label }}</span>
-          </button>
-        </div>
+    <!-- 图表区域 -->
+    <div v-if="globalActiveTab === 'chart'" class="tab-panel">
+      <div class="chart-container">
+        <div ref="chartRef" class="risk-chart"></div>
       </div>
 
-      <!-- 风险等级图例 -->
-      <div class="risk-legend">
-        <div class="legend-item" v-for="level in riskLevels" :key="level.value">
-          <span
-            class="legend-color"
-            :style="{ backgroundColor: level.color }"
-          ></span>
-          <span class="legend-text">{{ level.label }} ({{ level.range }})</span>
+      <!-- 控制区与图例 -->
+      <div class="chart-controls">
+        <!-- 风险维度切换 -->
+        <div class="dimension-controls">
+          <div class="dimension-buttons">
+            <button
+              v-for="dim in riskDimensions"
+              :key="dim.value"
+              :class="{ 'dim-btn': true, active: activeDimensions.includes(dim.value) }"
+              @click="toggleDimension(dim.value)"
+            >
+              <span class="dim-icon">{{ dim.icon }}</span>
+              <span class="dim-text">{{ dim.label }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 风险等级图例 -->
+        <div class="risk-legend">
+          <div class="legend-item" v-for="level in riskLevels" :key="level.value">
+            <span
+              class="legend-color"
+              :style="{ backgroundColor: level.color }"
+            ></span>
+            <span class="legend-text">{{ level.label }} ({{ level.range }})</span>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- 悬浮详情tooltip -->
     <div
-      v-if="showTooltip"
+      v-if="showTooltip && globalActiveTab === 'chart'"
       class="detail-tooltip"
       :style="{ left: tooltipLeft + 'px', top: tooltipTop + 'px' }"
     >
@@ -80,64 +95,54 @@
       </div>
     </div>
     
-    <!-- 应对措施和替代航线切换面板 -->
-    <div class="toggleable-section">
-      <div class="section-tabs">
-        <button 
-          :class="{ 'tab-btn': true, active: activeTab === 'recommendations' }"
-          @click="activeTab = 'recommendations'"
-          :disabled="recommendations.length === 0"
+    <!-- 应对措施面板 -->
+    <div v-if="globalActiveTab === 'measures'" class="tab-panel">
+      <div class="measures-content">
+        <h3 class="panel-title">风险应对措施</h3>
+        <div 
+          v-for="(rec, index) in recommendations" 
+          :key="index"
+          class="recommendation-item"
+          :class="`risk-level-${rec.level}`"
         >
-          应对措施 ({{ recommendations.length }})
-        </button>
-        <button 
-          :class="{ 'tab-btn': true, active: activeTab === 'alternatives' }"
-          @click="activeTab = 'alternatives'"
-          :disabled="alternativeRoutes.length === 0"
-        >
-          替代航线 ({{ alternativeRoutes.length }})
-        </button>
-      </div>
-      
-      <div class="section-content">
-        <!-- 应对措施建议 -->
-        <div v-show="activeTab === 'recommendations'" class="tab-content">
-          <div 
-            v-for="(rec, index) in recommendations" 
-            :key="index"
-            class="recommendation-item"
-            :class="`risk-level-${rec.level}`"
-          >
-            <span class="rec-icon">{{ rec.icon }}</span>
-            <div class="rec-content">
-              <h4>{{ rec.title }}</h4>
-              <p>{{ rec.description }}</p>
-            </div>
+          <span class="rec-icon">{{ rec.icon }}</span>
+          <div class="rec-content">
+            <h4>{{ rec.title }}</h4>
+            <p>{{ rec.description }}</p>
           </div>
         </div>
-        
-        <!-- 替代航线建议 -->
-        <div v-show="activeTab === 'alternatives'" class="tab-content">
-          <div 
-            v-for="(route, index) in alternativeRoutes" 
-            :key="index"
-            class="alternative-item"
-            @click="selectAlternativeRoute(route)"
-          >
-            <div class="route-header">
-              <span class="route-name">{{ route.name }}</span>
-              <span class="route-risk" :class="`risk-${route.riskLevel}`">
-                {{ route.riskText }}
-              </span>
-            </div>
-            <div class="route-details">
-              <span>距离: {{ route.distance }}km</span>
-              <span>预计时间: {{ route.estimatedTime }}</span>
-            </div>
-            <div class="route-description">
-              {{ route.description }}
-            </div>
+        <div v-if="recommendations.length === 0" class="empty-state">
+          <p>暂无风险应对措施建议</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 备选航线面板 -->
+    <div v-if="globalActiveTab === 'alternatives'" class="tab-panel">
+      <div class="alternatives-content">
+        <h3 class="panel-title">备选航线建议</h3>
+        <div 
+          v-for="(route, index) in alternativeRoutes" 
+          :key="index"
+          class="alternative-item"
+          @click="selectAlternativeRoute(route)"
+        >
+          <div class="route-header">
+            <span class="route-name">{{ route.name }}</span>
+            <span class="route-risk" :class="`risk-${route.riskLevel}`">
+              {{ route.riskText }}
+            </span>
           </div>
+          <div class="route-details">
+            <span>距离: {{ route.distance }}km</span>
+            <span>预计时间: {{ route.estimatedTime }}</span>
+          </div>
+          <div class="route-description">
+            {{ route.description }}
+          </div>
+        </div>
+        <div v-if="alternativeRoutes.length === 0" class="empty-state">
+          <p>暂无备选航线建议</p>
         </div>
       </div>
     </div>
@@ -185,8 +190,18 @@ const tooltipData = ref({});
 const tooltipLeft = ref(0);
 const tooltipTop = ref(0);
 
-// 控制面板切换状态
+// 全局选项卡状态
+const globalActiveTab = ref('chart'); // 默认显示图表
+
+// 控制面板切换状态（内部子选项卡）
 const activeTab = ref('recommendations'); // 默认显示应对措施
+
+// 定义选项卡配置
+const tabs = [
+  { key: 'chart', label: '风险图表', icon: '📊' },
+  { key: 'measures', label: '应对措施', icon: '🛡️' },
+  { key: 'alternatives', label: '备选航线', icon: '🗺️' }
+];
 
 // 风险维度配置（支持多维度叠加）
 const riskDimensions = ref([
@@ -666,7 +681,29 @@ const selectAlternativeRoute = (route) => {
 <style scoped lang="scss">
 // 卡片基础样式
 .route-warning-card {
+  height: 370px;
   position: relative;
+  overflow: auto;
+  
+  // 自定义滚动条样式
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  }
 }
 
 // 卡片头部
@@ -674,8 +711,6 @@ const selectAlternativeRoute = (route) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 12px;
   margin-bottom: 16px;
 
   .card-icon {
@@ -734,9 +769,46 @@ const selectAlternativeRoute = (route) => {
   }
 }
 
+// 全局选项卡样式
+.global-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 16px;
+  
+  .tab-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    cursor: pointer;
+    color: #94a3b8;
+    font-size: 13px;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+    
+    &:hover {
+      color: #3b82f6;
+      background-color: rgba(59, 130, 246, 0.05);
+    }
+    
+    &.active {
+      color: #3b82f6;
+      border-bottom-color: #3b82f6;
+      background-color: rgba(59, 130, 246, 0.05);
+    }
+    
+    .tab-icon {
+      font-size: 14px;
+    }
+    
+    .tab-label {
+      font-weight: 500;
+    }
+  }
+}
+
 // 图表容器
 .chart-container {
-  width: 800px;
   height: 200px;
   position: relative;
   margin-bottom: 16px;
@@ -747,11 +819,6 @@ const selectAlternativeRoute = (route) => {
   height: 100%;
 }
 
-// 控制区样式
-.chart-controls {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding-top: 16px;
-}
 
 // 维度控制按钮
 .dimension-controls {
@@ -881,13 +948,53 @@ const selectAlternativeRoute = (route) => {
   .chart-container {
     height: 250px;
   }
+  
+  .global-tabs {
+    flex-wrap: wrap;
+    
+    .tab-item {
+      padding: 8px 12px;
+      font-size: 12px;
+      
+      .tab-icon {
+        font-size: 13px;
+      }
+    }
+  }
 }
 
-// 切换面板样式
-.toggleable-section {
-  margin-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding-top: 16px;
+// 选项卡面板通用样式
+.tab-panel {
+  min-height: 200px;
+}
+
+// 面板标题
+.panel-title {
+  font-size: 16px;
+  color: #e2e8f0;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+// 应对措施内容样式
+.measures-content {
+  padding-bottom: 10px;
+}
+
+// 备选航线内容样式
+.alternatives-content {
+  padding-bottom: 10px;
+}
+
+// 空状态样式
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #64748b;
+  font-size: 14px;
+  background-color: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  border: 1px dashed rgba(255, 255, 255, 0.05);
 }
 
 .section-tabs {
@@ -942,7 +1049,7 @@ const selectAlternativeRoute = (route) => {
   border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  
+  margin-bottom: 5px;
   &.risk-level-high {
     border-left: 4px solid #ef4444;
     background-color: rgba(239, 68, 68, 0.05);
@@ -987,7 +1094,7 @@ const selectAlternativeRoute = (route) => {
   border: 1px solid rgba(59, 130, 246, 0.3);
   cursor: pointer;
   transition: all 0.2s;
-  
+  margin-bottom: 5px;
   &:hover {
     background-color: rgba(59, 130, 246, 0.1);
     border-color: #3b82f6;

@@ -1,7 +1,7 @@
 // src/composables/useMonitoringPoints.js
 import { ref, computed } from 'vue'
 import { useMonitoringPointStore } from '@/store/modules/monitoringPoints'
-import { fetchMonitoringPoints } from '@/api/monitoringPoints'
+import { fetchMonitoringPoints,fetchCurrentMonitoringPoint } from '@/api'
 
 // 初始化状态管理
 const isInitializing = ref(false)
@@ -24,9 +24,10 @@ export function useMonitoringPoints() {
     try {
       // 从API获取监测点数据
       const pointsData = await fetchMonitoringPoints();
-      
+      const currentPoint = await fetchCurrentMonitoringPoint();
       // 保存到store
       monitoringPointStore.setPointsList(pointsData);
+      monitoringPointStore.setSelectedPoint(currentPoint);
       
       isInitialized.value = true;
     } catch (error) {

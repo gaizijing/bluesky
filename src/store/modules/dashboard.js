@@ -4,7 +4,7 @@ import { DASHBOARD_MODULES } from '@/config/constants.js'
 
 export const useDashboardStore = defineStore('dashboard', {
   state: () => ({
-    currentModule: DASHBOARD_MODULES.DEVICE_MONITOR
+    currentModule: DASHBOARD_MODULES.LANDING_MONITOR
   }),
   
   actions: {
