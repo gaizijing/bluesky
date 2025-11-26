@@ -119,7 +119,7 @@ const initChart = () => {
     },
     grid: {
       left: 60,    // 左侧留空间显示气象因素
-      right: 0,   // 右侧留少量空间
+      right: 20,   // 右侧留少量空间
       bottom: 30,  // 底部留更多空间显示时间标签
       top: 10
     },

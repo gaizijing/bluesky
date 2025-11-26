@@ -45,11 +45,7 @@ export const CESIUM_CONFIG = {
         visible: false,
         zIndex: 20
       },
-      wind: {
-        name: 'wind',
-        visible: false,
-        zIndex: 30
-      },
+
       pressure: {
         name: 'pressure',
         visible: false,
@@ -83,12 +79,6 @@ export const CESIUM_CONFIG = {
       particleSpeed: 150 // 粒子下落速度
     },
 
-    // 风力图层
-    wind: {
-      min: 0,      // 最小风速（m/s）
-      max: 30,     // 最大风速（m/s）
-      lineWidth: 3, // 流线宽度
-      lineOpacity: 0.8 // 流线透明度
-    }
+
   }
 }

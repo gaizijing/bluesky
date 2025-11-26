@@ -2,31 +2,22 @@
   <div class="dashboard-container">
     <!-- 1. 全屏地图（底层） -->
     <div class="map-container">
-      <div id="cesiumContainer" class="cesium-container"></div>
-      <!-- 模型加载进度条 -->
-      <!-- <div class="cesium-loading" v-if="cesiumLoading || modelLoadProgress > 0">
-        
-
-        <div class="progress-container" >
-          <div class="progress-text">地图加载中: {{ modelLoadProgress }}%</div>
-          <el-progress :percentage="modelLoadProgress" stroke-width="6" stroke-color="#00c6ff"></el-progress>
-        </div>
-      </div> -->
-      <div class="cesium-loading" v-if="cesiumLoading">
-        <div class="loading-text">地图加载中...</div>
-
-      </div>
+      <MapContainer id="cesiumContainer" class="cesium-container" />
+    
     </div>
 
     <!-- 2. 蒙版背景图（新增） -->
     <!-- <div class="mask-overlay"></div> -->
 
-
     <!-- 3. 控制面板 -->
     <div class="control-panel">
-      <div class="control-item" v-for="module in MODULE_LIST" :key="module.key" @click="switchModule(module.key)"
-        :class="{ selected: currentModule === module.key }">
-        <i :class="module.icon" class="module-icon"></i>
+      <div
+        class="control-item"
+        v-for="module in MODULE_LIST"
+        :key="module.key"
+        @click="switchModule(module.key)"
+        :class="{ selected: currentModule === module.key }"
+      >
         <span class="module-text">{{ module.name }}</span>
       </div>
     </div>
@@ -46,7 +37,9 @@
           </div>
           <div class="main-panel left_bg">
             <div class="panel-header">
-              <span class="panel-title">{{ selectedRegionDetail.regionName }}详情</span>
+              <span class="panel-title"
+                >{{ selectedRegionDetail.regionName }}详情</span
+              >
             </div>
             <div class="panel-content">
               <region-detail :regionDetail="selectedRegionDetail" />
@@ -202,19 +195,16 @@
         </div>
       </div>
     </transition>
-
   </div>
 </template>
 <script setup>
 import { ref, onMounted, watch, computed } from "vue";
 import { DASHBOARD_MODULES, MODULE_LIST } from "@/config/constants.js";
 import { useDashboardStore } from "@/store/modules/dashboard"; // 新增导入
-import { ElLoading } from "element-plus";
 
 // 原有逻辑保留
 import { useWeatherStore } from "@/store/modules/weather";
 import { useCesiumStore } from "@/store/modules/cesium";
-import { useCesium } from "@/hooks/useCesium";
 import {
   getWeatherStatistics,
   getWeatherTrend,
@@ -222,14 +212,13 @@ import {
   getWeatherDetails,
 } from "@/api/weather";
 
-// 组件导入
-import WeatherElementSelector from "@/components/business/WeatherElementSelector/index.vue";
 // 在组件导入部分替换为异步导入
 import { defineAsyncComponent } from "vue";
 
 const RegionMoniterList = defineAsyncComponent(() =>
   import("@/components/business/RegionMoniterList/index.vue")
 );
+
 const RegionDetail = defineAsyncComponent(() =>
   import("@/components/business/RegionDetail/index.vue")
 );
@@ -275,9 +264,6 @@ const RouteList = defineAsyncComponent(() =>
 const RealTimeWeatherPanel = defineAsyncComponent(() =>
   import("@/components/business/Real-timeWeatherPanel/index.vue")
 );
-const WindTrend = defineAsyncComponent(() =>
-  import("@/components/business/WindTrend/index.vue")
-);
 const SystemMessage = defineAsyncComponent(() =>
   import("@/components/business/SystemMessage/index.vue")
 );
@@ -286,9 +272,6 @@ const MonitoringPoints = defineAsyncComponent(() =>
 );
 const DeviceTrace = defineAsyncComponent(() =>
   import("@/components/business/DeviceTrace/index.vue")
-);
-const WindProfileChart = defineAsyncComponent(() =>
-  import("@/components/business/WindProfileChart/index.vue")
 );
 const WeatherForecastPanel = defineAsyncComponent(() =>
   import("@/components/business/WeatherForecastPanel/index.vue")
@@ -299,12 +282,15 @@ const IndicatorPanel = defineAsyncComponent(() =>
 const LayerControl = defineAsyncComponent(() =>
   import("@/components/map/LayerControl/index.vue")
 );
+const MapContainer = defineAsyncComponent(() =>
+  import("@/components/map/MapContainer.vue")
+);
 import { useRegionStore } from "@/store/modules/region";
 import mockRegionWeatherData, {
   WEATHER_TYPE_LABELS,
   FLIGHT_CONDITIONS_THRESHOLD,
 } from "@/mock/regionWeatherData.js";
-const { isLoading: cesiumLoading } = useCesium("cesiumContainer"); // 启用Cesium
+// Cesium地图由MapContainer组件管理
 // 使用dashboard store
 const dashboardStore = useDashboardStore();
 
@@ -570,30 +556,36 @@ onMounted(() => {
 }
 
 .control-item {
+  width: 80px;
+  justify-content: center;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 7px 20px;
   background: linear-gradient(135deg, #1e3c72, #2a5298);
-  color: #c0cde0;
-  border-radius: 8px;
+  color: #c4c6c9c5;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  font-family: "jingangFont";
 
+  font-family: "AiDeepFont";
+  background-image: url("@/assets/images/bg_control_item.png");
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
   &:hover {
-    background: linear-gradient(135deg, #2a5298, #3a6bc0);
+    // background: linear-gradient(135deg, #2a5298, #3a6bc0);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    // box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 
   &.selected {
-    background: linear-gradient(135deg, #00c6ff, #0072ff);
+    background-image: url("@/assets/images/bg_control_item.png");
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: linear-gradient(135deg, #00c6ff, #ff9100);
     color: white;
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 114, 255, 0.4);
-    border-color: rgba(255, 255, 255, 0.2);
   }
 
   .module-icon {

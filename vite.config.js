@@ -44,6 +44,7 @@ export default defineConfig(({ mode }) => {
         '@assets': resolve(__dirname, './src/assets'),
         '@components': resolve(__dirname, './src/components'),
         '@utils': resolve(__dirname, './src/utils'),
+        '@zip.js/zip.js/lib/zip-no-worker.js': resolve(__dirname, './src/utils/zipNoWorkerStub.js')
       }
     },
     server: {
@@ -81,6 +82,10 @@ export default defineConfig(({ mode }) => {
           assetFileNames: '[ext]/[name]-[hash].[ext]'
         }
       }
+    },
+    // 优化 Cesium 包
+    optimizeDeps: {
+      include: ['cesium']
     },
     css: {
       /**

@@ -4,7 +4,9 @@ import { DASHBOARD_MODULES } from '@/config/constants.js'
 
 export const useDashboardStore = defineStore('dashboard', {
   state: () => ({
-    currentModule: DASHBOARD_MODULES.LANDING_MONITOR
+    //先隐藏所有模块只关注地图
+    // currentModule: DASHBOARD_MODULES.LANDING_MONITOR
+    currentModule:""
   }),
   
   actions: {

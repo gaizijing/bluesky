@@ -95,7 +95,7 @@ export const MODULE_LIST = [
   },
   {
     key: DASHBOARD_MODULES.LANDING_MONITOR,
-    name: "低空气象态势",
+    name: "气象态势",
   },
   // {
   //   key: DASHBOARD_MODULES.REGION_MONITOR,

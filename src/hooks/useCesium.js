@@ -2,24 +2,28 @@
 import { onMounted, ref, onUnmounted, watch, toRefs } from 'vue'
 import * as Cesium from 'cesium'
 import { useCesiumStore } from '@/store/modules/cesium'
-import { useWeatherStore } from '@/store/modules/weather'
+import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import { CESIUM_CONFIG } from '@/config/cesium'
-import { getWeatherData } from '@/api/weather'
 import request from '@/utils/request'
 import { useMonitoringPointStore } from '@/store/modules/monitoringPoints'
 import { createProgressManager } from '../utils/progressUtils'
+import { WindLayer } from 'cesium-wind-layer';
+import { vi } from 'element-plus/es/locales.mjs'
+import { set } from 'lodash'
+
 
 // Cesium地图初始化&气象可视化Hook
 export function useCesium(containerId) {
   // Store实例
   const cesiumStore = useCesiumStore()
   const monitorStore = useMonitoringPointStore()
-  
+  const layerSettingsStore = useLayerSettingsStore()
+
   // 响应式状态
   const viewer = ref(null)
   const isLoading = ref(false)
   const errorMsg = ref('')
-
+  const windLayer = ref(null)
   // Cesium图层和实体引用
   let tiandituLayer = null
   let districtPrimitive = null
@@ -35,6 +39,7 @@ export function useCesium(containerId) {
   // 节流控制：避免频繁 pick 导致卡顿（ms）
   const MOUSE_MOVE_THROTTLE_MS = 50
   let lastMouseMoveTime = 0
+
 
   // ==================== 辅助函数 ====================
   /**
@@ -123,12 +128,21 @@ export function useCesium(containerId) {
 
   const loadTerrain = async (viewerInstance) => {
     try {
+      // 启用更详细的地形加载，包括水面遮罩和法线（用于更好的光照效果）
       const terrainProvider = await Cesium.createWorldTerrainAsync({
-        requestWaterMask: false,
-        requestVertexNormals: false
+        requestWaterMask: true,      // 启用水面遮罩
+        requestVertexNormals: true   // 启用顶点法线（增强地形光照效果）
       })
       viewerInstance.terrainProvider = terrainProvider
       viewerInstance.scene.globe.enableLighting = true
+
+      // 添加地形夸张设置，增强地形特征显示（在气象应用中很有用）
+      viewerInstance.scene.globe.terrainExaggeration = 1.5  // 地形高度夸张1.5倍
+
+      // 确保相机考虑地形高度
+      viewerInstance.scene.globe.depthTestAgainstTerrain = true
+
+      console.log('地形加载成功，已启用增强地形效果和高度夸张')
     } catch (error) {
       console.warn('地形加载失败，使用默认地形:', error)
       viewerInstance.terrainProvider = new Cesium.EllipsoidTerrainProvider()
@@ -225,20 +239,20 @@ export function useCesium(containerId) {
           unusedTiles: 100
         }
       })
-      
+
       const progressManager = createProgressManager((displayProgress) => {
         cesiumStore.setModelLoadProgress(displayProgress);
       }, {
         totalExpectedUpdates: 20,
         maxPossibleValue: 35
       });
-      
+
       modelTileset.loadProgress.addEventListener(progress => {
         progressManager.updateProgress(progress);
       });
-      
+
       viewerInstance.scene.primitives.add(modelTileset);
-      
+
       modelTileset.allTilesLoaded.addEventListener(() => {
         progressManager.markAsCompleted();
         setTimeout(() => {
@@ -246,7 +260,7 @@ export function useCesium(containerId) {
           progressManager.reset();
         }, 3000);
       });
-      
+
     } catch (error) {
       console.error('加载3D模型失败:', error)
     }
@@ -446,7 +460,7 @@ export function useCesium(containerId) {
     // 移除已存在的实体（保持唯一）
     if (monitorEntities.has(`monitor_${point.id}`)) {
       const old = monitorEntities.get(`monitor_${point.id}`)
-      try { viewer.value.entities.remove(old) } catch(e) {}
+      try { viewer.value.entities.remove(old) } catch (e) { }
       originalBillboardStyle.delete(`monitor_${point.id}`)
     }
 
@@ -489,7 +503,7 @@ export function useCesium(containerId) {
 
     // 清空现有实体（原来逻辑）——确保不会残留旧实体
     monitorEntities.forEach(entity => {
-      try { viewer.value.entities.remove(entity) } catch(e) {}
+      try { viewer.value.entities.remove(entity) } catch (e) { }
       originalBillboardStyle.delete(entity.id)
     })
     monitorEntities.clear()
@@ -503,7 +517,7 @@ export function useCesium(containerId) {
    */
   const bindMonitorPointEvents = () => {
     if (!viewer.value) return
-    
+
     // 相机移动结束后保持选中样式
     viewer.value.scene.camera.moveEnd.addEventListener(() => {
       if (selectedEntity?.billboard) {
@@ -543,7 +557,7 @@ export function useCesium(containerId) {
         const pickedObject = viewer.value.scene.pick(movement.endPosition)
 
         // 如果之前有 hovered，但现在不再被 hover 到并且不是 selected，则恢复它
-        if (hoveredEntity && hoveredEntity !== selectedEntity) {
+        if (hoveredEntity && hoveredEntity.id !== selectedEntity.id) {
           const stillHovered = Cesium.defined(pickedObject) && pickedObject.id === hoveredEntity
           if (!stillHovered) {
             restoreOriginalBillboardStyle(hoveredEntity)
@@ -569,7 +583,7 @@ export function useCesium(containerId) {
               // 保存当前实体原始样式（若未保存）
               saveOriginalBillboardStyle(pickedObject.id)
               // 设置轻量悬停视觉（只改 scale，避免改 image）
-              if (pickedObject.id.billboard) pickedObject.id.billboard.scale = 1.2
+              if (pickedObject.id.billboard) pickedObject.id.billboard.scale = 1.6
               hoveredEntity = pickedObject.id
             }
           }
@@ -591,7 +605,7 @@ export function useCesium(containerId) {
   const clearMonitorPoints = () => {
     if (viewer.value) {
       monitorEntities.forEach(entity => {
-        try { viewer.value.entities.remove(entity) } catch(e) {}
+        try { viewer.value.entities.remove(entity) } catch (e) { }
         originalBillboardStyle.delete(entity.id)
       })
       monitorEntities.clear()
@@ -601,9 +615,351 @@ export function useCesium(containerId) {
     originalBillboardStyle.clear()
     delete window.flyToMonitor
   }
+  //=================风场======================
+  const initWind = async () => {
+    // 从store获取风场配置
+    const windOptions = layerSettingsStore.windOptions;
+    // 使用配置文件中的文件路径
+    const dataConfigs = {
+      file: import.meta.env.VITE_WIND_DATA_URL,
+      options: windOptions
+    };
 
+    // 先获取数据
+    const res = await fetch(dataConfigs.file);
+    const data = await res.json();
+    console.log('gaj',data);
+    
+    const windData = {
+      ...data,
+      bounds: {
+        west: 120.0,
+        south: 35.5,
+        east: 121.0,
+        north: 37.0
+      }
+    };
+
+    const rectangle = Cesium.Rectangle.fromDegrees(
+      windData.bounds.west,
+      windData.bounds.south,
+      windData.bounds.east,
+      windData.bounds.north
+    );
+    viewer.value.camera.flyTo({
+      destination: rectangle,
+      duration: 0,
+    });
+
+    windLayer.value = new WindLayer(viewer.value, windData, dataConfigs.options);
+
+    // Add event listeners
+    windLayer.value.addEventListener('dataChange', (data) => {
+      console.log('Wind data updated:', data);
+      // Handle data change
+    });
+
+    windLayer.value.addEventListener('optionsChange', (options) => {
+      console.log('Options updated:', options);
+      // Handle options change
+    });
+
+    // 监听store中风场配置变化，实时更新风场图层
+    watch(function () {
+      return layerSettingsStore.windOptions;
+    }, function (newOptions) {
+      if (windLayer.value) {
+        console.log('Updating wind layer options from store:', newOptions);
+        windLayer.value.updateOptions(newOptions);
+      }
+    }, { deep: true });
+  }
+//==========================热力图======================
+
+/**
+ * 👉 根据 bounds 生成一个 polygon 用来贴切片
+ */
+function polygonFromBounds(b) {
+  return Cesium.Cartesian3.fromDegreesArray([
+    b.west, b.south,
+    b.east, b.south,
+    b.east, b.north,
+    b.west, b.north
+  ]);
+}
+
+/**
+ * 👉 创建插值网格以生成连续的热力图
+ */
+function createInterpolatedGrid(points, bounds, gridSize = 100) {
+  const grid = [];
+  const lonStep = (bounds.east - bounds.west) / (gridSize - 1);
+  const latStep = (bounds.north - bounds.south) / (gridSize - 1);
+  
+  // 创建网格点
+  for (let i = 0; i < gridSize; i++) {
+    const row = [];
+    for (let j = 0; j < gridSize; j++) {
+      const lon = bounds.west + j * lonStep;
+      const lat = bounds.south + i * latStep;
+      row.push({ lon, lat, value: null });
+    }
+    grid.push(row);
+  }
+  
+  // 对每个网格点进行插值
+  for (let i = 0; i < gridSize; i++) {
+    for (let j = 0; j < gridSize; j++) {
+      const gridPoint = grid[i][j];
+      gridPoint.value = interpolateValue(gridPoint.lon, gridPoint.lat, points);
+    }
+  }
+  
+  return grid;
+}
+
+/**
+ * 👉 使用反距离加权插值(IDW)算法
+ */
+function interpolateValue(lon, lat, points) {
+  const power = 2; // 距离权重的幂次
+  let weightedSum = 0;
+  let weightSum = 0;
+  
+  // 如果网格点正好在数据点上，直接使用该点的值
+  for (const point of points) {
+    if (Math.abs(point.lon - lon) < 0.0001 && Math.abs(point.lat - lat) < 0.0001) {
+      return point.value;
+    }
+  }
+  
+  // 计算到所有数据点的距离并进行插值
+  for (const point of points) {
+    const distance = Math.sqrt(
+      Math.pow(point.lon - lon, 2) + Math.pow(point.lat - lat, 2)
+    );
+    
+    // 避免除零错误
+    if (distance < 0.0001) {
+      return point.value;
+    }
+    
+    const weight = 1 / Math.pow(distance, power);
+    weightedSum += point.value * weight;
+    weightSum += weight;
+  }
+  
+  return weightSum > 0 ? weightedSum / weightSum : 0;
+}
+
+/**
+ * 👉 根据插值网格生成热力图纹理
+ */
+function heatTextureFromGrid(grid, colorRamp) {
+  const size = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  
+  // 底色透明
+  ctx.clearRect(0, 0, size, size);
+  
+  // 计算整个网格的最小值和最大值
+  let minValue = Infinity;
+  let maxValue = -Infinity;
+  
+  for (let i = 0; i < grid.length; i++) {
+    for (let j = 0; j < grid[i].length; j++) {
+      if (grid[i][j].value !== null) {
+        minValue = Math.min(minValue, grid[i][j].value);
+        maxValue = Math.max(maxValue, grid[i][j].value);
+      }
+    }
+  }
+  
+  // 绘制热力图，使用渐变色块而非单色填充
+  const cellWidth = size / grid[0].length;
+  const cellHeight = size / grid.length;
+  
+  for (let i = 0; i < grid.length; i++) {
+    for (let j = 0; j < grid[i].length; j++) {
+      const value = grid[i][j].value;
+      if (value !== null) {
+        const color = colorRamp(value, minValue, maxValue);
+        let cssColor;
+        
+        if (color instanceof Cesium.Color) {
+          cssColor = color.toCssColorString();
+        } else if (typeof color === 'string') {
+          cssColor = color;
+        } else if (Array.isArray(color) && color.length >= 3) {
+          const alpha = color.length > 3 ? color[3] / 255 : 0.7; // 提高透明度
+          cssColor = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`;
+        } else {
+          cssColor = 'rgba(255, 0, 0, 0.7)'; // 提高透明度
+        }
+        
+        // 绘制带透明度的色块
+        ctx.fillStyle = cssColor;
+        ctx.fillRect(j * cellWidth, i * cellHeight, cellWidth, cellHeight);
+      }
+    }
+  }
+  
+  return new Cesium.ImageMaterialProperty({
+    image: canvas,
+    transparent: true
+  });
+}
+
+/**
+ * 👉 颜色映射函数
+ */
+function createColorRamp() {
+  return function(value, min, max) {
+    const t = (value - min) / (max - min);
+    
+    // 颜色渐变定义
+    const stops = [
+      { t: 0.0, color: [0, 0, 130, 180] },     // 深蓝 (增加alpha值)
+      { t: 0.2, color: [0, 100, 255, 160] },   // 蓝色
+      { t: 0.4, color: [0, 200, 255, 140] },   // 青色
+      { t: 0.6, color: [0, 255, 0, 120] },     // 绿色
+      { t: 0.8, color: [255, 255, 0, 100] },   // 黄色
+      { t: 1.0, color: [255, 0, 0, 80] }       // 红色 (较低alpha值)
+    ];
+    
+    // 找到所在区间
+    for (let i = 1; i < stops.length; i++) {
+      if (t <= stops[i].t) {
+        const p = (t - stops[i - 1].t) / (stops[i].t - stops[i - 1].t);
+        const c1 = stops[i - 1].color;
+        const c2 = stops[i].color;
+        const r = Math.round(c1[0] + (c2[0] - c1[0]) * p);
+        const g = Math.round(c1[1] + (c2[1] - c1[1]) * p);
+        const b = Math.round(c1[2] + (c2[2] - c1[2]) * p);
+        const a = Math.round(c1[3] + (c2[3] - c1[3]) * p); // 插值alpha值
+        
+        return Cesium.Color.fromBytes(r, g, b, a);
+      }
+    }
+    
+    // 默认返回红色
+    return Cesium.Color.RED.withAlpha(0.7);
+  };
+}
+
+// 存储热力图实体
+let heatMapEntities = [];
+
+/**
+ * 👉 生成连续的热力图，紧贴地面
+ */
+async function addHeatVolume() {
+  try {
+    const data = await fetch(import.meta.env.VITE_TEM_DATA_URL);
+    const parsedData = await data.json();
+    
+    // 青岛范围
+    const bounds = {
+      west: 120.0,
+      south: 35.5,
+      east: 121.0,
+      north: 37.0
+    };
+    
+    // 创建插值网格
+    const grid = createInterpolatedGrid(parsedData.points, bounds, 80);
+    
+    // 创建颜色映射函数
+    const colorRamp = createColorRamp();
+    
+    // 清空之前的热力图实体
+    heatMapEntities.forEach(entity => {
+      if (viewer.value) {
+        try {
+          viewer.value.entities.remove(entity);
+        } catch (e) {
+          console.warn('移除热力图实体失败:', e);
+        }
+      }
+    });
+    heatMapEntities = [];
+    
+    // 创建紧贴地面的热力图（只创建一个层面，不使用3D切片）
+    const entity = viewer.value.entities.add({
+      name: 'heat-map',
+      show: true,
+      polygon: {
+        hierarchy: polygonFromBounds(bounds),
+        height: 0, // 紧贴地面
+        material: heatTextureFromGrid(grid, colorRamp),
+        outline: true,
+        outlineColor: Cesium.Color.WHITE.withAlpha(0.5),
+        outlineWidth: 1,
+        perPositionHeight: false,
+        // 启用地形跟随
+        classificationType: Cesium.ClassificationType.TERRAIN
+      }
+    });
+    
+    heatMapEntities.push(entity);
+    
+    // 添加热力图轮廓线（可选）
+    addHeatOutline(bounds);
+    
+  } catch (error) {
+    console.error('热力图加载失败:', error);
+  }
+}
+
+/**
+ * 👉 添加热力图轮廓线
+ */
+function addHeatOutline(bounds) {
+  const outlineEntity = viewer.value.entities.add({
+    name: 'heat-outline',
+    show: true,
+    polyline: {
+      positions: Cesium.Cartesian3.fromDegreesArray([
+        bounds.west, bounds.south,
+        bounds.east, bounds.south,
+        bounds.east, bounds.north,
+        bounds.west, bounds.north,
+        bounds.west, bounds.south
+      ]),
+      width: 2,
+      material: new Cesium.PolylineGlowMaterialProperty({
+        color: Cesium.Color.WHITE.withAlpha(0.6),
+        glowPower: 0.3,
+        taperPower: 1.0
+      }),
+      clampToGround: true // 紧贴地面
+    }
+  });
+  
+  heatMapEntities.push(outlineEntity);
+}
+
+/**
+ * 👉 清理热力图
+ */
+const clearHeatMap = () => {
+  heatMapEntities.forEach(entity => {
+    if (viewer.value) {
+      try {
+        viewer.value.entities.remove(entity);
+      } catch (e) {
+        console.warn('移除热力图实体失败:', e);
+      }
+    }
+  });
+  heatMapEntities = [];
+};
   // ==================== 初始化 ====================
   const initViewer = async () => {
+    console.log('initViewer', containerId);
+
     if (!containerId) {
       errorMsg.value = 'Cesium容器ID不存在'
       return
@@ -612,9 +968,9 @@ export function useCesium(containerId) {
     isLoading.value = true
     try {
       Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_TOKEN || ''
-      
+
       const viewerOptions = getViewerOptions();
-      
+
       viewerOptions.contextOptions = {
         ...viewerOptions.contextOptions,
         webgl: {
@@ -625,16 +981,16 @@ export function useCesium(containerId) {
           antialias: true
         }
       };
-      
+
       viewerOptions.scene3DOnly = true;
       viewerOptions.useBrowserRecommendedResolution = true;
-      
+
       viewer.value = new Cesium.Viewer(containerId, viewerOptions)
 
       // 基础配置
       viewer.value.camera.setView(CESIUM_CONFIG.initialView)
       viewer.value.cesiumWidget.creditContainer.style.display = 'none'
-      
+
       // 加载资源
       await loadTerrain(viewer.value)
       await addWhiteModel(viewer.value)
@@ -643,7 +999,8 @@ export function useCesium(containerId) {
       cesiumStore.setViewer(viewer.value)
       renderMonitorPoints()
       bindMonitorPointEvents()
-
+      initWind();
+      //addHeatVolume();
       // 数据监听
       watch(monitorPoints, renderMonitorPoints, { deep: true })
       watch(
@@ -670,27 +1027,107 @@ export function useCesium(containerId) {
     }
   }
 
-  // 生命周期
-  onMounted(() => {
-    initViewer()
+  // 立即执行初始化，不依赖onMounted
+  // 注意：这是临时修改，用于调试和修复地图不显示的问题
+  const initPromise = initViewer();
+  console.log('初始化Promise:', initPromise);
+
+  // 保留生命周期钩子，但不在这里执行主要初始化
+  onMounted(async () => {
+    console.log('useCesium onMounted 执行，viewer当前状态:', viewer.value);
+    // 如果viewer还未初始化，再次尝试
+    if (!viewer.value) {
+      console.log('onMounted中再次尝试初始化...');
+      await initViewer();
+    }
   })
 
   onUnmounted(() => {
     if (viewer.value) {
-      try { viewer.value.destroy() } catch(e) {}
+      try { viewer.value.destroy() } catch (e) { }
       viewer.value = null
       clearMonitorPoints()
+      clearHeatMap(); // 添加这行
+
+      windLayer.value.destroy();
+
     }
   })
+
+  // ==================== 图层控制 ====================
+  /**
+   * 设置模型图层可见性
+   */
+  const setModelVisibility = (visible) => {
+    if (modelTileset) {
+      modelTileset.show = visible;
+    }
+  };
+
+  /**
+   * 设置风场图层可见性
+   */
+  const setWindVisibility = (visible) => {
+    if (windLayer.value) {
+      windLayer.value.show = visible
+    }
+  };
+
+  /**
+   * 设置监测点图层可见性
+   */
+  const setMonitoringPointsVisibility = (visible) => {
+    monitorEntities.forEach((entity) => {
+      if (entity) {
+        entity.show = visible;
+      }
+    });
+  };
+
+  /**
+   * 设置温度图层可见性
+   */
+  const setTemperatureVisibility = (visible) => {
+    // 控制所有热力图实体的显示/隐藏
+    heatMapEntities.forEach(entity => {
+      if (entity) {
+        entity.show = visible;
+      }
+    });
+  };
+  /**
+   * 更新风场配置选项
+   */
+  const updateWindOptions = (options) => {
+    if (windLayer.value && options) {
+      windLayer.value.updateOptions({
+        particleHeight: options.height,
+        particleSize: options.particleSize,
+        lineWidth: { min: options.lineWidth, max: options.lineWidth + 1 },
+        speedFactor: options.speedFactor,
+        colors: options.colorScale === 'rainbow' ? ['#FF0000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF'] :
+          options.colorScale === 'jet' ? ['#000080', '#0000FF', '#00FFFF', '#FFFF00', '#FF0000', '#800000'] :
+            ['#440154', '#3B528B', '#21908C', '#5DC863', '#FDE725'], // viridis
+        opacity: options.opacity,
+        maxParticles: options.maxParticles
+      });
+    }
+  };
 
   // 暴露公共方法
   return {
     viewer,
     isLoading,
     errorMsg,
+    windLayer,
     flyToRegion,
     flyToRectangle,
     getCurrentCameraParams,
-    clearMonitorPoints
+    clearMonitorPoints,
+    setModelVisibility,
+    setWindVisibility,
+    setMonitoringPointsVisibility,
+    setTemperatureVisibility,
+    updateWindOptions
   }
 }

@@ -350,7 +350,6 @@ onMounted(() => {
   font-size: 13px;
   position: sticky;
   top: 0;
-  background-color: #0f1733;
   z-index: 10;
   
   .table-column {
@@ -534,7 +533,8 @@ onMounted(() => {
 }
 
 .analyze-btn {
-  padding: 6px 12px;
+  padding: 6px;
+  width: 40px;
   background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
   border: none;

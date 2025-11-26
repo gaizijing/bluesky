@@ -13,7 +13,7 @@ export const useCesiumStore = defineStore('cesium', {
       baseLayer: true,    // 基础地图
       temperature: false, // 温度图层
       precipitation: false,// 降水图层
-      wind: false,        // 风力图层
+
       pressure: false     // 气压图层
     },
     // 可视化参数（粒子密度、动画速度等）
