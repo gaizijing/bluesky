@@ -7,7 +7,6 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import '@/styles/index.scss'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-
 const app = createApp(App)
 
 // 全局注册 Element Plus 图标组件

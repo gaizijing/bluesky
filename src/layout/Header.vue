@@ -121,7 +121,7 @@ const MonitoringPoints = defineAsyncComponent(() =>
 const ThresholdManagement = defineAsyncComponent(() =>
   import("@/pages/Setting/views/ThresholdManagement.vue")
 );
-import { useMonitoringPoints } from "@/composables/useMonitoringPoints";
+import { useMonitoringPoints } from "@/hooks/useMonitoringPoints";
 import { useWeatherStore } from "@/store/modules/weather";
 import { useLayerSettingsStore } from "@/store/modules/layerSettings";
 import { fetchCurrentPointWeather } from "@/api";
@@ -153,6 +153,7 @@ const handleThresholdClose = () => {
 
 // 显示图层设置弹窗
 const mapSetting = () => {
+  console.log('mapSetting', showLayerDialog.value);
   showLayerDialog.value = !showLayerDialog.value;
   layerSettingsStore.setShow(showLayerDialog.value);
 };

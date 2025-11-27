@@ -41,7 +41,7 @@ export const WIND_LAYER_DEFAULTS = {
     flipY: true,
     useViewerBounds: false,
     dynamic: true,
-    domain: {
+    displayRange: {
       min: 0,
       max: 10                  
     }

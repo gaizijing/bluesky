@@ -126,7 +126,7 @@
 </template>
 <script setup>
 import { ref, computed, onMounted, onBeforeMount } from "vue";
-import { useMonitoringPoints } from "@/composables/useMonitoringPoints";
+import { useMonitoringPoints } from "@/hooksuseMonitoringPoints";
 import { updateSelectedPoint } from "@/api";
 
 // 使用组合函数

@@ -5,6 +5,10 @@ export const useCesiumStore = defineStore('cesium', {
   state: () => ({
     // Cesium Viewer实例（全局唯一）
     viewer: null,
+    // 风场图层实例（全局唯一）
+    windLayer: null,
+    // 温度图层实例（全局唯一）
+    temperatureLayer: null,
     // 当前相机位置（用于保存/恢复视角）
     cameraPosition: null,
     modelLoadProgress: 0,// 新增模型加载进度状态
@@ -27,6 +31,14 @@ export const useCesiumStore = defineStore('cesium', {
     baseLayer: 'osm' // osm/satellite/terrain
   }),
   actions: {
+    // 设置风场图层实例
+    setWindLayer(windLayer) {
+      this.windLayer = windLayer
+    },
+    // 设置温度图层实例
+    setTemperatureLayer(temperatureLayer) {
+      this.temperatureLayer = temperatureLayer
+    },
     // 设置Viewer实例
     setViewer(viewer) {
       this.viewer = viewer
