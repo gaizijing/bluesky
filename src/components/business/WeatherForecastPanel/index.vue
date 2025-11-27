@@ -163,7 +163,6 @@ const selectTimeRange = (range) => {
 
 // 将原来的loadData函数替换为：
 const loadData = async () => {
-  console.log('开始加载数据，时间范围:', selectedTimeRange.value, '气象要素:', currentElementConfig.value.name);
   isLoading.value = true;
   try {
     // 调用模拟API获取数据

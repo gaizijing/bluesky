@@ -100,7 +100,6 @@ const getWindSpeedLevel = (windSpeed) => {
 //     const data = await fetchCurrentPointWeather(
 //       monitoringPointStore.selectedPoint
 //     );
-//     console.log(data);
 //     // 更新天气数据
 //     weatherStore.currentPointWeather.value = data.weather;
 //   } catch (err) {

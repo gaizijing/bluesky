@@ -64,7 +64,7 @@ class CacheUtils {
   get(key, useLocalStorage = false) {
     // 先从内存缓存获取
     let cacheItem = this.memoryCache.get(key);
-    
+
     // 如果内存缓存没有，且允许使用localStorage，则从localStorage获取
     if (!cacheItem && useLocalStorage) {
       try {
@@ -140,7 +140,7 @@ class CacheUtils {
    */
   clearExpired(includeLocalStorage = false) {
     const now = Date.now();
-    
+
     // 清除内存中过期的缓存
     for (const [key, item] of this.memoryCache.entries()) {
       if (now > item.expiry) {
@@ -179,7 +179,7 @@ class CacheUtils {
     try {
       const keys = [];
       const now = Date.now();
-      
+
       // 收集所有缓存键和过期时间
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -194,10 +194,10 @@ class CacheUtils {
           }
         }
       }
-      
+
       // 按过期时间排序
       keys.sort((a, b) => a.expiry - b.expiry);
-      
+
       // 删除最旧的20%缓存项
       const deleteCount = Math.max(1, Math.floor(keys.length * 0.2));
       for (let i = 0; i < deleteCount; i++) {
@@ -221,21 +221,19 @@ class CacheUtils {
     return async (...args) => {
       // 生成缓存键
       const cacheKey = this.generateKey(prefix || asyncFunc.name, args);
-      
+
       // 尝试从缓存获取
       const cachedResult = this.get(cacheKey, useLocalStorage);
       if (cachedResult !== null) {
-        console.log(`从缓存获取: ${cacheKey}`);
         return cachedResult;
       }
-      
+
       // 执行原函数
       const result = await asyncFunc(...args);
-      
+
       // 缓存结果
       this.set(cacheKey, result, duration, useLocalStorage);
-      console.log(`缓存结果: ${cacheKey}`);
-      
+
       return result;
     };
   }
@@ -247,7 +245,7 @@ class CacheUtils {
   getStats() {
     let localStorageCount = 0;
     let localStorageSize = 0;
-    
+
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -260,7 +258,7 @@ class CacheUtils {
     } catch (error) {
       console.error('获取localStorage统计信息失败:', error);
     }
-    
+
     return {
       memoryCacheCount: this.memoryCache.size,
       localStorageCount,

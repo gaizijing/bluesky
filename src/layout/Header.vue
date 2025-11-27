@@ -5,17 +5,12 @@
         <img src="@/assets/icons/logo.png" class="logo-img" alt="系统logo" />
       </div>
       <div class="location-info">
-        <span class="location-name" @click="togglePointSelector"
-          >当前位置：{{ monitoringPointStore.selectedPointName }}</span
-        >
+        <span class="location-name" @click="togglePointSelector">当前位置：{{ monitoringPointStore.selectedPointName
+          }}</span>
       </div>
     </div>
     <!-- 切换起降点弹窗 -->
-    <div
-      v-if="showPointSelector"
-      class="dialog-mask"
-      @click="togglePointSelector"
-    >
+    <div v-if="showPointSelector" class="dialog-mask" @click="togglePointSelector">
       <div class="dialog-container" @click.stop>
         <div class="dialog-header">
           <h3>选择起降点</h3>
@@ -28,11 +23,7 @@
     </div>
 
     <!-- 阈值管理弹窗 -->
-    <div
-      v-if="showThresholdDialog"
-      class="dialog-mask"
-      @click="handleThresholdClose"
-    >
+    <div v-if="showThresholdDialog" class="dialog-mask" @click="handleThresholdClose">
       <div class="dialog-container" @click.stop>
         <div class="dialog-header">
           <h3 class="dialog-header-h3">阈值设置</h3>
@@ -98,8 +89,8 @@
         </template>
       </el-dropdown>
     </div>
-    
-    
+
+
   </header>
 </template>
 
@@ -153,7 +144,6 @@ const handleThresholdClose = () => {
 
 // 显示图层设置弹窗
 const mapSetting = () => {
-  console.log('mapSetting', showLayerDialog.value);
   showLayerDialog.value = !showLayerDialog.value;
   layerSettingsStore.setShow(showLayerDialog.value);
 };
@@ -304,6 +294,7 @@ onMounted(() => {
 .user-info {
   cursor: pointer;
 }
+
 .dialog-container {
   font-style: normal !important;
   font-family: "AideepFont" !important;

@@ -10,7 +10,7 @@ export const initWind = async (viewer, layerSettingsStore, windLayerRef) => {
 
   const res = await fetch(dataConfigs.file);
   const data = await res.json();
-  
+
   const windData = {
     ...data,
     bounds: {
@@ -24,16 +24,13 @@ export const initWind = async (viewer, layerSettingsStore, windLayerRef) => {
   windLayerRef.value = new WindLayer(viewer, windData, dataConfigs.options);
 
   windLayerRef.value.addEventListener('dataChange', (data) => {
-    console.log('Wind data updated:', data);
   });
 
   windLayerRef.value.addEventListener('optionsChange', (options) => {
-    console.log('Options updated:', options);
   });
 
   watch(() => layerSettingsStore.windOptions, (newOptions) => {
     if (windLayerRef.value) {
-      console.log('Updating wind layer options from store:', newOptions);
       windLayerRef.value.updateOptions(newOptions);
     }
   }, { deep: true });

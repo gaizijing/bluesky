@@ -1,40 +1,23 @@
 <template>
   <aside class="layout-sidebar">
-    <el-menu
-      :default-active="activeRoute"
-      class="sidebar-menu"
-      mode="vertical"
-      background-color="transparent"
-      text-color="#ccc"
-      active-text-color="#fff"
-      @select="handleMenuSelect"
-    >
+    <el-menu :default-active="activeRoute" class="sidebar-menu" mode="vertical" background-color="transparent"
+      text-color="#ccc" active-text-color="#fff" @select="handleMenuSelect">
       <!-- 使用递归组件渲染嵌套路由 -->
       <template v-for="item in displayRoutes" :key="item.path">
-        <el-menu-item 
-          v-if="!item.children || item.children.length === 0"
-          :index="item.path"
-        >
+        <el-menu-item v-if="!item.children || item.children.length === 0" :index="item.path">
           <el-icon v-if="item.meta?.icon">
             <component :is="getIconComponent(item.meta.icon)" />
           </el-icon>
           <template #title>{{ item.meta?.title }}</template>
         </el-menu-item>
-        <el-sub-menu 
-          v-else
-          :index="item.path"
-        >
+        <el-sub-menu v-else :index="item.path">
           <template #title>
             <el-icon v-if="item.meta?.icon">
               <component :is="getIconComponent(item.meta.icon)" />
             </el-icon>
             <span>{{ item.meta?.title }}</span>
           </template>
-          <el-menu-item
-            v-for="child in item.children"
-            :key="child.path"
-            :index="child.path"
-          >
+          <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
             <template #title>{{ child.meta?.title }}</template>
           </el-menu-item>
         </el-sub-menu>
@@ -61,8 +44,7 @@ const activeRoute = computed(() => {
 const displayRoutes = computed(() => {
   // 获取顶层路由的children作为显示菜单
   const mainRoute = routes.find(r => r.path === '/')
-  console.log(mainRoute?.children || []);
-  
+
   return mainRoute?.children || []
 })
 
@@ -171,13 +153,13 @@ const getIconComponent = (iconName) => {
   .layout-sidebar {
     width: 200px;
   }
-  
+
   .sidebar-menu :deep(.el-menu-item),
   .sidebar-menu :deep(.el-sub-menu__title) {
     font-size: 14px;
     padding: 0 15px;
   }
-  
+
   .sidebar-menu :deep(.el-menu--inline) .el-menu-item {
     padding: 0 35px !important;
   }
@@ -187,23 +169,23 @@ const getIconComponent = (iconName) => {
   .layout-sidebar {
     width: 60px;
   }
-  
+
   .sidebar-menu :deep(.el-menu-item),
   .sidebar-menu :deep(.el-sub-menu__title) {
     font-size: 12px;
     text-align: center;
     padding: 0;
   }
-  
+
   .sidebar-menu :deep(.el-icon) {
     margin-right: 0;
   }
-  
+
   .sidebar-menu :deep(.el-menu-item__content),
   .sidebar-menu :deep(.el-sub-menu__title > span:not(.el-sub-menu__icon-arrow)) {
     display: none;
   }
-  
+
   .sidebar-menu :deep(.el-menu--inline) {
     position: absolute;
     left: 60px;

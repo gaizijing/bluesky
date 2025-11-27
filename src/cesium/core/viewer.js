@@ -6,12 +6,28 @@ export const getViewerOptions = () => ({
   homeButton: false,
   sceneModePicker: false,
   navigationHelpButton: false,
-  infoBox: true,
+  infoBox: false,
   infoBoxSandbox: 'allow-same-origin allow-scripts allow-popups allow-forms',
   fullscreenButton: false,
   animation: false,
   timeline: false,
-  selectionIndicator: true,
+  selectionIndicator: false,
+
+  // 渲染精度设置
+  maximumScreenSpaceError: 1, // 较低的值提高精度但可能降低性能，可根据需求调整为2-4
+
+  // 性能优化关键设置
+  requestRenderMode: true, // 启用请求渲染模式，只在需要时渲染，提高性能
+  maximumRenderTimeChange: 0.1, // 控制请求渲染模式下的帧率，较小的值提高响应速度
+  scene3DOnly: true, // 如果只需要3D场景，禁用2D和Columbus View可提高性能
+
+  // 降低视觉效果换取性能
+  orderIndependentTranslucency: false, // 禁用顺序无关透明度，大幅提高性能
+  shadows: false, // 禁用阴影计算
+
+  showRenderLoopErrors: false, // 生产环境禁用错误弹窗
+
+  // WebGL上下文配置
   contextOptions: {
     requestWebgl1: false,
     allowTextureFilterAnisotropic: true,
@@ -19,7 +35,7 @@ export const getViewerOptions = () => ({
       alpha: false,
       depth: true,
       stencil: false,
-      antialias: true,
+      antialias: true, // 可设置为false进一步提高性能，但会降低画质
       powerPreference: 'high-performance',
       premultipliedAlpha: true,
       preserveDrawingBuffer: false,
@@ -30,7 +46,7 @@ export const getViewerOptions = () => ({
 
 export const createViewer = (containerId) => {
   Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_TOKEN || ''
-  
+
   return new Cesium.Viewer(containerId, getViewerOptions())
 }
 

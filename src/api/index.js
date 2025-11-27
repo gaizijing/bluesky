@@ -150,7 +150,6 @@ export const fetchCurrentMonitoringPoint = async () => {
       }
     }
 
-    console.log('当前选中的监测点:', response.data)
     return response.data
   } catch (error) {
     console.error('获取当前选中监测点失败:', error)
@@ -178,7 +177,6 @@ export const updateSelectedPoint = async (point) => {
       }
     }
 
-    console.log('监测点切换信息已保存到后台:', point.id, point.name)
     return response.data
   } catch (error) {
     console.error('保存监测点切换信息失败:', error)
@@ -256,14 +254,14 @@ export const getWeatherSuitability = async (currentPoint) => {
     const detail = timePoints.map((timePoint, timeIndex) => {
       // 对于不同因素，使用不同格式的时间点
       let formattedTimePoint = factorIndex === 0 ? timePoint.split(' ')[1] : timePoint;
-      
+
       return {
         timePoint: formattedTimePoint,
         statusData: statusData[factorIndex][timeIndex],
         valueData: valueData[factorIndex][timeIndex]
       };
     });
-    
+
     return {
       factor: factor,
       detail: detail
@@ -279,7 +277,7 @@ export const getWeatherSuitability = async (currentPoint) => {
       "suitabilityList": suitabilityList
     }
   };
-  
+
   return response.data
 }
 export const getWeatherForecastTrend = async (currentPoint) => {
@@ -317,7 +315,7 @@ export const getWeatherForecastTrend = async (currentPoint) => {
  */
 export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
   try {
-   
+
     const [longitude, latitude] = currentPoint.coordinates;
     // 2. API核心配置（遵循官方规范）
     const API_KEY = import.meta.env.VITE_QWEATHER_API_KEY;
@@ -337,7 +335,7 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
       timeout: 15000, // 15秒超时保护
       decompress: true // 自动解压Gzip（axios v1.0+ 支持）
     });
-    
+
     // 4. 响应校验（遵循和风API错误码规范）
     const { data } = response;
     // 5. 格式化数据为项目可用格式
@@ -401,7 +399,6 @@ const fetchProfessionalWeatherDataFromAPI = async (currentPoint) => {
     // 3. 从特殊数据源获取
 
     // 模拟专业气象数据（实际项目中需要根据具体计算或专业API获取）
-    console.log("fetchProfessionalWeatherData");
 
     // 模拟根据基本气象数据计算或从专业数据源获取的结果
     const response = {

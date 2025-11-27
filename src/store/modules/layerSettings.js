@@ -14,7 +14,7 @@ export const useLayerSettingsStore = defineStore('layerSettings', {
       wind: { visible: true, name: '风场图层' },
       monitoringPoints: { visible: true, name: '监测点' }
     },
-    show:false,
+    show: false,
 
     // 风场配置参数 - 与WindLayerOptions接口完全匹配
     windOptions: {
@@ -37,7 +37,7 @@ export const useLayerSettingsStore = defineStore('layerSettings', {
   },
 
   actions: {
-    setShow(value){
+    setShow(value) {
       this.show = value
     },
 
@@ -89,7 +89,6 @@ export const useLayerSettingsStore = defineStore('layerSettings', {
           layers: this.layers,
           windOptions: this.windOptions
         }))
-        console.log('图层设置已保存到本地存储')
       } catch (error) {
         console.error('保存图层设置到本地存储失败:', error)
       }
@@ -111,10 +110,7 @@ export const useLayerSettingsStore = defineStore('layerSettings', {
           if (windOptions.lineLength) {
             mergedWindOptions.lineLength = { ...this.windOptions.lineLength, ...windOptions.lineLength }
           }
-
-          // 加载时进行参数验证
-          this.windOptions = validateWindOptions(mergedWindOptions)
-          console.log('从本地存储加载了图层设置')
+          this.windOptions = mergedWindOptions
         }
       } catch (error) {
         console.error('从本地存储加载图层设置失败:', error)

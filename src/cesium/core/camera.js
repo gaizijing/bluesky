@@ -43,16 +43,28 @@ export const getFlyToOptions = (options) => ({
 })
 
 export const flyToRegion = (viewer, region) => {
-  console.log('flyToRegion', region);
-  
+
   if (!viewer || !region) return
 
   try {
     if (region.coordinates?.length >= 2) {
       const [longitude, latitude] = region.coordinates
-      viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, 500),
-        ...getFlyToOptions({ ...region, isRegion: true })
+      // 创建中心点的笛卡尔坐标
+      const center = Cesium.Cartesian3.fromDegrees(longitude, latitude, 0)
+      // 创建边界球，半径根据需要调整，这里使用默认值1000米
+      const boundingSphere = new Cesium.BoundingSphere(center, region.radius || 1000)
+      
+      // 设置相机偏移参数
+      const offset = new Cesium.HeadingPitchRange(
+        Cesium.Math.toRadians(region.heading || 0),
+        Cesium.Math.toRadians(region.pitch || -30),
+        boundingSphere.radius * 2 // 距离球体中心的距离为半径的2倍
+      )
+      
+      viewer.camera.flyToBoundingSphere(boundingSphere, {
+        offset: offset,
+        duration: region.duration || 1.5,
+        easingFunction: region.easingFunction || Cesium.EasingFunction.CUBIC_IN_OUT
       })
     } else {
       console.warn('无效的区域坐标数据:', region)

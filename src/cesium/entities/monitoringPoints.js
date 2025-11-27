@@ -6,13 +6,18 @@ export const isMonitorEntity = (entity) => {
 }
 
 export const bindMonitorPointEvents = (viewer, monitorEntities, monitorStore, originalBillboardStyle) => {
-  if (!viewer) return
+  // 确保viewer实例有效
+  if (!viewer) {
+    console.warn("无法绑定监测点事件：viewer实例无效")
+    return
+  }
 
   let hoveredEntity = null
   let selectedEntity = null
   const MOUSE_MOVE_THROTTLE_MS = 50
   let lastMouseMoveTime = 0
 
+  // 相机移动结束时保持选中状态的样式
   viewer.scene.camera.moveEnd.addEventListener(() => {
     if (selectedEntity?.billboard) {
       selectedEntity.billboard.image = '/image/ic_select_point.png'
@@ -20,22 +25,23 @@ export const bindMonitorPointEvents = (viewer, monitorEntities, monitorStore, or
     }
   })
 
+  // 绑定左键点击事件
   viewer.screenSpaceEventHandler.setInputAction((movement) => {
     try {
-    
-      
+      // 检查点击的对象是否为监测点实体
+
       const pickedObject = viewer.scene.pick(movement.position)
       if (Cesium.defined(pickedObject) && isMonitorEntity(pickedObject.id)) {
         const pointData = pickedObject.id.properties.pointData
         selectedEntity = setEntityAsSelected(
-          viewer, 
-          pickedObject.id, 
-          monitorStore, 
-          originalBillboardStyle, 
+          viewer,
+          pickedObject.id,
+          monitorStore,
+          originalBillboardStyle,
           monitorEntities
         )
         const point = pointData && pointData.getValue ? pointData.getValue() : pointData
-        flyToRegion(viewer,{ coordinates: point.coordinates, duration: 2 })
+        flyToRegion(viewer, { coordinates: point.coordinates, duration: 1.5 })
       } else {
         restoreAllBillboardStyles(monitorEntities, originalBillboardStyle)
         monitorStore.setSelectedPoint(null)

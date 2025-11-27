@@ -35,7 +35,6 @@ const loadData = async () => {
     };
 
     chartData.value = adaptedData;
-    console.log('Data loaded and adapted:', chartData.value);
 
     // 数据加载完成后初始化图表
     if (chartRef.value && adaptedData) {
@@ -77,7 +76,6 @@ const initChart = () => {
     chartInstance.dispose();
   }
   chartInstance = echarts.init(chartRef.value);
-  console.log('Initializing chart with data:', chartData.value);
 
   const timeLabels = getTimeLabels();
   const factorCount = chartData.value.factors.length;

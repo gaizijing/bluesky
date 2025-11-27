@@ -141,7 +141,6 @@ export function useCesium(containerId) {
       // 确保相机考虑地形高度
       viewerInstance.scene.globe.depthTestAgainstTerrain = true
 
-      console.log('地形加载成功，已启用增强地形效果和高度夸张')
     } catch (error) {
       console.warn('地形加载失败，使用默认地形:', error)
       viewerInstance.terrainProvider = new Cesium.EllipsoidTerrainProvider()
@@ -626,7 +625,6 @@ export function useCesium(containerId) {
     // 先获取数据
     const res = await fetch(dataConfigs.file);
     const data = await res.json();
-    console.log('gaj',data);
     
     const windData = {
       ...data,
@@ -642,12 +640,10 @@ export function useCesium(containerId) {
 
     // Add event listeners
     windLayer.value.addEventListener('dataChange', (data) => {
-      console.log('Wind data updated:', data);
       // Handle data change
     });
 
     windLayer.value.addEventListener('optionsChange', (options) => {
-      console.log('Options updated:', options);
       // Handle options change
     });
 
@@ -656,7 +652,6 @@ export function useCesium(containerId) {
       return layerSettingsStore.windOptions;
     }, function (newOptions) {
       if (windLayer.value) {
-        console.log('Updating wind layer options from store:', newOptions);
         windLayer.value.updateOptions(newOptions);
       }
     }, { deep: true });
@@ -751,7 +746,6 @@ function initializeHeatmap(heatmapState) {
       };
     }
   );
-  console.log('gzj',heatmapState.heatmapInstance);
   
 
   heatmapState.heatmapInstance.addData(heatmapPoints);
@@ -1117,7 +1111,6 @@ const clearHeatMap = () => {
 };
 // ==================== 初始化 ====================
   const initViewer = async () => {
-    console.log('initViewer', containerId);
 
     if (!containerId) {
       errorMsg.value = 'Cesium容器ID不存在'
@@ -1189,14 +1182,11 @@ const clearHeatMap = () => {
   // 立即执行初始化，不依赖onMounted
   // 注意：这是临时修改，用于调试和修复地图不显示的问题
   const initPromise = initViewer();
-  console.log('初始化Promise:', initPromise);
 
   // 保留生命周期钩子，但不在这里执行主要初始化
   onMounted(async () => {
-    console.log('useCesium onMounted 执行，viewer当前状态:', viewer.value);
     // 如果viewer还未初始化，再次尝试
     if (!viewer.value) {
-      console.log('onMounted中再次尝试初始化...');
       await initViewer();
     }
   })
@@ -1335,27 +1325,23 @@ const setTemperatureVisibility = (visible) => {
         return;
       }
       
-      console.log(`开始显示航线: ${route.name || '未命名航线'}`);
       
       let west = 180, east = -180, south = 90, north = -90;
       
       // 遍历所有航段
       route.segments.forEach((segment, index) => {
         if (!segment.pathCoordinates || segment.pathCoordinates.length === 0) {
-          console.warn(`航段${index + 1}没有坐标数据，跳过`);
           return;
         }
         
         // 获取风险颜色
         const color = getCesiumRiskColor(segment.risk || 0);
         if (!color) {
-          console.error(`航段${index + 1} - 无法获取风险颜色，跳过该航段`);
           return;
         }
         
         // 确保Cartesian3可用
         if (!Cesium.Cartesian3) {
-          console.error('Cesium.Cartesian3不可用，无法创建航线');
           return;
         }
         

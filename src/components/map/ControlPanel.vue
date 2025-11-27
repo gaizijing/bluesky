@@ -11,19 +11,11 @@
       </div>
 
       <div v-show="expandedSections.layers" class="section-content">
-        <div
-          v-for="(layer, key) in layerSettingsStore.layers"
-          :key="key"
-          class="layer-item"
-        >
+        <div v-for="(layer, key) in layerSettingsStore.layers" :key="key" class="layer-item">
           <div class="layer-row">
             <span class="layer-name">{{ layer.name }}</span>
             <label class="switch">
-              <input
-                type="checkbox"
-                :checked="layer.visible"
-                @change="toggleLayerVisibility(key, $event)"
-              />
+              <input type="checkbox" :checked="layer.visible" @change="toggleLayerVisibility(key, $event)" />
               <span class="slider"></span>
             </label>
           </div>
@@ -41,112 +33,52 @@
       <div v-show="expandedSections.wind" class="section-content">
         <div class="control-group">
           <label>粒子数量: {{ localOptions.particlesTextureSize }}</label>
-          <input
-            type="range"
-            min="100"
-            max="1000"
-            step="10"
-            :value="localOptions.particlesTextureSize"
-            @input="handleParticlesTextureSizeChange"
-          />
+          <input type="range" min="100" max="1000" step="10" :value="localOptions.particlesTextureSize"
+            @input="handleParticlesTextureSizeChange" />
         </div>
 
         <div class="control-group">
           <label>速度因子: {{ localOptions.speedFactor.toFixed(2) }}</label>
-          <input
-            type="range"
-            min="0"
-            max="5"
-            step="0.1"
-            :value="localOptions.speedFactor"
-            @input="handleSpeedFactorChange"
-          />
+          <input type="range" min="0" max="5" step="0.1" :value="localOptions.speedFactor"
+            @input="handleSpeedFactorChange" />
         </div>
 
         <div class="control-group">
-          <label
-            >线宽范围: {{ localOptions.lineWidth.min }} -
-            {{ localOptions.lineWidth.max }}</label
-          >
+          <label>线宽范围: {{ localOptions.lineWidth.min }} -
+            {{ localOptions.lineWidth.max }}</label>
           <div class="range-group">
-            <input
-              type="range"
-              min="0"
-              max="10"
-              step="1"
-              :value="localOptions.lineWidth.min"
-              @input="handleLineWidthMinChange"
-            />
-            <input
-              type="range"
-              min="0"
-              max="10"
-              step="1"
-              :value="localOptions.lineWidth.max"
-              @input="handleLineWidthMaxChange"
-            />
+            <input type="range" min="0" max="10" step="1" :value="localOptions.lineWidth.min"
+              @input="handleLineWidthMinChange" />
+            <input type="range" min="0" max="10" step="1" :value="localOptions.lineWidth.max"
+              @input="handleLineWidthMaxChange" />
           </div>
         </div>
 
         <div class="control-group">
-          <label
-            >线条长度: {{ localOptions.lineLength.min }} -
-            {{ localOptions.lineLength.max }}</label
-          >
+          <label>线条长度: {{ localOptions.lineLength.min }} -
+            {{ localOptions.lineLength.max }}</label>
           <div class="range-group">
-            <input
-              type="range"
-              min="1"
-              max="100"
-              step="1"
-              :value="localOptions.lineLength.min"
-              @input="handleLineLengthMinChange"
-            />
-            <input
-              type="range"
-              min="1"
-              max="100"
-              step="1"
-              :value="localOptions.lineLength.max"
-              @input="handleLineLengthMaxChange"
-            />
+            <input type="range" min="1" max="100" step="1" :value="localOptions.lineLength.min"
+              @input="handleLineLengthMinChange" />
+            <input type="range" min="1" max="100" step="1" :value="localOptions.lineLength.max"
+              @input="handleLineLengthMaxChange" />
           </div>
         </div>
 
         <div class="control-group">
-          <label
-            >显示速度范围: {{ localOptions.displayRange.min }} -
-            {{ localOptions.displayRange.max }}</label
-          >
+          <label>显示速度范围: {{ localOptions.displayRange.min }} -
+            {{ localOptions.displayRange.max }}</label>
           <div class="range-group">
-            <input
-              type="range"
-              min="1"
-              max="100"
-              step="1"
-              :value="localOptions.displayRange.min"
-              @input="handleDisplayRangeMinChange"
-            />
-            <input
-              type="range"
-              min="1"
-              max="100"
-              step="1"
-              :value="localOptions.displayRange.max"
-              @input="handleDisplayRangeMaxChange"
-            />
+            <input type="range" min="1" max="100" step="1" :value="localOptions.displayRange.min"
+              @input="handleDisplayRangeMinChange" />
+            <input type="range" min="1" max="100" step="1" :value="localOptions.displayRange.max"
+              @input="handleDisplayRangeMaxChange" />
           </div>
         </div>
         <div class="control-group">
           <label>粒子高度: {{ localOptions.particleHeight }}</label>
-          <input
-            type="range"
-            min="10"
-            max="5000"
-            step="10"
-            :value="localOptions.particleHeight"
-            @input="handleParticleHeightChange"
-          />
+          <input type="range" min="10" max="5000" step="10" :value="localOptions.particleHeight"
+            @input="handleParticleHeightChange" />
         </div>
 
         <div class="control-group">
@@ -196,7 +128,8 @@ const toggleSection = (section: string) => {
 const toggleLayerVisibility = (key: string, event: Event) => {
   const visible = (event.target as HTMLInputElement).checked;
   layerSettingsStore.setLayerVisibility(key, visible);
-  console.log(props, key);
+  // 保存设置到本地存储
+  layerSettingsStore.saveSettingsToLocal();
 
   // 调用传入的Cesium控制方法
   if (props.layerControls) {
@@ -238,13 +171,15 @@ watch(
 
 // 更新风场选项
 const updateWindLayerOptions = (changedOptions: Partial<WindLayerOptions>) => {
-  if (props.windLayer && props.windLayer.value) {
-    props.windLayer.value.updateOptions(changedOptions);
-    emit("optionsChange", changedOptions);
+  props.windLayer.updateOptions(changedOptions);
+  emit("optionsChange", changedOptions);
 
-    // 同步更新store中的风场配置
-    layerSettingsStore.updateWindOptions(changedOptions);
-  }
+  // 同步更新store中的风场配置
+  layerSettingsStore.updateWindOptions(changedOptions);
+
+  // 保存设置到本地存储
+  layerSettingsStore.saveSettingsToLocal();
+
 };
 
 // 处理各种参数变更
@@ -304,13 +239,13 @@ const handleParticleHeightChange = (event: Event) => {
 // 重置为默认值
 const resetToDefaults = () => {
   Object.assign(localOptions, defaultOptions);
-  if (props.windLayer && props.windLayer.value) {
-    props.windLayer.value.updateOptions(defaultOptions);
-    emit("optionsChange", defaultOptions);
 
-    // 重置store中的风场配置
-    layerSettingsStore.resetWindOptions();
-  }
+  props.windLayer.updateOptions(defaultOptions);
+  emit("optionsChange", defaultOptions);
+
+  // 重置store中的风场配置
+  layerSettingsStore.resetWindOptions();
+
 };
 </script>
 
@@ -444,11 +379,11 @@ const resetToDefaults = () => {
   border-radius: 50%;
 }
 
-input:checked + .slider {
+input:checked+.slider {
   background-color: #1890ff;
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
   transform: translateX(20px);
 }
 
