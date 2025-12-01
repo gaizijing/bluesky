@@ -44,6 +44,14 @@ export const routes = [
         ]
       }
     ]
+  },{
+    path: '/vuemap',
+    name: 'Map',
+    component: () => import('@/components/map/VueMap.vue'),
+    meta: {
+      title: '地图',
+      icon: 'map'
+    }
   }
 //   {
 //     path: '/error',

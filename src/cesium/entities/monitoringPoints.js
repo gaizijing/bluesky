@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium'
 import { configureCamera, getCurrentCameraParams, flyToRegion, flyToRectangle } from '@/cesium/core/camera'
+import eventManager from '@/cesium/core/eventManager' // 导入独立的事件管理器
 
 export const isMonitorEntity = (entity) => {
   return entity?.id?.startsWith && entity.id.startsWith('monitor_')
@@ -25,11 +26,10 @@ export const bindMonitorPointEvents = (viewer, monitorEntities, monitorStore, or
     }
   })
 
-  // 绑定左键点击事件
-  viewer.screenSpaceEventHandler.setInputAction((movement) => {
+  // 监测点点击处理器函数
+  const monitorPointClickHandler = (viewer, movement) => {
     try {
       // 检查点击的对象是否为监测点实体
-
       const pickedObject = viewer.scene.pick(movement.position)
       if (Cesium.defined(pickedObject) && isMonitorEntity(pickedObject.id)) {
         const pointData = pickedObject.id.properties.pointData
@@ -42,15 +42,17 @@ export const bindMonitorPointEvents = (viewer, monitorEntities, monitorStore, or
         )
         const point = pointData && pointData.getValue ? pointData.getValue() : pointData
         flyToRegion(viewer, { coordinates: point.coordinates, duration: 1.5 })
-      } else {
-        restoreAllBillboardStyles(monitorEntities, originalBillboardStyle)
-        monitorStore.setSelectedPoint(null)
-        selectedEntity = null
+        return true // 返回true表示事件已处理
       }
+      return false // 返回false表示事件未处理，允许其他处理器处理
     } catch (e) {
       console.warn('点击处理失败：', e)
+      return false
     }
-  }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
+  }
+  
+  // 注册监测点点击处理器，优先级设为2（比航线优先级高）
+  eventManager.registerClickHandler(monitorPointClickHandler, 2)
 
   viewer.screenSpaceEventHandler.setInputAction((movement) => {
     const now = Date.now()

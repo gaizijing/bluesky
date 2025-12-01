@@ -76,18 +76,6 @@
                 <div class="segment-number">{{ segment.segment }}</div>
               </div>
             </div>
-            <!-- 可视化图例（精简） -->
-            <div class="visual-legend">
-              <span class="legend-item">
-                <span class="legend-dot" style="background-color: #10b981;"></span>低
-              </span>
-              <span class="legend-item">
-                <span class="legend-dot" style="background-color: #f59e0b;"></span>中
-              </span>
-              <span class="legend-item">
-                <span class="legend-dot" style="background-color: #ef4444;"></span>高
-              </span>
-            </div>
           </div>
         </div>
       </div>
@@ -186,16 +174,45 @@ const generateRoutes = () => {
       "作业区3-机场B"
     ];
     const randomName = locationPairs[Math.floor(Math.random() * locationPairs.length)];
+    
+    // 从完整名称中解析出起点和终点名称
+    const [startName, endName] = randomName.split('-');
+
+    // 在初始生成时就创建waypoints数组，避免后续点击时转换
+    const waypoints = [];
+    const dangers = []; // 存储每个航段的危险等级
+    
+    if (segmentData.length > 0) {
+      // 添加第一个航段的起点
+      waypoints.push({
+        longitude: segmentData[0].startCoordinates[0],
+        latitude: segmentData[0].startCoordinates[1]
+      });
+      
+      // 添加所有航段的终点，并设置对应的危险等级
+      segmentData.forEach((segment, index) => {
+        waypoints.push({
+          longitude: segment.endCoordinates[0],
+          latitude: segment.endCoordinates[1]
+        });
+        // 根据风险值设置危险等级（0-10范围），与地图组件的颜色映射保持一致
+        dangers.push(Math.round(segment.risk * 10));
+      });
+    }
 
     result.push({
       id: `route-${i + 1}`,
       name: randomName,
+      startName,
+      endName,
       length,
       segments,
       averageRisk,
       highestRisk,
       highestRiskSegment,
-      segmentData
+      segmentData,
+      waypoints,
+      dangers // 存储航段危险等级，用于地图上的颜色显示
     });
   }
   return result;
@@ -350,7 +367,9 @@ const exportAnalysis = () => {
 
   alert(`正在导出 ${currentRoute.value.name} 的分析报告...`);
 };
-
+/**
+ * todo : 
+ */
 // 航段tooltip位置设置
 const setTooltipPos = (idx, routeId) => {
   // 使用 nextTick 确保 DOM 更新后再获取位置
@@ -368,7 +387,7 @@ const setTooltipPos = (idx, routeId) => {
 const getRiskColor = (value) => {
   if (value < 0.3) return "#10b981"; // 低风险-绿
   if (value < 0.7) return "#f59e0b"; // 中风险-黄
-  return "#ef4444"; // 高风险-红
+  return "#ef4444"; // 高风险-红  
 };
 const getRiskClass = (value) => {
   if (value < 0.3) return "low";
@@ -383,8 +402,8 @@ const getRiskText = (value) => {
 // 新增：列表点击事件（核心！）
 const onRouteClick = (route) => {
 
-  // 1. 把选中的航线存入store，供地图组件读取
   routeStore.setCurrentRoute(route)
+  
   // 2. 可选：滚动/高亮当前航线
   document.querySelector(`[data-route-id="${route.id}"]`)?.scrollIntoView({
     behavior: 'smooth',
@@ -398,7 +417,6 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-.route-list-container {}
 
 .routes-table {
   height: 100%;

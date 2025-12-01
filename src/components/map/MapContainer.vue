@@ -22,6 +22,8 @@ import { useCesiumStore } from '@/store/modules/cesium'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import ControlPanel from "@/components/map/ControlPanel.vue"
 import { useRouteStore } from '@/store/modules/routeStore'
+import eventManager from '@/cesium/core/eventManager' // 导入独立的事件管理器
+
 // 地图容器ID
 const CESIUM_CONTAINER_ID = 'cesiumContainer'
 const layerSettingsStore = useLayerSettingsStore()
@@ -66,7 +68,9 @@ const initializeMap = async () => {
     
     // 应用图层显示状态设置
     applyLayerVisibilitySettings()
-    
+     // 使用独立的事件管理器初始化viewer事件
+  eventManager.initializeViewerEvents(cesiumHooks.viewer.value
+  );
     // 设置hook加载完成标志
     // isHookLoaded.value = true
   } catch (error) {

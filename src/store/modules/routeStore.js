@@ -29,7 +29,7 @@ export const useRouteStore = defineStore('route', {
           highestRiskSegment: route.highestRiskSegment
         }
       }
-      this.currentRoute = cesiumRoute
+      this.currentRoute = {...route}
       this.renderedRouteId = route.id
     },
     // 把列表的segmentData转成Cesium的waypoints（关键转换）

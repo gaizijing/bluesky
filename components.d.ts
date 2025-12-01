@@ -42,6 +42,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SurveillanceFootage: typeof import('./src/components/business/SurveillanceFootage/index.vue')['default']
     SystemMessage: typeof import('./src/components/business/SystemMessage/index.vue')['default']
+    VueMap: typeof import('./src/components/map/VueMap.vue')['default']
     WeatherElementSelector: typeof import('./src/components/business/WeatherElementSelector/index.vue')['default']
     WeatherForecastPanel: typeof import('./src/components/business/WeatherForecastPanel/index.vue')['default']
     WeatherWarnings: typeof import('./src/components/business/WeatherWarnings/index.vue')['default']

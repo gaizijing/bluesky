@@ -12,7 +12,6 @@ import { addWhiteModel } from '@/cesium/layers/model3d'
 import { renderMonitorPoints, clearMonitorPoints, bindMonitorPointEvents, setEntityAsSelected, restoreAllBillboardStyles } from '@/cesium/entities/monitoringPoints.js'
 import { initWind } from '@/cesium/visualization/wind'
 import { addHeatVolume } from '@/cesium/visualization/heatmap'
-import { clearRouteEntities } from '@/cesium/entities/routes'
 import routeManager from '@/cesium/entities/routes' // 引入航线管理器
 import { useRouteStore } from '@/store/modules/routeStore'
 
@@ -107,11 +106,11 @@ export function useCesium(containerId) {
         async (newRoute) => {
             if (!newRoute) return
             // 1. 先清空地图上已有的航线
-            await routeManager.clearAllRoutes()
-            // 2. 渲染新选中的航线（调用之前写的addRoute方法）
-            if (viewer.value && viewer.value.scene) {
-              await routeManager.addRoute(newRoute)
-            }
+              await routeManager.clearAllRoutes()
+              // 2. 渲染新选中的航线（调用之前写的addRoute方法）
+              
+                await routeManager.addRoute(newRoute)
+              
 
           // 替换原来的选择中心点代码块为:
           // 3. 获取航线的边界矩形并飞入
@@ -143,7 +142,7 @@ export function useCesium(containerId) {
   const cleanup = () => {
     if (viewer.value) {
       // 清理航线
-      clearRouteEntities(viewer.value, currentRouteEntities)
+     routeManager.clearRouteEntities(viewer.value, currentRouteEntities)
       // 清理监测点
       clearMonitorPoints(viewer.value, monitorEntities, originalBillboardStyle)
       // 清理热力图

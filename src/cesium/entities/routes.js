@@ -1,6 +1,7 @@
 // src/cesium/entities/routes.js
 import * as Cesium from 'cesium'
 import { useCesiumStore } from '@/store/modules/cesium'
+import eventManager from '@/cesium/core/eventManager'
 
 // 存储航线实体和飞机模型
 let routeEntities = new Map() // routeId -> { polylineEntity, planeEntity, positions, dangers, info }
@@ -190,11 +191,7 @@ export const clearRouteEntities = (viewer, currentRouteEntities) => {
  */
 export const addRoute = async (route) => {
   if (!viewer || !route?.waypoints || route.waypoints.length < 2) return
-  
-  // 先检查并移除已存在的相同ID的航线，避免实体ID重复
-  if (routeEntities.has(route.id)) {
-    removeRoute(route.id)
-  }
+console.log(route);
 
   // 在addRoute函数的"构建航点数组"部分修改
   const enhancedWaypoints = [];
@@ -205,8 +202,6 @@ export const addRoute = async (route) => {
   const startHeight = startPoint.height || 1000;
   enhancedWaypoints.push(
     { ...startPoint, height: 0 }, // 地面
-    { ...startPoint, height: startHeight * 0.3 }, // 低空
-    { ...startPoint, height: startHeight * 0.7 }, // 半高
     { ...startPoint, height: startHeight } // 起点高度
   );
 
@@ -217,8 +212,6 @@ export const addRoute = async (route) => {
   const endHeight = endPoint.height || 1000;
   enhancedWaypoints.push(
     { ...endPoint, height: endHeight }, // 终点高度
-    { ...endPoint, height: endHeight * 0.7 }, // 半高
-    { ...endPoint, height: endHeight * 0.3 }, // 低空
     { ...endPoint, height: 0 } // 地面
   );
 
@@ -244,7 +237,8 @@ export const addRoute = async (route) => {
     )
     segment && segmentEntities.push(segment)
   }
-
+  console.log(segmentEntities,positions.length);
+  
   // 创建飞机模型
   const planeEntity = await createRoutePlane(
     route.id,
@@ -301,8 +295,7 @@ export const addRoute = async (route) => {
  * 移除航线
  */
 export const removeRoute = (routeId) => {
-  // 检查 viewer 是否已初始化及其属性
-  if (!viewer || !viewer.entities || !routeEntities.has(routeId)) return
+  if (!viewer || !routeEntities.has(routeId)) return
 
   const routeData = routeEntities.get(routeId)
 
@@ -323,14 +316,15 @@ export const removeRoute = (routeId) => {
  * 移除所有航线
  */
 export const clearAllRoutes = () => {
-  // 检查 viewer 是否已初始化
-  if (!viewer) return
-  
+  if (!viewer) return; // 添加viewer检查，避免在viewer未初始化时执行
   routeEntities.forEach((_, routeId) => removeRoute(routeId))
 }
 
+
+
 const bindRouteEvents = () => {
   if (!viewer) return;
+debugger
 
   // 辅助函数：安全获取DOM元素
   const getSafeElement = (id) => {
@@ -416,19 +410,22 @@ const bindRouteEvents = () => {
     });
   }
 
-  // 航线点击事件
-  viewer.screenSpaceEventHandler.setInputAction((movement) => {
+
+  // 航线点击处理器函数
+  const routeClickHandler = (viewer, movement) => {
+   
+    
     const pickedObject = viewer.scene.pick(movement.position);
-
-    if (Cesium.defined(pickedObject) && pickedObject.id?.properties?.isRouteSegment?.getValue()) {
-      const routeId = pickedObject.id.properties.routeId.getValue();
-      const segmentIndex = pickedObject.id.properties.segmentIndex.getValue();
-      const routeData = routeEntities.get(routeId);
-
+    
+    // 检查是否点击的是航线分段
+    if (Cesium.defined(pickedObject) && pickedObject.id?.properties?.isRouteSegment) {
+      const routeId = pickedObject.id.properties.routeId;
+      const segmentIndex = pickedObject.id.properties.segmentIndex;
+      const routeData = routeEntities.get(routeId.getValue());
       if (routeData && popup && popupTitle && popupContent) {
         // 1. 设置弹窗内容
         popupTitle.textContent = `航线 ${routeData.name} - 第${segmentIndex + 1}段`;
-
+         
         // 根据危险等级设置样式类
         const dangerValue = routeData.dangers[segmentIndex] || 0;
         popup.className = ''; // 清除之前的类
@@ -439,7 +436,7 @@ const bindRouteEvents = () => {
         } else {
           popup.classList.add('popup-risk-high');
         }
-
+        
         popupContent.innerHTML = `
           <div style="margin-bottom: 8px;">
             <span style="display: inline-block; font-weight: 500; min-width: 80px;">危险等级：</span>
@@ -510,12 +507,26 @@ const bindRouteEvents = () => {
           ),
           duration: 2
         });
+        
+        // 返回true表示事件已处理
+        return true;
       }
     } else if (popup) {
       // 点击空白处关闭弹窗
       popup.style.display = 'none';
     }
-  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    
+    // 返回false表示事件未处理，允许其他处理器处理
+    return false;
+  };
+
+  // 注册航线点击处理器到独立的事件管理器
+  eventManager.registerClickHandler(routeClickHandler, 1); // 优先级设为1
+  
+  // 暴露注销方法，方便组件卸载时清理
+  return () => {
+    eventManager.unregisterClickHandler(routeClickHandler);
+  };
 };
 // 新增辅助函数：危险等级文本描述
 const getDangerText = (danger) => {
@@ -546,5 +557,6 @@ export default {
   addRoute,
   removeRoute,
   clearAllRoutes,
-  getColorByDangerLevel
+  getColorByDangerLevel,
+  clearRouteEntities
 }

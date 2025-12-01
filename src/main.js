@@ -6,6 +6,8 @@ import store from './store'    // 导入Pinia store实例（关键）
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import '@/styles/index.scss'
+import 'vue-cesium/dist/index.css'
+
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 const app = createApp(App)
 
