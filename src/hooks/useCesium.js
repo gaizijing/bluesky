@@ -152,7 +152,6 @@ export function useCesium(containerId) {
    * 设置监测点图层可见性
    */
   const setMonitoringPointsVisibility = (visible) => {
-    console.log('gzj',monitorEntities);
    monitorManager.setMonitoringPointsVisibility(visible)
   };
 

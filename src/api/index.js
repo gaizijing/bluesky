@@ -282,9 +282,7 @@ export const getWeatherSuitability = async (currentPoint) => {
 
   return response.data
 }
-export const getWeatherForecastTrend = async (params) => {
-  console.log("getWeatherForecastTrend",params);
-  
+export const getWeatherForecastTrend = async (params) => {  
   const params1 = {
 	latitude: 52.52,
 	longitude: 13.41,

@@ -241,9 +241,7 @@ class MonitorPointManager {
 
   // 私有方法：创建监测点实体
   _createMonitorPoint(dataSource, point) {
-    if (!dataSource || !point?.coordinates) return
-    console.log(point);
-    
+    if (!dataSource || !point?.coordinates) return    
     const entityId = `monitor_${point.id}`
     // 移除旧实体
     if (this.monitorEntities.has(entityId)) {
@@ -471,7 +469,6 @@ class MonitorPointManager {
     }
   }
    setMonitoringPointsVisibility(visible) {
-    console.log('gzj', this.monitorEntities);
 
     this.monitorEntities.forEach((entity) => {
       console.log(entity);

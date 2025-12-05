@@ -8,12 +8,10 @@ export const useMonitoringPointStore = defineStore('monitoringPoint', {
   
   actions: {
     setSelectedPoint(point) {
-      console.log('setSelectedPoint', point);
       this.selectedPoint = point;
     },
     
     setPointsList(points) {
-      console.log('setPointsList', points);
       this.pointsList = points;
       // 如果还没有选中点，且列表不为空，则默认选中第一个起降点
       if (!this.selectedPoint && points && points.length > 0) {
