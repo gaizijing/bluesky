@@ -126,13 +126,11 @@
 </template>
 <script setup>
 import { ref, computed, onMounted, onBeforeMount } from "vue";
-import { useMonitoringPoints } from "@/hooks/useMonitoringPoints";
+import { useMonitoringPointStore } from "@/store/modules/monitoringPoints";
 import { updateSelectedPoint } from "@/api";
 
 // 使用组合函数
-const {
-  monitoringPointStore
-} = useMonitoringPoints();
+const monitoringPointStore= useMonitoringPointStore();
 
 // 状态管理
 const searchKeyword = ref("");

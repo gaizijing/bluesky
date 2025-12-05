@@ -1,6 +1,8 @@
 import request from '../utils/request';
 import axios from 'axios';
 import cacheUtils, { cacheAsync } from '../utils/cacheUtils';
+import { fetchWeatherApi } from "openmeteo";
+
 // 获取监测点列表
 export const fetchMonitoringPoints = async () => {
   try {
@@ -280,31 +282,53 @@ export const getWeatherSuitability = async (currentPoint) => {
 
   return response.data
 }
-export const getWeatherForecastTrend = async (currentPoint) => {
-  if (!currentPoint) {
-    throw new Error('未选择监测点')
-  }
+export const getWeatherForecastTrend = async (params) => {
+  console.log("getWeatherForecastTrend",params);
+  
+  const params1 = {
+	latitude: 52.52,
+	longitude: 13.41,
+	minutely_15: ["precipitation", "wind_speed_10m", "visibility"],
+	forecast_days: 1,
+};
+  const url = "https://api.open-meteo.com/v1/forecast";
+const responses = await fetchWeatherApi(url, params1);
+ // Process first location. Add a for-loop for multiple locations or weather models
+const response = responses[0];
+// Attributes for timezone and location
+const latitude = response.latitude();
+const longitude = response.longitude();
+const elevation = response.elevation();
+const utcOffsetSeconds = response.utcOffsetSeconds();
 
-  // 在实际项目中，这里会是真实的API调用:
-  // const response = await axios.get(`/api/weather/analysis/${currentPoint.id}`)
+console.log(
+	`\nCoordinates: ${latitude}°N ${longitude}°E`,
+	`\nElevation: ${elevation}m asl`,
+	`\nTimezone difference to GMT+0: ${utcOffsetSeconds}s`,
+);
+const minutely15 = response.minutely15();
 
-  const response = {
-    "code": 200,
-    "message": "success",
-    "data": {
-      "trend": [
-        { "time": "12:00", "value": 5.2 },
-        { "time": "12:30", "value": 6.8 },
-        { "time": "13:00", "value": 7.5 },
-        { "time": "13:30", "value": 6.3 },
-        { "time": "14:00", "value": 5.8 },
-        { "time": "14:30", "value": 7.1 }
-      ]
-    }
-  }
-  return response.data
+// Note: The order of weather variables in the URL query and the indices below need to match!
+const weatherData = {
+	minutely15: {
+		time: Array.from(
+			{ length: (Number(minutely15.timeEnd()) - Number(minutely15.time())) / minutely15.interval() }, 
+			(_, i) => new Date((Number(minutely15.time()) + i * minutely15.interval() + utcOffsetSeconds) * 1000)
+		),
+		// 将TypedArray转换为普通JavaScript数组，解决ECharts的"dimensions must be given if data is TypedArray"错误
+		precipitation: Array.from(minutely15.variables(0).valuesArray()),
+		// 风速：保留两位小数
+		wind_speed_10m: Array.from(minutely15.variables(1).valuesArray()).map(value => Number(value.toFixed(2))),
+		// 能见度：从米转换为公里并取整
+		visibility: Array.from(minutely15.variables(2).valuesArray()).map(value => Math.round(value / 1000))
+	},
+
+};
+
+// The 'weatherData' object now contains a simple structure, with arrays of datetimes and weather information
+console.log("\nMinutely15 data:\n", weatherData.minutely15)
+return weatherData.minutely15
 }
-
 /**
  * 遵循和风天气API规范，获取实时天气数据
  * 核心规范：HTTPS协议 + 请求头传API Key + Gzip解压 + 专属Host
@@ -329,8 +353,7 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
       },
       headers: {
         'X-QW-Api-Key': API_KEY, // 关键：请求头传Key（替代URL参数）
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip, deflate' // 支持Gzip解压
+        'Accept': 'application/json'
       },
       timeout: 15000, // 15秒超时保护
       decompress: true // 自动解压Gzip（axios v1.0+ 支持）
@@ -340,36 +363,9 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
     const { data } = response;
     // 5. 格式化数据为项目可用格式
     const nowData = data.now;
-    return {
-      windSpeed: {
-        value: parseFloat(nowData.windSpeed),
-        unit: 'm/s'
-      },
-      windDirection: {
-        value: parseInt(nowData.wind360),
-        unit: '°',
-        text: nowData.windDir // 风向文字（如：东北）
-      },
-      temperature: {
-        value: parseInt(nowData.temp),
-        unit: '℃'
-      },
-      relativeHumidity: {
-        value: parseInt(nowData.humidity),
-        unit: '%'
-      },
-      weatherPhenomenon: nowData.text, // 天气现象（如：晴）
-      feelsLike: { // 体感温度（新增字段）
-        value: parseInt(nowData.feelsLike),
-        unit: '℃'
-      },
-      visibility: {
-        value: parseFloat(nowData.vis),
-        unit: 'km'
-      },
-      updateTime: data.updateTime, // 数据更新时间
-      refer: data.refer // 数据来源说明
-    };
+    console.log(data);
+    
+    return nowData;
 
   } catch (error) {
     console.error('获取天气数据失败（遵循和风API规范）：', error.message);
@@ -378,12 +374,12 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
 };
 
 
-// 导出带缓存的函数，避免频繁调用和风天气API导致配额耗尽
-export const fetchBasicWeatherData = cacheAsync(fetchBasicWeatherDataFromAPI, {
-  prefix: 'weather_data', // 缓存键前缀
-  duration: 5 * 60 * 1000, // 缓存5分钟
-  useLocalStorage: true // 同时使用localStorage，保证页面刷新后仍能使用缓存
-});
+// // 导出带缓存的函数，避免频繁调用和风天气API导致配额耗尽
+// export const fetchBasicWeatherData = cacheAsync(fetchBasicWeatherDataFromAPI, {
+//   prefix: 'weather_data', // 缓存键前缀
+//   duration: 5 * 60 * 1000, // 缓存5分钟
+//   useLocalStorage: true // 同时使用localStorage，保证页面刷新后仍能使用缓存
+// });
 
 
 // 原始的获取专业气象数据函数
@@ -426,7 +422,7 @@ export const fetchCurrentPointWeather = async (currentPoint) => {
 
     // 并行获取两类数据以提高性能
     const [basicData, professionalData] = await Promise.all([
-      fetchBasicWeatherData(currentPoint),
+      fetchBasicWeatherDataFromAPI(currentPoint),
       fetchProfessionalWeatherDataFromAPI(currentPoint)
     ]);
     // 合并两类数据
@@ -434,7 +430,8 @@ export const fetchCurrentPointWeather = async (currentPoint) => {
       ...basicData,
       ...professionalData
     };
-
+    console.log(combinedData);
+    
     return combinedData;
   } catch (error) {
     console.error('获取当前监测点天气数据失败:', error)
@@ -546,4 +543,42 @@ export const getRiskWarnings = async () => {
     return { code: 500, message: '获取数据失败' }
   }
 }
-
+const handleQuery = async () => {
+    if (!validate()) return;
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        latitude: form.latitude,
+        longitude: form.longitude,
+        elevation: form.elevation,
+        start_date: form.startDate,
+        end_date: form.endDate,
+        hourly: form.elements.join(','),
+        timezone: 'Asia/Shanghai'
+      });
+      const response = await fetch(`https://api.open-meteo.com/v1/archive?${params}`, {
+        method: 'GET'
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP错误：${response.status}`);
+      }
+      const rawData = await response.json();
+      if (rawData.error) {
+        throw new Error(rawData.reason || 'API请求失败');
+      }
+      const transformed = transformData(rawData);
+      setResult(JSON.stringify({
+        code: 200,
+        message: '查询成功',
+        data: transformed
+      }, null, 2));
+    } catch (error) {
+      setResult(JSON.stringify({
+        code: 400,
+        message: error.message,
+        data: null
+      }, null, 2));
+    } finally {
+      setLoading(false);
+    }
+  };

@@ -20,14 +20,14 @@ class EventManager {
   registerClickHandler(handler, priority = 0) {
     if (typeof handler !== 'function') {
       console.warn('事件处理器必须是函数');
-      return () => {};
+      return () => { };
     }
-    
+
     const handlerObj = { handler, priority };
     this.clickHandlers.push(handlerObj);
     // 按优先级排序，优先级高的先执行
     this.clickHandlers.sort((a, b) => b.priority - a.priority);
-    
+
     // 返回注销函数
     return () => this.unregisterClickHandler(handler);
   }
@@ -48,11 +48,11 @@ class EventManager {
   registerDefaultHandler(handler) {
     if (typeof handler !== 'function') {
       console.warn('默认处理器必须是函数');
-      return () => {};
+      return () => { };
     }
-    
+
     this.defaultHandlers.push(handler);
-    
+
     // 返回注销函数
     return () => this.unregisterDefaultHandler(handler);
   }
@@ -72,8 +72,9 @@ class EventManager {
    * @returns {boolean} 事件是否被处理
    */
   handleClick(viewer, movement) {
+    console.log('处理点击事件');
     let handled = false;
-    
+
     // 先执行所有注册的点击处理器
     this.clickHandlers.forEach(({ handler }) => {
       try {
@@ -84,7 +85,7 @@ class EventManager {
         console.warn('点击处理器执行错误：', e);
       }
     });
-    
+
     // 然后执行所有默认处理器（无论事件是否被处理）
     this.defaultHandlers.forEach(handler => {
       try {
@@ -93,7 +94,7 @@ class EventManager {
         console.warn('默认处理器执行错误：', e);
       }
     });
-    
+
     return handled;
   }
 
@@ -105,12 +106,12 @@ class EventManager {
     if (!viewer || this.initializedViewers.has(viewer)) {
       return;
     }
-    
+
     // 注册统一的LEFT_CLICK事件处理器
     viewer.screenSpaceEventHandler.setInputAction((movement) => {
       this.handleClick(viewer, movement);
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-    
+
     this.initializedViewers.add(viewer);
   }
 
@@ -134,14 +135,14 @@ class EventManager {
       // 如果事件未被处理，检查是否点击了空白区域
       if (!handled) {
         const pickedObject = viewer.scene.pick(movement.position);
-        
+
         // 如果没有拾取到任何对象，或者拾取到的对象不是我们关心的类型
-        if (!Cesium.defined(pickedObject) || 
-            (!pickedObject.id?.properties?.isRouteSegment && 
-             !(pickedObject.id?.id && 
-               typeof pickedObject.id.id === 'string' && 
-               pickedObject.id.id.startsWith('monitor_')))) {
-          
+        if (!Cesium.defined(pickedObject) ||
+          (!pickedObject.id?.properties?.isRouteSegment &&
+            !(pickedObject.id?.id &&
+              typeof pickedObject.id.id === 'string' &&
+              pickedObject.id.id.startsWith('monitor_')))) {
+
           // 触发全局点击空白区域事件，可以通过自定义事件系统通知其他模块
           const customEvent = new CustomEvent('cesium-click-blank', {
             detail: {
@@ -153,9 +154,10 @@ class EventManager {
         }
       }
     };
-    
+
     return this.registerDefaultHandler(globalDefaultHandler);
   }
+ 
 }
 
 // 创建单例实例
@@ -166,6 +168,7 @@ let unregisterGlobalHandler = null;
 if (!unregisterGlobalHandler) {
   unregisterGlobalHandler = eventManager.registerGlobalDefaultHandler();
 }
+
 
 export default eventManager;
 export { EventManager };

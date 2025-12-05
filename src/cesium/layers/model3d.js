@@ -25,7 +25,8 @@ export const addWhiteModel = async (viewerInstance) => {
       purgeOptions: {
         retainCurrentLevelOfDetail: true,
         unusedTiles: 100
-      }
+      },
+      distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 200000)
     })
 
     const progressManager = createProgressManager((displayProgress) => {
@@ -40,7 +41,8 @@ export const addWhiteModel = async (viewerInstance) => {
     });
 
     viewerInstance.scene.primitives.add(modelTileset);
-
+    //模型调试
+    // viewerInstance.extend(Cesium.viewerCesium3DTilesInspectorMixin)
     modelTileset.allTilesLoaded.addEventListener(() => {
       progressManager.markAsCompleted();
       setTimeout(() => {
@@ -48,6 +50,11 @@ export const addWhiteModel = async (viewerInstance) => {
         progressManager.reset();
       }, 3000);
     });
+
+
+    ///////////cesium自带的模型////////////
+    //  const tileset = await Cesium.createOsmBuildingsAsync();
+    //   viewerInstance.scene.primitives.add(tileset);
 
   } catch (error) {
     console.error('加载3D模型失败:', error)

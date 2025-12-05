@@ -27,7 +27,8 @@ export const useWeatherStore = defineStore('weather', {
       min: null,
       average: null,
       trend: 'stable' // stable/up/down
-    }
+    },
+    isLoading: false,
   }),
   getters: {
     // 快捷获取当前气象要素的数据
@@ -47,8 +48,10 @@ export const useWeatherStore = defineStore('weather', {
       return labelMap[state.currentElement] || '气象要素'
     },
     // 获取Header组件需要的天气信息
-    headerWeatherInfo(state) {      
+     headerWeatherInfo(state) {      
       if (!state.currentPointWeather) {
+        console.log('天气数据获取失败，请检查');
+        
         return {
           temperature: '25°C',
           windSpeed: '3.5m/s',
@@ -61,16 +64,20 @@ export const useWeatherStore = defineStore('weather', {
       const weatherData = state.currentPointWeather
       
       return {
-        temperature: weatherData.temperature ? `${weatherData.temperature.value}${weatherData.temperature.unit}` : '25°C',
-        windSpeed: weatherData.windSpeed ? `${weatherData.windSpeed.value}${weatherData.windSpeed.unit}` : '3.5m/s',
+        temperature: weatherData.temp + '°C',
+        windSpeed: weatherData.windSpeed + 'm/s',
         // 由于API可能没有返回能见度数据，暂时使用默认值
-        visibility:weatherData.visibility ? `${weatherData.visibility.value}${weatherData.visibility.unit}`: '10km',
+        visibility:weatherData.vis + 'km',
         // API返回的是relativeHumidity
-        humidity: weatherData.relativeHumidity ? `${weatherData.relativeHumidity.value}${weatherData.relativeHumidity.unit}` : '0%'
+        humidity: weatherData.humidity +'%'
       }
     }
   },
   actions: {
+    setIsLoading(isLoading) {
+      this.isLoading=isLoading;
+    },
+    
     // 设置当前气象要素
     setCurrentElement(element) {
       if (Object.values(WEATHER_ELEMENTS).includes(element)) {

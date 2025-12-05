@@ -154,12 +154,13 @@
           </div>
           <div class="main-panel left_bg">
             <div class="panel-header">
-              <span class="panel-title">未来风势预测</span>
+              <span class="panel-title">实况与未来2小时预报</span>
             </div>
             <div class="panel-content">
               <div class="dashboard-content">
                 <div class="analysis-panel">
                   <WeatherForecastPanel />
+                  <!-- <Xinyuce/> -->
                 </div>
               </div>
             </div>
@@ -276,12 +277,8 @@ const DeviceTrace = defineAsyncComponent(() =>
 const WeatherForecastPanel = defineAsyncComponent(() =>
   import("@/components/business/WeatherForecastPanel/index.vue")
 );
-const IndicatorPanel = defineAsyncComponent(() =>
-  import("@/components/map/IndicatorPanel/index.vue")
-);
-const LayerControl = defineAsyncComponent(() =>
-  import("@/components/map/LayerControl/index.vue")
-);
+
+
 const MapContainer = defineAsyncComponent(() =>
   import("@/components/map/MapContainer.vue")
 );
@@ -556,7 +553,7 @@ onMounted(() => {
 }
 
 .control-item {
-  width: 80px;
+  width: 120px;
   justify-content: center;
   display: flex;
   align-items: center;

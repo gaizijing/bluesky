@@ -1,17 +1,21 @@
 <template>
   <div class="map-container">
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-overlay">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">加载中...</div>
+      </div>
+    </div>
+
     <!-- Cesium地图容器 -->
-    <div id="cesiumContainer" class="cesium-container"></div>
-    
+    <div id="cesiumContainer" class="cesium-container" :class="{ 'hidden': loading }"></div>
+
     <!-- 控制面板 -->
-    <ControlPanel 
-      v-if="layerSettingsStore.isShow" 
-      :wind-layer="cesiumStore.windLayer"
-      :initial-options="layerSettingsStore.windOptions" 
-      @options-change="handleOptionsChange" 
-      :layer-controls="cesiumHooks"
-    />
-    
+    <ControlPanel v-if="layerSettingsStore.isShow" :wind-layer="cesiumStore.windLayer"
+      :initial-options="layerSettingsStore.windOptions" @options-change="handleOptionsChange"
+      :layer-controls="cesiumHooks" />
+
   </div>
 </template>
 
@@ -56,23 +60,25 @@ const applyLayerVisibilitySettings = () => {
     }
   }
 }
-
+const loading = ref(true)
 // 初始化地图
 const initializeMap = async () => {
   try {
     cesiumHooks = useCesium(CESIUM_CONTAINER_ID)
     // 等待Cesium初始化完成
     await cesiumHooks.initCesium()
+
+
     // 从本地存储加载设置
     layerSettingsStore.loadSettingsFromLocal()
-    
+
     // 应用图层显示状态设置
-    applyLayerVisibilitySettings()
-     // 使用独立的事件管理器初始化viewer事件
-  eventManager.initializeViewerEvents(cesiumHooks.viewer.value
-  );
-    // 设置hook加载完成标志
-    // isHookLoaded.value = true
+     applyLayerVisibilitySettings()
+   
+    // 使用独立的事件管理器初始化viewer事件
+    eventManager.initializeViewerEvents(cesiumHooks.viewer.value);
+     loading.value = false
+   
   } catch (error) {
     console.error('地图初始化失败:', error)
   }
@@ -109,15 +115,68 @@ onUnmounted(() => {
   height: 100%;
   overflow: hidden;
 }
+
+/* 加载状态样式 */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid #1976d2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  color: white;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 隐藏地图容器的类 */
+.hidden {
+  display: none;
+}
+
 /* 新增地图航线详情弹窗样式 */
 .map-route-detail {
   position: absolute;
-  background: rgba(0,0,0,0.8);
+  background: rgba(0, 0, 0, 0.8);
   color: white;
   padding: 10px 15px;
   border-radius: 8px;
   z-index: 1000;
 }
+
 .map-route-detail button {
   margin-top: 8px;
   padding: 4px 8px;

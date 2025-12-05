@@ -1,5 +1,26 @@
 <template>
   <div class="route-list-container">
+    <!-- 添加视角控制工具栏 -->
+    <div class="view-controls" v-if="routeStore.currentRoute">
+      <div class="view-control-group">
+        <span class="view-label">视角控制:</span>
+        <button class="view-btn" @click="viewTopDown" title="俯视视角">
+          俯视
+        </button>
+        <button class="view-btn" @click="viewSide" title="侧视视角">
+          侧视
+        </button>
+        <button class="view-btn" @click="viewCurrentAircraft" title="跟踪飞机" >
+          跟踪
+        </button>
+        <button class="view-btn" @click="releaseTracking" title="自由视角">
+          自由
+        </button>
+        <button class="view-btn" @click="releaseRoute" title="退出">
+          退出
+        </button>
+      </div>
+    </div>
     <!-- 航线列表 -->
     <div class="routes-table">
       <div class="table-header">
@@ -120,6 +141,8 @@ import { ref, computed, onMounted } from "vue";
 import RouterRisk from "@/components/business/RouterRisk/index.vue";
 import { useCesium } from '@/hooks/useCesium';
 import { useRouteStore } from "@/store/modules/routeStore"; // 引入store
+import routeManager from '@/cesium/entities/routes'; // 导入航线管理器
+
 const routeStore = useRouteStore()
 
 // 状态管理
@@ -174,21 +197,21 @@ const generateRoutes = () => {
       "作业区3-机场B"
     ];
     const randomName = locationPairs[Math.floor(Math.random() * locationPairs.length)];
-    
+
     // 从完整名称中解析出起点和终点名称
     const [startName, endName] = randomName.split('-');
 
     // 在初始生成时就创建waypoints数组，避免后续点击时转换
     const waypoints = [];
     const dangers = []; // 存储每个航段的危险等级
-    
+
     if (segmentData.length > 0) {
       // 添加第一个航段的起点
       waypoints.push({
         longitude: segmentData[0].startCoordinates[0],
         latitude: segmentData[0].startCoordinates[1]
       });
-      
+
       // 添加所有航段的终点，并设置对应的危险等级
       segmentData.forEach((segment, index) => {
         waypoints.push({
@@ -324,10 +347,6 @@ const refreshRoutes = async () => {
   }
 };
 
-// 注意：showRouteOnMap函数已经从useCesium hook中导入，不再需要在组件中重新实现
-
-// 注意：clearCurrentRoute和getCesiumRiskColor函数已经从useCesium hook中导入，不再需要在组件中重新实现
-
 // 打开航线分析弹窗
 const openAnalysis = (route) => {
 
@@ -342,7 +361,7 @@ const openAnalysis = (route) => {
     name: route.name,
     segments: route.segmentData
   };
-  showRouteOnMap(routeData);
+  //  showRouteOnMap(routeData);
 };
 
 // 关闭弹窗
@@ -403,20 +422,106 @@ const getRiskText = (value) => {
 const onRouteClick = (route) => {
 
   routeStore.setCurrentRoute(route)
-  
+
   // 2. 可选：滚动/高亮当前航线
   document.querySelector(`[data-route-id="${route.id}"]`)?.scrollIntoView({
     behavior: 'smooth',
     block: 'center'
   })
 }
-// 初始化加载数据
+
+const viewTopDown = () => {
+  routeManager.viewTopDown();
+};
+
+const viewSide = () => {
+  routeManager.viewSide();
+};
+
+const viewCurrentAircraft = () => {
+  if (routeStore.currentRoute && routeStore.currentRoute.id) {
+    routeManager.viewAircraft(routeStore.currentRoute.id);
+  }
+};
+
+const releaseTracking = () => {
+  routeManager.releaseTracking();
+};
+const releaseRoute = () => {
+  currentRoute.value = null;
+  routeStore.clearCurrentRoute()
+
+  routeManager.clearAllRoutes();
+}
+
 onMounted(() => {
   loadRoutes();
 });
+
 </script>
 
 <style scoped lang="scss">
+.route-list-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* 添加视角控制样式 */
+.view-controls {
+  padding: 10px 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(15, 23, 42, 0.8);
+}
+
+.view-control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.view-label {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.view-btn {
+  padding: 6px 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid #3b82f6;
+  color: #e2e8f0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: rgba(59, 130, 246, 0.2);
+    transform: translateY(-1px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.routes-table {
+  flex: 1;
+  height: calc(100% - 60px);
+  /* 减去工具栏高度 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
 .routes-table {
   height: 100%;

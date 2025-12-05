@@ -1,16 +1,24 @@
 <template>
   <div class="landing-point-card">
-    <div class="card-body">
+    <div v-if="weatherStore.isLoading || weatherStore.currentPointWeather==null" class="loading-overlay">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">加载中...</div>
+      </div>
+    </div>
+    <div class="card-body" v-else>
       <div class="data-panel wind-speed-panel">
         <div class="panel-label">
           <span>实时风速</span>
         </div>
         <div class="panel-value">
-          <span class="value">{{ weatherStore.currentPointWeather.windSpeed.value }}</span>
-          <span class="unit">{{ weatherStore.currentPointWeather.windSpeed.unit }}</span>
+          <span class="value">{{ weatherStore.currentPointWeather.windSpeed }}</span>
+          <span class="unit">
+            m/s
+          </span>
         </div>
         <div class="panel-desc">
-          {{ WIND_SPEED_DESC[getWindSpeedLevel(weatherStore.currentPointWeather.windSpeed.value)] }}
+          {{ WIND_SPEED_DESC[getWindSpeedLevel(weatherStore.currentPointWeather.windSpeed)] }}
         </div>
       </div>
       <div class="data-panel wind-shear-panel" :class="`level-${weatherStore.currentPointWeather.windShearLevel}`">

@@ -1,32 +1,6 @@
 <template>
   <div class="weather-analysis-panel" ref="panelRef">
-    <!-- 标题作为交互触发点 -->
-    <div class="panel-sub-header">
-      <h3 class="panel-title" title="点击或悬停查看选项">{{ dynamicPanelTitle }}</h3>
 
-      <!-- 隐藏的选择器区域，鼠标悬停在标题上时显示 -->
-      <div class="selectors-container">
-        <div class="selector-wrapper">
-          <span class="selector-label">要素：</span>
-          <div class="select-buttons">
-            <button v-for="(item, index) in weatherElements" :key="index" :class="{ active: selectedElement === index }"
-              :style="{ '--element-color': item.color }" @click="selectElement(index)">
-              {{ item.name }}
-            </button>
-          </div>
-        </div>
-
-        <div class="selector-wrapper">
-          <span class="selector-label">时间：</span>
-          <div class="select-buttons">
-            <button v-for="range in timeRanges" :key="range.value"
-              :class="{ active: selectedTimeRange === range.value }" @click="selectTimeRange(range.value)">
-              {{ range.label }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- 图表区域 -->
     <div class="charts-container">
@@ -79,67 +53,48 @@ const panelRef = ref(null);
 // 状态
 const isLoading = ref(false);
 const selectedElement = ref(0); // 默认选中第一个气象要素
-const selectedTimeRange = ref('3h'); // 默认3小时
 
-// 气象要素配置
+// 自动计算时间范围（当前时间后两个小时，间隔10分钟）
+const getTimeRange = () => {
+  const now = new Date();
+  const startTime = new Date(now);
+  const endTime = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 当前时间后2小时
+  const interval = 10; // 10分钟间隔
+
+  return {
+    startTime: startTime.toISOString().slice(0, 19).replace('T', ' '),
+    endTime: endTime.toISOString().slice(0, 19).replace('T', ' '),
+    timeInterval: interval
+  };
+};
+
+// 气象要素配置 - 固定选择能见度、风速、降水
 const weatherElements = ref([
   {
     name: '风速',
     unit: 'm/s',
-    color: '#3b82f6',
+    color: '#f97316',
     type: 'windSpeed'
   },
   {
-    name: '风向',
-    unit: '°',
-    color: '#8b5cf6',
-    type: 'windDirection'
+    name: '能见度',
+    unit: 'km',
+    color: '#22c55e',
+    type: 'visibility'
   },
   {
-    name: '风切变',
-    unit: 's⁻¹',
-    color: '#f59e0b',
-    type: 'windShear'
-  },
-  {
-    name: '湍流',
-    unit: 'm²/s³',
-    color: '#ef4444',
-    type: 'turbulence'
+    name: '降水量',
+    unit: 'mm',
+    color: '#3b82f6',
+    type: 'precipitation'
   }
 ]);
 
-// 时间范围配置
-const timeRanges = ref([
-  { label: '1小时', value: '1h' },
-  { label: '3小时', value: '3h' },
-  { label: '6小时', value: '6h' }
-]);
-
-// 当前选中的气象要素配置
-const currentElementConfig = computed(() => weatherElements.value[selectedElement.value]);
+// 移除时间范围配置，改为自动计算
 
 // 动态生成面板标题
 const dynamicPanelTitle = computed(() => {
-  const elementName = currentElementConfig.value.name;
-  let timeLabel = '';
-
-  // 根据选中的时间范围确定时间标签
-  switch (selectedTimeRange.value) {
-    case '1h':
-      timeLabel = '1小时';
-      break;
-    case '3h':
-      timeLabel = '3小时';
-      break;
-    case '6h':
-      timeLabel = '6小时';
-      break;
-    default:
-      timeLabel = '3小时';
-  }
-
-  return `${timeLabel}${elementName}预测`;
+  return '未来两小时气象要素预测'; // 固定标题，因为现在显示三个要素
 });
 
 // 获取风向文本（8方向）
@@ -149,32 +104,32 @@ const getDirectionText = (degree) => {
   return dirs[index];
 };
 
-// 选择气象要素
-const selectElement = (index) => {
-  selectedElement.value = index;
-  loadData();
-};
-
-// 选择时间范围
-const selectTimeRange = (range) => {
-  selectedTimeRange.value = range;
-  loadData();
-};
 
 // 将原来的loadData函数替换为：
 const loadData = async () => {
   isLoading.value = true;
   try {
+    // 获取时间范围
+    const timeRange = getTimeRange();
+    // 获取选中的监测点信息
+    const selectedPoint = monitoringPointStore.selectedPoint;
+    const pointId = selectedPoint?.id || 'BJ-001';
+    const coordinates = selectedPoint?.coordinates || [116.403874, 39.914885];
+
     // 调用模拟API获取数据
     const trendData = await getWeatherForecastTrend({
-      pointId: monitoringPointStore.selectedPoint?.id || 'mock-point',
-      element: currentElementConfig.value.type,
-      timeRange: selectedTimeRange.value
+      monitoringPointId: pointId,
+      longitude: coordinates[0],
+      latitude: coordinates[1],
+      altitude: 50.0, // 固定高度
+      elements: ['precipitation', 'visibility', 'windSpeed'], // 固定选择三个要素
+      startTime: timeRange.startTime,
+      endTime: timeRange.endTime,
+      timeInterval: timeRange.timeInterval
     });
-
     const profileData = await getWeatherForecastHeatmap({
       pointId: monitoringPointStore.selectedPoint?.id || 'mock-point',
-      timeRange: selectedTimeRange.value
+      // timeRange: selectedTimeRange.value
     });
 
     // 更新图表
@@ -194,120 +149,41 @@ const updateTrendChart = (data) => {
     return;
   }
 
-  // 处理API返回的数据格式
-  const chartData = data.success ? data.data : data;
+  // 提取时间标签（只显示小时）
+  const timeLabels = data.time.map(item => {
+    const date = new Date(item);
+    return `${date.getHours().toString().padStart(2, '0')}`;
+  });
+  // 当前时间索引（近似中间位置）
+    // 当前时间索引（根据当前小时数定位）
+  const currentHour = new Date().getHours();
+  const currentHourStr = currentHour.toString().padStart(2, '0');
+  const currentIndex = timeLabels.indexOf(currentHourStr);
+  
 
-  if (!chartData || !chartData.trend) {
-    return;
-  }
 
-  const trendData = chartData.trend;
-  const unit = chartData.unit || currentElementConfig.value.unit;
+  // 自定义tooltip格式化器
+  const tooltipFormatter = (params) => {
+    let result = `<div style="margin-bottom: 6px"><strong style="color: #3b82f6">${timeLabels[params[0].dataIndex]}</strong></div>`;
 
-  // 使用数据中提供的时间标签（如果有），否则生成默认标签
-  let timeLabels = chartData.timeLabels;
-  if (!timeLabels) {
-    // 提取X轴时间
-    timeLabels = trendData.map(item => {
-      const date = new Date(item.time);
-      return item.time;
+    params.forEach(param => {
+      const element = weatherElements.value.find(el => el.name === param.seriesName);
+      if (element) {
+        result += `
+          <div style="margin: 4px 0; line-height: 1.4">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${element.color}; margin-right: 6px;"></span>
+            <span style="color: #94a3b8; display: inline-block; width: 60px">${element.name}：</span>
+            <span style="color: ${element.color}">${param.value} ${element.unit}</span>
+          </div>
+        `;
+      }
     });
-  }
 
-  // 根据选中的气象要素处理数据
-  let seriesData;
-  let yAxisConfig;
-  let tooltipFormatter;
-
-  if (currentElementConfig.value.type === 'windDirection') {
-    // 风向特殊处理 - 保持原来的散点图样式
-    seriesData = trendData.map((item, index) => ({
-      value: [index, item.value],
-      symbolRotate: item.value
-    }));
-
-    yAxisConfig = {
-      type: 'value',
-      name: `${currentElementConfig.value.name} (${currentElementConfig.value.unit})`,
-      nameTextStyle: { color: currentElementConfig.value.color },
-      axisLine: { lineStyle: { color: '#334155' } },
-      axisLabel: { color: '#94a3b8' },
-      splitLine: {
-        show: true,
-        lineStyle: {
-          color: 'rgba(51, 65, 85, 0.3)',
-          type: 'dashed'
-        }
-      },
-      min: 0,
-      max: 360,
-      interval: 90
-    };
-
-    tooltipFormatter = (params) => {
-      const index = params[0].dataIndex;
-      const item = trendData[index];
-      return `
-        <div style="margin-bottom: 6px">
-          <strong style="color: #3b82f6">${timeLabels[index]}</strong>
-        </div>
-        <div style="margin: 4px 0; line-height: 1.4">
-          <span style="color: #94a3b8; display: inline-block; width: 60px">${currentElementConfig.value.name}：</span>
-          <span>${item.value}° (${getDirectionText(item.value)})</span>
-        </div>
-      `;
-    };
-  } else {
-    // 其他气象要素（风速、温度、湿度）- 应用新的样式
-    seriesData = trendData.map(item => item.value);
-
-    // 计算合理的Y轴范围
-    let min = Math.min(...seriesData);
-    let max = Math.max(...seriesData);
-    const padding = (max - min) * 0.1;
-    min = Math.floor(min - padding);
-    max = Math.ceil(max + padding);
-
-    if (currentElementConfig.value.type === 'humidity') {
-      min = 0;
-      max = Math.min(max, 100);
-    }
-
-    yAxisConfig = {
-      type: 'value',
-      name: `${currentElementConfig.value.name} (${currentElementConfig.value.unit})`,
-      nameTextStyle: { color: '#ef4444' }, // 使用红色
-      axisLine: { lineStyle: { color: '#334155' } },
-      axisLabel: { color: '#94a3b8' },
-      splitLine: {
-        show: true,
-        lineStyle: {
-          color: 'rgba(51, 65, 85, 0.3)',
-          type: 'dashed'
-        }
-      },
-      min: min,
-      max: max
-    };
-
-    tooltipFormatter = (params) => {
-      const index = params[0].dataIndex;
-      const item = trendData[index];
-      return `
-        <div style="margin-bottom: 6px">
-          <strong style="color: #3b82f6">${timeLabels[index]}</strong>
-        </div>
-        <div style="margin: 4px 0; line-height: 1.4">
-          <span style="color: #94a3b8; display: inline-block; width: 60px">${currentElementConfig.value.name}：</span>
-          <span>${item.value} ${currentElementConfig.value.unit}</span>
-        </div>
-      `;
-    };
-  }
+    return result;
+  };
 
   // 配置图表
   const option = {
-    backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis',
       backgroundColor: 'rgba(15, 23, 51, 0.95)',
@@ -320,69 +196,200 @@ const updateTrendChart = (data) => {
       padding: [8, 12],
       formatter: tooltipFormatter
     },
+    legend: {
+      data: ['风速', '能见度', '降水量'],
+      top: '5%',
+      left: '10%',
+      itemWidth: 10,
+      itemHeight: 10,
+      itemGap: 20,
+      icon: 'rect',
+      textStyle: {
+        color: '#ffffff'
+      }
+    },
     grid: {
-      left: '5%',
+      left: '3%',
       right: '8%',
-      bottom: '15%',
-      top: '23%',
+      bottom: '0%',
+      top: '20%',
       containLabel: true
     },
     xAxis: {
       type: 'category',
       data: timeLabels,
-      axisLine: { lineStyle: { color: '#334155' } },
-      axisLabel: {
-        color: '#94a3b8',
-        interval: 0, // 显示所有标签
-        rotate: 0 // 不旋转
-      },
-      splitLine: { show: false }
-    },
-    yAxis: yAxisConfig,
-    series: [
-      {
-        name: currentElementConfig.value.name,
-        type: currentElementConfig.value.type === 'windDirection' ? 'scatter' : 'line',
-        data: seriesData,
-        smooth: true, // 所有折线都平滑
-        symbol: currentElementConfig.value.type === 'windDirection' ? 'path://M0,0 L8,0 L4,-6 Z' : 'none', // 非风向不显示点
-        symbolSize: currentElementConfig.value.type === 'windDirection' ? 12 : 6,
-        // 使用当前要素的颜色配置，不再硬编码红色
+      axisLine: {
         lineStyle: {
-          color: currentElementConfig.value.color, // 所有要素使用自己配置的颜色
-          width: currentElementConfig.value.type === 'windDirection' ? 0 : 1
+          color: 'rgba(255, 255, 255, 0.3)'
+        }
+      },
+      axisLabel: {
+        color: 'rgba(255, 255, 255, 0.7)',
+        // 只显示整点小时标签
+        // formatter: function(value, index) {
+        //   const date = new Date(data.time[index]);
+        //   return date.getMinutes() === 0 ? value : '';
+        // },
+        rotate: 0,
+        fontSize: 10
+      },
+      splitLine: { show: false },
+      axisPointer: {
+        value: timeLabels[currentIndex],
+        snap: true,
+        lineStyle: {
+          color: '#7581BD',
+          width: 1
         },
-        itemStyle: {
-          color: currentElementConfig.value.color // 所有要素使用自己配置的颜色
+        
+        handle: {
+          show: true,
+          color: '#7581BD'
+        }
+      },
+    },
+    // 双Y轴配置
+    yAxis: [
+      // 左Y轴：风速（折线图）
+      {
+        type: 'value',
+        name: 'm/s',
+        min: 0,
+        max: 10,
+        position: 'left',
+        axisLine: {
+          lineStyle: {
+            color: '#f97316'
+          }
         },
-        areaStyle: currentElementConfig.value.type !== 'windDirection' ? {
-          // 根据当前要素颜色动态生成渐变填充
+        axisLabel: {
+          color: 'rgba(255, 255, 255, 0.7)',
+          fontSize: 10,
+          formatter: '{value}'
+        },
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: 'rgba(255, 255, 255, 0.1)',
+            type: 'solid'
+          }
+        }
+      },
+      // 右Y轴：能见度（折线图）
+      {
+        type: 'value',
+        name: 'km',
+        min: 0,
+        max: 25,
+        position: 'right',
+        offset: 0,
+        axisLine: {
+          lineStyle: {
+            color: '#22c55e'
+          }
+        },
+        axisTick: { show: true },
+        axisLabel: {
+          color: 'rgba(255, 255, 255, 0.7)',
+          fontSize: 10,
+          formatter: '{value}'
+        },
+        splitLine: { show: false }
+      },
+      // 右Y轴：降水量（柱状图）
+      {
+        type: 'value',
+        name: 'mm',
+        min: 0,
+        max: 10,
+        position: 'right',
+        offset: 15,
+        axisLine: {
+          lineStyle: {
+            color: '#3b82f6'
+          }
+        },
+        axisLabel: {
+          color: 'rgba(255, 255, 255, 0.7)',
+          fontSize: 10,
+          formatter: '{value}'
+        },
+        splitLine: { show: false }
+      }
+    ],
+    series: [
+      // 风速：折线图（橙色区域图）
+      {
+        name: '风速',
+        type: 'line',
+        yAxisIndex: 0,
+        data: data.wind_speed_10m,
+        smooth: true,
+        lineStyle: {
+          color: '#f97316',
+          width: 1
+        },
+        areaStyle: {
           color: new echarts.graphic.LinearGradient(
             0,
             0,
             0,
-            1, // 渐变方向：从上到下
+            1,
             [
-              { offset: 0, color: currentElementConfig.value.color + '99' }, // 上方：半透明颜色
-              { offset: 1, color: currentElementConfig.value.color + '0D' } // 下方：接近透明
+              { offset: 0, color: 'rgba(249, 115, 22, 0.8)' },
+              { offset: 1, color: 'rgba(249, 115, 22, 0.2)' }
             ]
-          ),
-          // 阴影发光核心配置 - 使用要素颜色
-          shadowBlur: 30,
-          shadowColor: currentElementConfig.value.color + 'B3', // 与折线同色系，半透明
-          shadowOffsetY: 5,
-          shadowOffsetX: 0
-        } : undefined,
-        label: {
-          show: false
+          )
+        },
+        symbol: 'none'
+      },
+      // 能见度：折线图（绿色区域图）
+      {
+        name: '能见度',
+        type: 'line',
+        yAxisIndex: 1,
+        data: data.visibility,
+        smooth: true,
+        lineStyle: {
+          color: '#22c55e',
+          width: 1
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(
+            0,
+            0,
+            0,
+            1,
+            [
+              { offset: 0, color: 'rgba(34, 197, 94, 0.8)' },
+              { offset: 1, color: 'rgba(34, 197, 94, 0.2)' }
+            ]
+          )
+        },
+        symbol: 'none'
+      },
+      // 降水：柱状图（蓝色柱状图）
+      {
+        name: '降水量',
+        type: 'bar',
+        yAxisIndex: 2,
+        data: data.precipitation,
+        barWidth: '40%',
+        itemStyle: {
+          color: '#3b82f6',
+          opacity: 1
         },
         emphasis: {
-          symbolSize: currentElementConfig.value.type === 'windDirection' ? 8 : 6
+          itemStyle: {
+            color: '#3b82f6',
+            opacity: 1
+          }
         }
       }
     ]
   };
 
+  // 设置图表配置
   trendChartInstance.setOption(option, true);
 };
 

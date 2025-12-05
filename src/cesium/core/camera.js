@@ -89,3 +89,42 @@ export const flyToRectangle = (viewer, region) => {
     console.error('视角切换失败:', error)
   }
 }
+export const handleCameraMove = (viewer) => { 
+  // 将事件处理函数保存为变量，以便后续可以移除它
+  const handleKeydown = (e) => {
+    var height = viewer.camera.positionCartographic.height;
+    var moveRate = height / 100;
+    switch(e.key){
+      case 'w':
+        viewer.camera.moveForward(moveRate);
+        break;
+      case "s":
+        viewer.camera.moveBackward(moveRate);
+        break;
+      case "a":
+        viewer.camera.moveLeft(moveRate);
+        break;
+      case "d":
+        viewer.camera.moveRight(moveRate);
+        break;
+      case "q":
+        viewer.camera.lookLeft(Cesium.Math.toRadians(0.1));
+        break;
+      case "e":
+        viewer.camera.lookRight(Cesium.Math.toRadians(0.1));
+        break;
+      case "r":
+        viewer.camera.lookUp(Cesium.Math.toRadians(0.1));
+        break;
+      case "f":
+        viewer.camera.lookDown(Cesium.Math.toRadians(0.1));
+        break;
+    }
+  };
+
+  // 添加事件监听器
+  document.addEventListener('keydown', handleKeydown);
+
+  // 返回处理函数，以便可以在需要时移除它
+  return handleKeydown;
+}

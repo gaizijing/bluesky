@@ -78,9 +78,9 @@
 <script setup>
 import { ref, onMounted, computed, defineAsyncComponent,watch  } from "vue";
 import { getRiskWarnings } from "@/api";
-import { useMonitoringPoints } from "@/hooks/useMonitoringPoints";
+import { useMonitoringPointStore } from "@/store/modules/monitoringPoints";
 
-const {monitoringPointStore} = useMonitoringPoints();
+const monitoringPointStore = useMonitoringPointStore();
 const WeatherWarnings = defineAsyncComponent(() =>
   import("@/components/business/WeatherWarnings/index.vue")
 );

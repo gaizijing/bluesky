@@ -4,16 +4,17 @@ import { useCesiumStore } from '@/store/modules/cesium'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import { useMonitoringPointStore } from '@/store/modules/monitoringPoints'
 import { createViewer, destroyViewer } from '@/cesium/core/viewer'
+import { handleCameraMove } from '@/cesium/core/camera'
 import { configureCamera, getCurrentCameraParams, flyToRegion, flyToRectangle } from '@/cesium/core/camera'
-import { addTiandituLayer } from '@/cesium/layers/tianditu'
+import { addTiandituLayer, addTiandituWithGaodeOverlay } from '@/cesium/layers/tianditu'
 import { loadTerrain } from '@/cesium/layers/terrain'
-import { addDistrictInfo } from '@/cesium/layers/district'
 import { addWhiteModel } from '@/cesium/layers/model3d'
-import { renderMonitorPoints, clearMonitorPoints, bindMonitorPointEvents, setEntityAsSelected, restoreAllBillboardStyles } from '@/cesium/entities/monitoringPoints.js'
+import { MonitorPointManager } from '@/cesium/entities/monitoringPoints.js'
 import { initWind } from '@/cesium/visualization/wind'
 import { addHeatVolume } from '@/cesium/visualization/heatmap'
-import routeManager from '@/cesium/entities/routes' // 引入航线管理器
+import { routeManager } from '@/cesium/entities/routes' // 引入航线管理器
 import { useRouteStore } from '@/store/modules/routeStore'
+import { addDistrictInfo, addBoundGeo } from '@/cesium/layers/district'
 
 export function useCesium(containerId) {
   // Store实例
@@ -33,7 +34,9 @@ export function useCesium(containerId) {
   let modelTileset = null
   let heatMapInstance = null
   let currentRouteEntities = [] // 存储当前显示的航线实体
-
+  let monitorManager;
+  // 事件处理函数引用（用于卸载）
+  let cameraMoveHandler = null;
   // 监测点相关
   const { pointsList: monitorPoints } = toRefs(monitorStore)
   let monitorEntities = new Map() // 存储监测点实体（id -> entity）
@@ -47,88 +50,49 @@ export function useCesium(containerId) {
       // 创建Viewer
       viewer.value = createViewer(containerId)
       viewer.value.cesiumWidget.creditContainer.style.display = 'none'
-
-      // 配置相机
+      // 配置键盘控制相机
+      cameraMoveHandler = handleCameraMove(viewer.value)
       // configureCamera(viewer.value)
       // 添加天地图
-      // tiandituLayer = addTiandituLayer(viewer.value)
+      tiandituLayer = addTiandituLayer(viewer.value)
       // 加载地形
-      await loadTerrain(viewer.value)
+      loadTerrain(viewer.value)
       // // 添加行政区划
       // await addDistrictInfo(viewer.value)
+      addBoundGeo(viewer.value)
       // 加载3D模型
       modelTileset = await addWhiteModel(viewer.value)
       // 渲染监测点
-      renderMonitorPoints(viewer.value, monitorPoints.value, monitorEntities, originalBillboardStyle)
+      monitorManager = MonitorPointManager.getInstance(viewer.value, monitorStore)
+      monitorManager.render(monitorPoints.value)
       // 初始化风场
       await initWind(viewer.value, layerSettingsStore, windLayer)
       // 将风场图层实例设置到store中，使控制面板能够访问
       cesiumStore.setWindLayer(windLayer.value)
       heatMapInstance = await addHeatVolume(viewer.value)
       // 初始化航线管理器
-      routeManager.initRouteManager(viewer.value)
-
-      // 最后绑定监测点事件，确保其获得最高优先级
-      bindMonitorPointEvents(
-        viewer.value,
-        monitorEntities,
-        monitorStore,
-        originalBillboardStyle
-      )
-
+      routeManager.init(viewer.value)
       watch(
         () => monitorStore.selectedPoint,
         (newPoint) => {
           if (newPoint && viewer.value) {
-            const entity = monitorEntities.get(`monitor_${newPoint.id}`)
-            if (entity) {
-              // 修正：添加所有必需的参数
-              setEntityAsSelected(
-                viewer.value,
-                entity,
-                monitorStore,
-                originalBillboardStyle,
-                monitorEntities
-              )
-              // 修正：添加viewer参数
-              flyToRegion(viewer.value, { coordinates: newPoint.coordinates, duration: 1.0 })
-            }
-          } else if (!newPoint) {
-            // clear selection
             // 修正：添加所有必需的参数
-            restoreAllBillboardStyles(monitorEntities, originalBillboardStyle)
+            monitorManager.setSelected(`monitor_${newPoint.id}`)
+            flyToRegion(viewer.value, { coordinates: newPoint.coordinates, duration: 1.0 })
           }
         },
-        { deep: true, immediate: true }
+        { deep: true }
       )
       watch(
         () => routeStore.currentRoute,
-        async (newRoute) => {
-            if (!newRoute) return
-            // 1. 先清空地图上已有的航线
-              await routeManager.clearAllRoutes()
-              // 2. 渲染新选中的航线（调用之前写的addRoute方法）
-              
-                await routeManager.addRoute(newRoute)
-              
-
-          // 替换原来的选择中心点代码块为:
-          // 3. 获取航线的边界矩形并飞入
-          const positions = newRoute.waypoints.map(wp =>
-            Cesium.Cartesian3.fromDegrees(wp.longitude, wp.latitude)
-          );
-          const boundingSphere = Cesium.BoundingSphere.fromPoints(positions);
-          viewer.value.camera.flyToBoundingSphere(boundingSphere, {
-            duration: 1.5,
-            offset: new Cesium.HeadingPitchRange(
-              0,
-              Cesium.Math.toRadians(-10), // 垂直俯视角度
-              boundingSphere.radius * 3   // 距离调整为半径的2倍
-            )
-          });
-
+        (newRoute) => {
+          if (newRoute && viewer.value) {
+            routeManager.render(newRoute)
+          }
         }
       )
+
+
 
     } catch (error) {
       errorMsg.value = `初始化失败: ${error.message}`
@@ -140,11 +104,19 @@ export function useCesium(containerId) {
 
   // 卸载清理
   const cleanup = () => {
+    console.log('开始清理Cesium资源...');
+
+    // 移除相机移动事件监听器
+    if (cameraMoveHandler) {
+      document.removeEventListener('keydown', cameraMoveHandler);
+      cameraMoveHandler = null;
+    }
+
     if (viewer.value) {
       // 清理航线
-     routeManager.clearRouteEntities(viewer.value, currentRouteEntities)
+      routeManager.destroy()
       // 清理监测点
-      clearMonitorPoints(viewer.value, monitorEntities, originalBillboardStyle)
+      monitorManager.destroy()
       // 清理热力图
       if (heatMapInstance) {
         heatMapInstance.destroy();
@@ -180,11 +152,8 @@ export function useCesium(containerId) {
    * 设置监测点图层可见性
    */
   const setMonitoringPointsVisibility = (visible) => {
-    monitorEntities.forEach((entity) => {
-      if (entity) {
-        entity.show = visible;
-      }
-    });
+    console.log('gzj',monitorEntities);
+   monitorManager.setMonitoringPointsVisibility(visible)
   };
 
   /**
@@ -229,9 +198,5 @@ export function useCesium(containerId) {
     setMonitoringPointsVisibility,
     setTemperatureVisibility,
     updateWindOptions,
-    addRoute: routeManager.addRoute,
-    removeRoute: routeManager.removeRoute,
-    clearAllRoutes: routeManager.clearAllRoutes,
-    getRouteDangerColor: routeManager.getColorByDangerLevel
   }
 }
