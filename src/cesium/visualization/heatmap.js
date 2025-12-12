@@ -159,6 +159,7 @@ function initializeHeatmap(heatmapState) {
         flat: true,
       }),
       asynchronous: false,
+        show: true
     })
   );
   heatmapState.heatmapPrimitive.id = "heatmap3d";
@@ -188,6 +189,7 @@ function computeNormalizedCoordinates(position, heatmapState) {
   );
   const xOffset = Cesium.Cartesian3.dot(originVector, heatmapState.xAxis);
   const yOffset = Cesium.Cartesian3.dot(originVector, heatmapState.yAxis);
+
   return {
     x: Number(
       (xOffset / heatmapState.xAxisLength) * heatmapState.canvasWidth
