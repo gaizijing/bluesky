@@ -1,7 +1,7 @@
 import { WindLayer } from 'cesium-wind-layer';
 import { watch } from 'vue'
 
-export const initWind = async (viewer, layerSettingsStore, windLayerRef) => {
+export const initWind = async (viewer, layerSettingsStore) => {
   const windOptions = layerSettingsStore.windOptions;
   const dataConfigs = {
     file: import.meta.env.VITE_WIND_DATA_URL,
@@ -21,19 +21,19 @@ export const initWind = async (viewer, layerSettingsStore, windLayerRef) => {
     }
   };
 
-  windLayerRef.value = new WindLayer(viewer, windData, dataConfigs.options);
+  let windLayerRef = new WindLayer(viewer, windData, dataConfigs.options);
 
-  windLayerRef.value.addEventListener('dataChange', (data) => {
+  windLayerRef.addEventListener('dataChange', (data) => {
   });
 
-  windLayerRef.value.addEventListener('optionsChange', (options) => {
+  windLayerRef.addEventListener('optionsChange', (options) => {
   });
 
   watch(() => layerSettingsStore.windOptions, (newOptions) => {
-    if (windLayerRef.value) {
-      windLayerRef.value.updateOptions(newOptions);
+    if (windLayerRef) {
+      windLayerRef.updateOptions(newOptions);
     }
   }, { deep: true });
 
-  return windLayerRef.value
+  return windLayerRef
 }

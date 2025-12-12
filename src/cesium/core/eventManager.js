@@ -9,6 +9,7 @@ class EventManager {
     this.clickHandlers = []; // 存储点击事件处理器
     this.defaultHandlers = []; // 存储默认处理器，总是在最后执行
     this.initializedViewers = new Set(); // 已初始化的viewer实例集合
+    this.eventListeners = new Map(); // 存储普通事件监听器
   }
 
   /**
@@ -156,6 +157,97 @@ class EventManager {
     };
 
     return this.registerDefaultHandler(globalDefaultHandler);
+  }
+
+  /**
+   * 注册事件监听器
+   * @param {string} eventName - 事件名称
+   * @param {Function} callback - 事件处理函数
+   * @param {Object} context - 回调函数的上下文（可选）
+   * @returns {Function} 注销该监听器的函数
+   */
+  on(eventName, callback, context = null) {
+    if (typeof callback !== 'function') {
+      console.warn('事件监听器必须是函数');
+      return () => {};
+    }
+
+    if (!this.eventListeners.has(eventName)) {
+      this.eventListeners.set(eventName, []);
+    }
+
+    const listeners = this.eventListeners.get(eventName);
+    const listenerObj = { callback, context };
+    listeners.push(listenerObj);
+
+    // 返回注销函数
+    return () => {
+      const index = listeners.indexOf(listenerObj);
+      if (index > -1) {
+        listeners.splice(index, 1);
+      }
+    };
+  }
+
+  /**
+   * 注册一次性事件监听器
+   * @param {string} eventName - 事件名称
+   * @param {Function} callback - 事件处理函数
+   * @param {Object} context - 回调函数的上下文（可选）
+   * @returns {Function} 注销该监听器的函数
+   */
+  once(eventName, callback, context = null) {
+    const wrappedCallback = (...args) => {
+      callback.apply(context, args);
+      // 执行后自动注销
+      unregister();
+    };
+
+    const unregister = this.on(eventName, wrappedCallback, context);
+    return unregister;
+  }
+
+  /**
+   * 移除事件监听器
+   * @param {string} eventName - 事件名称
+   * @param {Function} callback - 要移除的事件处理函数
+   */
+  off(eventName, callback) {
+    if (!this.eventListeners.has(eventName)) return;
+
+    const listeners = this.eventListeners.get(eventName);
+    if (callback) {
+      // 移除特定的监听器
+      const index = listeners.findIndex(listener => listener.callback === callback);
+      if (index > -1) {
+        listeners.splice(index, 1);
+      }
+    } else {
+      // 移除所有监听器
+      this.eventListeners.set(eventName, []);
+    }
+  }
+
+  /**
+   * 触发事件
+   * @param {string} eventName - 事件名称
+   * @param {*} data - 事件数据
+   */
+  emit(eventName, data) {
+    if (!this.eventListeners.has(eventName)) {
+      // 可以添加调试日志，方便调试
+      console.debug(`事件 ${eventName} 没有监听器`);
+      return;
+    }
+
+    const listeners = this.eventListeners.get(eventName);
+    for (const listener of listeners) {
+      try {
+        listener.callback.call(listener.context, data);
+      } catch (error) {
+        console.error(`事件 ${eventName} 监听器执行错误:`, error);
+      }
+    }
   }
  
 }

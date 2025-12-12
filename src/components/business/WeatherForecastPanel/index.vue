@@ -111,7 +111,7 @@ const loadData = async () => {
   try {
     // 获取时间范围
     const timeRange = getTimeRange();
-    // 获取选中的监测点信息
+    // 获取选中的重点关注区域信息
     const selectedPoint = monitoringPointStore.selectedPoint;
     const pointId = selectedPoint?.id || 'BJ-001';
     const coordinates = selectedPoint?.coordinates || [116.403874, 39.914885];
@@ -255,7 +255,7 @@ const updateTrendChart = (data) => {
         type: 'value',
         name: 'm/s',
         min: 0,
-        max: 10,
+        max: 30,
         position: 'left',
         axisLine: {
           lineStyle: {
@@ -280,7 +280,7 @@ const updateTrendChart = (data) => {
         type: 'value',
         name: 'km',
         min: 0,
-        max: 25,
+        max: 50,
         position: 'right',
         offset: 0,
         axisLine: {
@@ -510,7 +510,7 @@ const updateProfileChart = (data) => {
       calculable: true,
       dimension: 2,
       inRange: {
-        color: ['#ef4444', '#fbbf24', '#a3e635', '#10b981'] // 增加中间色阶
+        color: ['#10b981 ', '#a3e635 ', '#fbbf24', '#f97316 ','#ef4444'] // 增加中间色阶
       }
     },
     series: [
@@ -584,7 +584,7 @@ const initCharts = () => {
   }
 };
 
-// 监听选中监测点变化
+// 监听选中重点关注区域变化
 watch(
   () => monitoringPointStore.selectedPoint,
   (newPoint) => {

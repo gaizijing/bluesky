@@ -17,6 +17,8 @@
             prefix-icon="el-icon-user"
             size="large"
             autocomplete="off"
+            @keyup.enter="handleLogin"
+            autofocus
           />
         </el-form-item>
         
@@ -29,6 +31,7 @@
             size="large"
             show-password
             autocomplete="off"
+            @keyup.enter="handleLogin"
           />
         </el-form-item>
         
@@ -130,7 +133,10 @@ onMounted(() => {
 <style scoped>
 .login-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-image: url('@/assets/images/bg_login.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -138,7 +144,7 @@ onMounted(() => {
 }
 
 .login-box {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.7);
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(10px);

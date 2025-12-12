@@ -47,7 +47,7 @@ export const routes = [
             name: 'MonitoringPointsManagement',
             component: () => import('@/pages/Setting/views/MonitoringPointsManagement.vue'),
             meta: {
-              title: '监测点管理'
+              title: '重点关注区域管理'
             }
           }
         ]

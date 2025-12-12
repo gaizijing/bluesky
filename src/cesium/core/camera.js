@@ -1,11 +1,6 @@
 import * as Cesium from 'cesium'
 
-export const configureCamera = (viewerInstance) => {
-  const controller = viewerInstance.scene.screenSpaceCameraController
-  controller.minimumZoomDistance = 0
-  controller.maximumZoomDistance = 30000
-  viewerInstance.scene.camera.constrainedAxis = Cesium.Cartesian3.UNIT_Z
-}
+
 
 export const getCurrentCameraParams = (viewer) => {
   if (!viewer) return null;

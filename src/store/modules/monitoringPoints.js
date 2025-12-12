@@ -3,7 +3,7 @@ import { defineStore } from 'pinia';
 export const useMonitoringPointStore = defineStore('monitoringPoint', {
   state: () => ({
     selectedPoint: null,
-    pointsList: [], // 新增监测点列表
+    pointsList: [], // 新增重点关注区域列表
   }),
   
   actions: {

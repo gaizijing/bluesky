@@ -436,7 +436,7 @@ const selectRow = (index) => {
 
 <style scoped lang="scss">
 .warning-details-container {
-  height: 240px;
+  height: 200px;
   overflow: hidden;
 }
 

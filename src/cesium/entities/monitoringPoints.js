@@ -286,7 +286,7 @@ class MonitorPointManager {
   _configureClustering(dataSource) {
     dataSource.clustering.enabled = true
     dataSource.clustering.pixelRange = 80
-    dataSource.clustering.minimumClusterSize = 2
+    dataSource.clustering.minimumClusterSize = 3
     dataSource.clustering.clusterEvent.addEventListener((clusteredEntities, cluster) => {
       cluster.label.show = false
       cluster.billboard.show = true
@@ -471,8 +471,6 @@ class MonitorPointManager {
    setMonitoringPointsVisibility(visible) {
 
     this.monitorEntities.forEach((entity) => {
-      console.log(entity);
-
       if (entity) {
         entity.show = visible;
       }

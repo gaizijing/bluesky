@@ -91,34 +91,43 @@
     <div class="logo-text">{{ appTitle }}</div>
 
     <div class="header-right">
-       <!-- 加载状态 -->
-    <div v-if="weatherStore.isLoading" class="loading-overlay">
-      <div class="loading-content">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">加载中...</div>
+      <!-- 加载状态 -->
+      <div v-if="weatherStore.isLoading" class="loading-overlay">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">加载中...</div>
+        </div>
       </div>
-    </div>
       <div v-else class="weather-info" @click="toggleWeatherDetail">
         <div class="weather-item">
-          <img src="@/assets/icons/ic_temperature.png" class="weather-icon" />
+          <div class="weather-icon-circle">
+            <img src="@/assets/icons/ic_temperature.png" class="weather-icon" />
+          </div>
+
           <span class="weather-value">{{
             weatherStore.headerWeatherInfo.temperature
           }}</span>
         </div>
         <div class="weather-item">
-          <img src="@/assets/icons/ic_windspeed.png" class="weather-icon" />
+          <div class="weather-icon-circle">
+            <img src="@/assets/icons/ic_windspeed.png" class="weather-icon" />
+          </div>
           <span class="weather-value">{{
             weatherStore.headerWeatherInfo.windSpeed
           }}</span>
         </div>
         <div class="weather-item">
-          <img src="@/assets/icons/ic_visibility.png" class="weather-icon" />
+          <div class="weather-icon-circle">
+            <img src="@/assets/icons/ic_visibility.png" class="weather-icon" />
+          </div>
           <span class="weather-value">{{
             weatherStore.headerWeatherInfo.visibility
           }}</span>
         </div>
         <div class="weather-item">
-          <img src="@/assets/icons/ic_humidity.png" class="weather-icon" />
+          <div class="weather-icon-circle">
+            <img src="@/assets/icons/ic_humidity.png" class="weather-icon" />
+          </div>
           <span class="weather-value">{{
             weatherStore.headerWeatherInfo.humidity
           }}</span>
@@ -166,7 +175,7 @@ import {
 } from "vue";
 import { useRouter } from "vue-router";
 import { useCurrentTime } from "@/hooks/useTime";
-// 导入监测点 store
+// 导入重点关注区域 store
 const MonitoringPoints = defineAsyncComponent(() =>
   import("@/components/business/MonitoringPoints/index.vue")
 );
@@ -177,7 +186,7 @@ const ThresholdManagement = defineAsyncComponent(() =>
 import { useWeatherStore } from "@/store/modules/weather";
 import { useLayerSettingsStore } from "@/store/modules/layerSettings";
 import { fetchCurrentPointWeather } from "@/api";
-import { fetchMonitoringPoints,fetchCurrentMonitoringPoint } from '@/api'
+import { fetchMonitoringPoints, fetchCurrentMonitoringPoint } from '@/api'
 import { useMonitoringPointStore } from '@/store/modules/monitoringPoints'
 
 const layerSettingsStore = useLayerSettingsStore();
@@ -192,7 +201,7 @@ const showLayerDialog = ref(false);
 const showWeatherDetail = ref(false);
 const router = useRouter();
 const weatherStore = useWeatherStore();
-const  monitoringPointStore= useMonitoringPointStore();
+const monitoringPointStore = useMonitoringPointStore();
 // 切换起降点选择器显示
 const togglePointSelector = () => {
   showPointSelector.value = !showPointSelector.value;
@@ -255,7 +264,7 @@ onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
 });
 
-// 获取当前监测点的天气数据并保存到store
+// 获取当前重点关注区域的天气数据并保存到store
 const fetchAndSaveWeatherData = async () => {
   if (!monitoringPointStore.hasSelectedPoint) {
     return;
@@ -278,18 +287,18 @@ watch(
   }
 );
 // 在组件挂载前检查是否需要初始化
-onMounted(async() => {
-  
-   // 从API获取监测点数据
-      const pointsData = await fetchMonitoringPoints();
-      const currentPoint = await fetchCurrentMonitoringPoint();
-      // 保存到store
-      monitoringPointStore.setPointsList(pointsData);
-      monitoringPointStore.setSelectedPoint(currentPoint);
-  
+onMounted(async () => {
+
+  // 从API获取重点关注区域数据
+  const pointsData = await fetchMonitoringPoints();
+  const currentPoint = await fetchCurrentMonitoringPoint();
+  // 保存到store
+  monitoringPointStore.setPointsList(pointsData);
+  monitoringPointStore.setSelectedPoint(currentPoint);
+
 });
 
-// 组件挂载后，获取当前监测点的天气数据
+// 组件挂载后，获取当前重点关注区域的天气数据
 onMounted(() => {
   if (monitoringPointStore.hasSelectedPoint) {
     fetchAndSaveWeatherData();
@@ -332,6 +341,10 @@ onMounted(() => {
   }
 }
 
+.location-info:hover {
+  transform: scale(1.05);
+}
+
 .header-logo {
   display: flex;
   align-items: center;
@@ -368,10 +381,11 @@ onMounted(() => {
   padding: 0 15px;
   cursor: pointer;
   transition: all 0.3s ease;
+
 }
 
 .weather-info:hover {
-  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.05);
 }
 
 .weather-item {
@@ -380,9 +394,20 @@ onMounted(() => {
   gap: 5px;
 }
 
+.weather-icon-circle {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, rgba(66, 153, 225, 0.8) 0%, rgba(66, 153, 225, 0.3) 100%);
+}
+
 .weather-icon {
-  width: 40px;
-  height: 40px;
+  width: 20px;
+  height: 20px;
 }
 
 .weather-value {
@@ -397,6 +422,10 @@ onMounted(() => {
 // 在原有的样式部分添加或修改
 .user-avatar {
   width: 40px;
+}
+
+.user-avatar:hover {
+  transform: scale(1.05);
 }
 
 .current-time {
@@ -427,10 +456,10 @@ onMounted(() => {
   top: 100px;
   right: 20px;
   width: 350px;
-  background: url('@/assets/images/bg_weather.jpg') no-repeat center center;
-  border: 2px solid rgba(66, 153, 225, 0.6);
+  background-image: url('@/assets/images/bg_weather.jpg') ;
+  background-size: cover;
+  background-position: center;
   border-radius: 10px;
-  box-shadow: 0 0 20px rgba(66, 153, 225, 0.3);
   color: #fff;
   padding: 20px;
   font-family: 'AideepFont';

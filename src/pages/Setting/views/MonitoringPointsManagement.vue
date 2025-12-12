@@ -1,14 +1,14 @@
 <template>
   <div class="monitoring-points-management">
     <div class="page-header">
-      <h1>监测点管理</h1>
-      <p>管理系统中的气象监测点</p>
+      <h1>重点关注区域管理</h1>
+      <p>管理系统中的气象重点关注区域</p>
     </div>
     
     <div class="content-wrapper">
       <div class="control-bar">
         <button class="btn btn-primary" @click="showAddDialog = true">
-          <span class="btn-icon">+</span> 添加监测点
+          <span class="btn-icon">+</span> 添加重点关注区域
         </button>
       </div>
       
@@ -52,7 +52,7 @@
             </tr>
             <tr v-if="monitorPoints.length === 0">
               <td colspan="8" class="empty-row">
-                暂无监测点数据
+                暂无重点关注区域数据
               </td>
             </tr>
           </tbody>
@@ -60,18 +60,18 @@
       </div>
     </div>
     
-    <!-- 监测点编辑对话框 -->
+    <!-- 重点关注区域编辑对话框 -->
     <div v-if="showDialog" class="dialog-overlay" @click.self="closeDialog">
       <div class="dialog">
         <div class="dialog-header">
-          <h3>{{ isEditMode ? '编辑监测点' : '添加监测点' }}</h3>
+          <h3>{{ isEditMode ? '编辑重点关注区域' : '添加重点关注区域' }}</h3>
           <button class="dialog-close" @click="closeDialog">×</button>
         </div>
         <div class="dialog-body">
           <form @submit.prevent="saveMonitorPoint">
             <div class="form-row">
               <div class="form-item">
-                <label class="form-label">监测点名称 <span class="required">*</span></label>
+                <label class="form-label">重点关注区域名称 <span class="required">*</span></label>
                 <input 
                   type="text" 
                   v-model="currentPoint.name" 
@@ -81,7 +81,7 @@
                 />
               </div>
               <div class="form-item">
-                <label class="form-label">监测点编号 <span class="required">*</span></label>
+                <label class="form-label">重点关注区域编号 <span class="required">*</span></label>
                 <input 
                   type="text" 
                   v-model="currentPoint.code" 
@@ -167,7 +167,7 @@ import { useMonitoringPointStore } from '@/store/modules/monitoringPoints'
 // 状态管理
 const monitoringPointStore = useMonitoringPointStore()
 
-// 监测点数据
+// 重点关注区域数据
 const monitorPoints = computed(() => monitoringPointStore.pointsList)
 
 // 对话框状态
@@ -244,7 +244,7 @@ const showAddDialog = computed({
   }
 })
 
-// 编辑监测点
+// 编辑重点关注区域
 const editMonitorPoint = (point) => {
   Object.assign(currentPoint, { ...point })
   isEditMode.value = true
@@ -256,16 +256,16 @@ const closeDialog = () => {
   showDialog.value = false
 }
 
-// 删除监测点
+// 删除重点关注区域
 const deleteMonitorPoint = (point) => {
-  if (confirm(`确定要删除监测点「${point.name}」吗？`)) {
+  if (confirm(`确定要删除重点关注区域「${point.name}」吗？`)) {
     const updatedList = monitoringPointStore.pointsList.filter(p => p.id !== point.id)
     monitoringPointStore.setPointsList(updatedList)
     alert('删除成功')
   }
 }
 
-// 保存监测点
+// 保存重点关注区域
 const saveMonitorPoint = () => {
   // 简单验证
   if (!currentPoint.name || !currentPoint.code || !currentPoint.longitude || !currentPoint.latitude) {

@@ -19,7 +19,7 @@ export const useWeatherStore = defineStore('weather', {
       [WEATHER_ELEMENTS.HUMIDITY]: null,
       [WEATHER_ELEMENTS.CLOUD]: null
     },
-    // 当前监测点的实时天气数据
+    // 当前重点关注区域的实时天气数据
     currentPointWeather: null,
     // 统计数据（最大值、最小值、平均值等）
     statistics: {
@@ -105,7 +105,7 @@ export const useWeatherStore = defineStore('weather', {
     updateStatistics(data) {
       this.statistics = { ...this.statistics, ...data }
     },
-    // 设置当前监测点的实时天气数据
+    // 设置当前重点关注区域的实时天气数据
     setCurrentPointWeather(weatherData) {
       this.currentPointWeather = weatherData
     },

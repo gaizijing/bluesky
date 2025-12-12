@@ -16,6 +16,12 @@
       :initial-options="layerSettingsStore.windOptions" @options-change="handleOptionsChange"
       :layer-controls="cesiumHooks" />
 
+    <!-- 时间进度条：只在存在当前航线时显示 -->
+    <TimeProgressBar 
+      v-if="routeStore.currentRoute"
+      @time-change="handleTimeChange" 
+    />
+
   </div>
 </template>
 
@@ -25,6 +31,7 @@ import { useCesium } from '@/hooks/useCesium'
 import { useCesiumStore } from '@/store/modules/cesium'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import ControlPanel from "@/components/map/ControlPanel.vue"
+import TimeProgressBar from "@/components/map/TimeProgressBar.vue"
 import { useRouteStore } from '@/store/modules/routeStore'
 import eventManager from '@/cesium/core/eventManager' // 导入独立的事件管理器
 
@@ -90,6 +97,28 @@ const handleOptionsChange = (options) => {
   layerSettingsStore.saveSettingsToLocal()
 }
 
+// 处理时间变化
+const handleTimeChange = (time) => {
+  console.log('时间变化:', time)
+  // 更新Cesium的时间系统
+  if (cesiumHooks && cesiumHooks.setCurrentTime) {
+    cesiumHooks.setCurrentTime(time)
+  }
+  
+  // 更新热力图数据
+  if (cesiumHooks && cesiumHooks.updateHeatmapTime) {
+    cesiumHooks.updateHeatmapTime(time)
+  }
+  
+  // 更新航线分析数据（根据时间偏移量）
+  if (routeStore.currentRoute) {
+    // 计算时间偏移量（秒）
+    const timeOffset = Math.floor((time - new Date()) / 1000)
+    // 触发航线分析面板更新
+    eventManager.emit('timeChange', { time, timeOffset })
+  }
+}
+
 
 // 清空地图航线
 const clearRoute = () => {
@@ -123,7 +152,10 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.8);
+  background: url("@/assets/images/bg_main_layout.png");
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;

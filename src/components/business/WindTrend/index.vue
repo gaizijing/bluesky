@@ -236,7 +236,7 @@ onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
 });
 
-// 监听选中监测点变化
+// 监听选中重点关注区域变化
 watch(
   () => monitoringPointStore.selectedPoint,
   (newPoint) => {

@@ -1,6 +1,6 @@
 <!-- ControlPanel.vue -->
 <template>
-  <div class="control-panel" v-if="windLayer">
+  <div class="control-panel">
     <!-- 图层控制部分 -->
     <div class="layer-control-section" v-if="layerSettingsStore">
       <div class="section-header" @click="toggleSection('layers')">
@@ -47,9 +47,9 @@
           <label>线宽范围: {{ localOptions.lineWidth.min }} -
             {{ localOptions.lineWidth.max }}</label>
           <div class="range-group">
-            <input type="range" min="0" max="10" step="1" :value="localOptions.lineWidth.min"
+            <input type="range" min="0" max="10" step="0.1" :value="localOptions.lineWidth.min"
               @input="handleLineWidthMinChange" />
-            <input type="range" min="0" max="10" step="1" :value="localOptions.lineWidth.max"
+            <input type="range" min="0" max="10" step="0.1" :value="localOptions.lineWidth.max"
               @input="handleLineWidthMaxChange" />
           </div>
         </div>

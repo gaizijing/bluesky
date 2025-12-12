@@ -243,11 +243,11 @@ export const getWeatherDetails = async (params) => {
 }
 
 
-// 获取当前选中监测点的风向趋势数据 gzj
+// 获取当前选中重点关注区域的风向趋势数据 gzj
 export const fetchCurrentPointWindTrend = async (currentPoint) => {
   try {
     if (!currentPoint) {
-      throw new Error('未选择监测点')
+      throw new Error('未选择重点关注区域')
     }
     
       try {
@@ -271,11 +271,11 @@ export const fetchCurrentPointWindTrend = async (currentPoint) => {
       deviation: parseFloat(((item.upper - item.lower) / 2).toFixed(1))
     }))
   } catch (error) {
-    console.error(`获取监测点${currentPoint.id}风向趋势数据失败:`, error)
+    console.error(`获取重点关注区域${currentPoint.id}风向趋势数据失败:`, error)
     throw error
   }
   } catch (error) {
-    console.error('获取当前监测点风向趋势数据失败:', error)
+    console.error('获取当前重点关注区域风向趋势数据失败:', error)
     throw error
   }
 }

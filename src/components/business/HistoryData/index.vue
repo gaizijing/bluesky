@@ -366,7 +366,7 @@ onUnmounted(() => {
   .button {
     text-align: center;
     padding: 8px 16px;
-    width: 50px;
+    width: 83px;
     background: transparent;
     color: #94a3b8;
     cursor: pointer;

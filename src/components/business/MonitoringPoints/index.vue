@@ -4,7 +4,7 @@
       <div class="stats-summary">
         <!-- 统计项保持不变 -->
         <div class="stat-item" @click="setFilter('all')">
-          <div class="stat-label">总监测点</div>
+          <div class="stat-label">总重点关注区域</div>
           <div class="stat-value">{{ totalPoints }}</div>
         </div>
         <div class="stat-item available" @click="setFilter('available')">
@@ -27,7 +27,7 @@
             ref="searchInputRef"
             v-model="searchKeyword"
             type="text"
-            placeholder="搜索监测点名称或位置..."
+            placeholder="搜索重点关注区域名称或位置..."
             class="search-input"
           />
         </div>
@@ -59,7 +59,7 @@
     </div>
 
     <!-- 其余部分保持不变 -->
-    <!-- 监测点列表 -->
+    <!-- 重点关注区域列表 -->
     <div class="points-table">
       <div class="table-header">
         <div class="table-cell">名称</div>
@@ -72,17 +72,17 @@
       <!-- 加载状态 -->
       <div v-if="isLoading" class="loading-state">
         <div class="spinner"></div>
-        <p>加载监测点数据中...</p>
+        <p>加载重点关注区域数据中...</p>
       </div>
 
       <!-- 空状态 -->
       <div v-if="!isLoading && filteredPoints.length === 0" class="empty-state">
         <div class="empty-icon">📌</div>
-        <p>没有找到匹配的监测点</p>
+        <p>没有找到匹配的重点关注区域</p>
         <button class="reset-btn" @click="resetFilters">重置筛选条件</button>
       </div>
 
-      <!-- 监测点列表项 -->
+      <!-- 重点关注区域列表项 -->
       <div class="table-body">
         <div
           v-for="point in filteredPoints"
@@ -141,7 +141,7 @@ const statusFilter = ref("all");
 // 添加 emit
 const emit = defineEmits(["point-selected"]);
 
-// 过滤后的监测点列表（从store中获取）
+// 过滤后的重点关注区域列表（从store中获取）
 const filteredPoints = computed(() => {
   return monitoringPointStore.pointsList.filter((point) => {
     // 类型过滤
@@ -196,7 +196,7 @@ const switchPoint = async (point) => {
     // 调用API保存到后台
     await updateSelectedPoint(point);
   } catch (error) {
-    console.error('保存监测点信息失败:', error);
+    console.error('保存重点关注区域信息失败:', error);
     // 即使保存失败，也继续执行后续操作
   }
 

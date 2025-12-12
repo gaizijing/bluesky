@@ -32,6 +32,8 @@ body {
   background-color: $background-color;
   font-family: 'Microsoft YaHei', sans-serif;
   outline: none;
+  overflow: hidden;
+  height: 100vh;
 }
 
 /* 通用面板样式 */
@@ -155,25 +157,53 @@ body {
     }
   }
 
-  .title-bar-button {
-    background-color: rgba(59, 130, 246, 0.1);
-    border: 1px solid #3b82f6;
-    color: #3b82f6;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-    transition: all 0.2s;
-
+ .title-bar-button {
+  background-color: rgb(216, 231, 231,0.8);
+  border: 2px solid #3b82f6;
+  color: #3b82f6;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  
+  &:hover {
+    background-color: rgba(59, 130, 246, 0.2);
+    border-color: #60a5fa;
+    color: #60a5fa;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    background-color: rgba(59, 130, 246, 0.15);
+  }
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  }
+  
+  &.active {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    border-color: #2563eb;
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+    
     &:hover {
-      transform: translateY(-2px);
-      background-color: rgba(59, 130, 246, 0.2);
-    }
-
-    &.active {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      background: linear-gradient(135deg, #60a5fa, #3b82f6);
+      box-shadow: 0 6px 10px rgba(59, 130, 246, 0.4);
     }
   }
+}
 
 }
 
@@ -213,8 +243,28 @@ body {
   background-repeat: no-repeat;
   background-position: center;
   width: 750px;
-  height: 500px;
+  max-height: 90vh;
   padding: 35px;
+  overflow: scroll;
+
+  // 自定义滚动条样式
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  }
 
   .dialog-header {
     display: flex;
@@ -249,24 +299,6 @@ body {
       margin: 5px 0;
     }
 
-    // 自定义滚动条样式
-    &::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 3px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 3px;
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.3);
-      }
-    }
   }
 }
 
@@ -398,7 +430,7 @@ body {
   }
 }
 
-/* 监测点弹窗样式 */
+/* 重点关注区域弹窗样式 */
 .monitor-info {
   font-family: sans-serif;
   padding: 8px;

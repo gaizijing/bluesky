@@ -4,14 +4,14 @@
   
     <div ref="chart" style="width: 100%; height: 280px;"></div>
     
-    <!-- 报警详情表格 -->
+    <!-- 告警详情表格 -->
     <div class="alarm-details-container">
       <div class="alarm-details">
         <div class="table-header">
           <div class="table-cell">设备类型</div>
           <div class="table-cell">设备名称</div>
-          <div class="table-cell">报警内容</div>
-          <div class="table-cell">报警时间</div>
+          <div class="table-cell">告警内容</div>
+          <div class="table-cell">告警时间</div>
         </div>
         <div class="table-body">
           <div 
@@ -46,7 +46,7 @@ const chart = ref(null); // 绑定 DOM 容器
 let myChart = null;
 const selectedRowIndex = ref(-1); // 当前选中的行索引
 
-// 报警详情数据
+// 告警详情数据
 const alarmDetails = ref([
   { date: '10-29', deviceType: '气象站', deviceName: '自动气象站01', alarmContent: '风速超限', alarmTime: '2023-10-29 08:30:15' },
   { date: '10-29', deviceType: '雷达', deviceName: '小型天气雷达', alarmContent: '信号异常', alarmTime: '2023-10-29 14:22:45' },
@@ -92,7 +92,7 @@ const option = {
   yAxis: [
     {
       type: 'value',
-      name: '报警次数',
+      name: '告警次数',
       position: 'left',
       axisLine: {
         show: true,
@@ -129,7 +129,7 @@ const option = {
   ],
   series: [
     {
-      name: '报警次数',
+      name: '告警次数',
       data: [3, 1, 3, 1, 1, 1, 3],
       type: 'bar',
       barWidth: '20%',
@@ -247,7 +247,7 @@ const option = {
     textStyle: {
       color: '#ffffff'
     },
-    data: ['报警次数', '设备在线率', '故障设备数']
+    data: ['告警次数', '设备在线率', '故障设备数']
   }
 };
   
@@ -399,7 +399,7 @@ watch(
   }
   
   &:last-child {
-    flex: 1.2;
+    flex: 2;
   }
 }
 

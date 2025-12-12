@@ -2,7 +2,6 @@
 import * as Cesium from 'cesium'
 import { useCesiumStore } from '@/store/modules/cesium'
 import eventManager from '@/cesium/core/eventManager'
-
 class RouteManager {
   // 单例实例
   static instance = null;
@@ -37,13 +36,7 @@ class RouteManager {
    */
   #getColorByDangerLevel(danger) {
     const normalized = Cesium.Math.clamp(danger, 0, 10);
-    let meterial=new Cesium.PolylineGlowMaterialProperty({
-      color: Cesium.Color.RED.withAlpha(1),
-      // 发光范围
-      glowPower: 0.5,
-      //锥体哪里收尾
-      taperPower: 1,
-    })
+    let meterial=new Cesium.ColorMaterialProperty()
     // 危险等级分三段：安全(绿)、警告(黄)、危险(红)
     if (normalized < 3) {
 
@@ -66,7 +59,7 @@ class RouteManager {
       id: `route_${routeId}_segment_${segmentIndex}`,
       polyline: {
         positions: positions,
-        width: 15,
+        width: 5,
         material: this.#getColorByDangerLevel(danger),
         depthFailMaterial: this.#getColorByDangerLevel(danger),
         clampToGround: false
@@ -95,7 +88,7 @@ class RouteManager {
       position: positions[0],
       model: {
         uri: modelUrl,
-        scale: 2.0,
+        scale: 4.0,
         show: true,
         minimumPixelSize: 64,
         maximumScale: 20000

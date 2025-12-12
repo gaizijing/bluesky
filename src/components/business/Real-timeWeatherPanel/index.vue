@@ -97,7 +97,7 @@ const getWindSpeedLevel = (windSpeed) => {
   return "extreme";
 };
 // const refreshData = async () => {
-//   // 如果没有选中的监测点，不执行刷新
+//   // 如果没有选中的重点关注区域，不执行刷新
 //   if (!monitoringPointStore.hasSelectedPoint) {
 //     return;
 //   }
@@ -117,7 +117,7 @@ const getWindSpeedLevel = (windSpeed) => {
 //     isRefreshing.value = false;
 //   }
 // };
-//监听监测点的变化修改数据
+//监听重点关注区域的变化修改数据
 // watch(
 //   () => monitoringPointStore.selectedPoint,
 //   (newPoint) => {

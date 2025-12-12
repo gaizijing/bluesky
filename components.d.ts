@@ -11,11 +11,8 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    AircraftAdapt: typeof import('./src/components/business/AircraftAdapt/index.vue')['default']
     ControlPanel: typeof import('./src/components/map/ControlPanel.vue')['default']
-    CoreIndicators: typeof import('./src/components/business/CoreIndicators/index.vue')['default']
     DeviceCount: typeof import('./src/components/business/DeviceCount/index.vue')['default']
-    DeviceTrace: typeof import('./src/components/business/DeviceTrace/index.vue')['default']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
     ElCollapse: typeof import('element-plus/es')['ElCollapse']
@@ -32,7 +29,6 @@ declare module 'vue' {
     ElSubMenu: typeof import('element-plus/es')['ElSubMenu']
     EquipmentAlarm: typeof import('./src/components/business/EquipmentAlarm/index.vue')['default']
     FlightSuitableAnalysisPanel: typeof import('./src/components/business/FlightSuitableAnalysisPanel/index.vue')['default']
-    FlightTasks: typeof import('./src/components/business/FlightTasks/index.vue')['default']
     HistoryData: typeof import('./src/components/business/HistoryData/index.vue')['default']
     MapContainer: typeof import('./src/components/map/MapContainer.vue')['default']
     MicroscaleWeather: typeof import('./src/components/business/MicroscaleWeather/index.vue')['default']
@@ -46,7 +42,7 @@ declare module 'vue' {
     RouterRisk: typeof import('./src/components/business/RouterRisk/index.vue')['default']
     RouterView: typeof import('vue-router')['RouterView']
     SurveillanceFootage: typeof import('./src/components/business/SurveillanceFootage/index.vue')['default']
-    SystemMessage: typeof import('./src/components/business/SystemMessage/index.vue')['default']
+    TimeProgressBar: typeof import('./src/components/map/TimeProgressBar.vue')['default']
     VueMap: typeof import('./src/components/map/VueMap.vue')['default']
     WeatherElementSelector: typeof import('./src/components/business/WeatherElementSelector/index.vue')['default']
     WeatherForecastPanel: typeof import('./src/components/business/WeatherForecastPanel/index.vue')['default']

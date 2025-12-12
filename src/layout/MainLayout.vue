@@ -27,7 +27,9 @@ import Sidebar from './Sidebar.vue'
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: $background-color;
+  background: url("@/assets/images/bg_main_layout.png");
+  background-size: cover;
+  background-position: center;
   overflow: hidden;
 }
 .layout-top {

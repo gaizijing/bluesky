@@ -13,7 +13,7 @@ export const userLogin = async (loginData) => {
     // const response = await request.post('/api/auth/login', loginData);
     
     // 模拟登录请求
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       setTimeout(() => {
         // 模拟登录成功
         if (loginData.username === 'admin' && loginData.password === 'admin123') {
@@ -29,7 +29,7 @@ export const userLogin = async (loginData) => {
           });
         } else {
           // 模拟登录失败
-          throw new Error('用户名或密码错误');
+          reject(new Error('用户名或密码错误'));
         }
       }, 1000);
     });

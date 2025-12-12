@@ -1,21 +1,6 @@
 <template>
   <div class="route-warning-card">
-    <!-- 卡片头部 -->
-    <div class="card-header">
-      <i class="card-icon">🧭</i>
-      <div class="header-text">
-        <p>
-          航线：{{ currentRoute.name }}
-          <span class="route-info">
-            总长：{{ currentRoute.length }}km | 分段：{{ currentRoute.segments }}段
-          </span>
-        </p>
-      </div>
-      <button class="refresh-btn" @click="refreshData" :disabled="isRefreshing">
-        <i v-if="!isRefreshing">🔄</i>
-        <div v-else class="loading-spinner"></div>
-      </button>
-    </div>
+
     
     <!-- 全局选项卡导航 -->
     <div class="global-tabs">
@@ -39,31 +24,7 @@
 
       <!-- 控制区与图例 -->
       <div class="chart-controls">
-        <!-- 风险维度切换 -->
-        <div class="dimension-controls">
-          <div class="dimension-buttons">
-            <button
-              v-for="dim in riskDimensions"
-              :key="dim.value"
-              :class="{ 'dim-btn': true, active: activeDimensions.includes(dim.value) }"
-              @click="toggleDimension(dim.value)"
-            >
-              <span class="dim-icon">{{ dim.icon }}</span>
-              <span class="dim-text">{{ dim.label }}</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- 风险等级图例 -->
-        <div class="risk-legend">
-          <div class="legend-item" v-for="level in riskLevels" :key="level.value">
-            <span
-              class="legend-color"
-              :style="{ backgroundColor: level.color }"
-            ></span>
-            <span class="legend-text">{{ level.label }} ({{ level.range }})</span>
-          </div>
-        </div>
+        <!-- 风险维度显示已移除 -->
       </div>
     </div>
 
@@ -154,6 +115,7 @@ import * as echarts from "echarts";
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from "vue";
 import { useDashboardStore } from "@/store/modules/dashboard"; 
 const dashboardStore = useDashboardStore();
+import eventManager from '@/cesium/core/eventManager';
 
 // 定义组件事件
 const emit = defineEmits(['highlightSegment', 'alternativeRouteSelected']);
@@ -211,8 +173,7 @@ const riskDimensions = ref([
   { label: "降水", value: "rainfall", icon: "🌧️", color: "#10b981" },
 ]);
 
-// 激活的维度（默认显示综合风险）
-const activeDimensions = ref(["risk"]);
+// 风险维度默认全部显示
 
 // 风险等级配置
 const riskLevels = ref([
@@ -256,14 +217,30 @@ const handleResize = () => {
 
 // 初始化图表（优化版）
 const initChart = () => {
+  console.log('=== 开始初始化图表 ===');
   // 关键：检查 DOM 元素是否存在
   if (!chartRef.value) {
     console.warn("图表容器 DOM 元素不存在");
     return;
   }
+  console.log('DOM 元素存在', chartRef.value);
+  
+  // 检查 routeData
+  console.log('routeData 长度:', routeData.value.length);
+  console.log('routeData 内容:', routeData.value);
+  
+  // 检查 riskDimensions
+  console.log('riskDimensions 长度:', riskDimensions.value.length);
+  console.log('riskDimensions 内容:', riskDimensions.value);
+  
   if (riskChart.value) riskChart.value.dispose();
   riskChart.value = echarts.init(chartRef.value);
+  console.log('ECharts 实例创建成功', riskChart.value);
 
+  // 生成系列数据
+  const seriesData = getSeriesData();
+  console.log('系列数据生成成功', seriesData);
+  
   // 图表配置（优化部分）
   const option = {
     // 1. 网格调整：增加边距，避免内容拥挤
@@ -363,9 +340,7 @@ const initChart = () => {
 
     // 6. 图例优化：位置与样式调整
     legend: {
-      data: activeDimensions.value.map(dim => 
-        riskDimensions.value.find(d => d.value === dim).label
-      ),
+      data: riskDimensions.value.map(dim => dim.label),
       top: "top",
       left: "center",
       textStyle: { color: "#94a3b8" },
@@ -382,6 +357,7 @@ const initChart = () => {
   };
 
   riskChart.value.setOption(option);
+  console.log('图表配置设置成功');
 
   // 交互事件保持不变（点击高亮、悬停提示）
   riskChart.value.on("click", handleSegmentClick);
@@ -393,13 +369,47 @@ const initChart = () => {
 
 // 生成系列数据（优化版：分组显示+风险等级色）
 const getSeriesData = () => {
-  return activeDimensions.value.map((dim) => {
-    const dimConfig = riskDimensions.value.find((d) => d.value === dim);
+  return riskDimensions.value.map((dimConfig) => {
+    const dim = dimConfig.value;
     const isMainIndex = dim === "risk";
+    
+    // 根据不同要素选择图表类型
+    let chartType = "line";
+    let chartConfig = {};
+    
+    // 综合风险使用柱状图
+    if (dim === "risk") {
+      chartType = "bar";
+      chartConfig = {
+        barWidth: 25,
+        barGap: "15%",
+        barCategoryGap: "35%",
+        borderRadius: [4, 4, 0, 0],
+        borderWidth: 1,
+        borderColor: "rgba(255, 255, 255, 0.1)"
+      };
+    } 
+    // 其他所有要素使用折线图
+    else {
+      chartType = "line";
+      chartConfig = {
+        symbol: "circle",
+        symbolSize: 7,
+        lineStyle: {
+          width: 2.5
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: dimConfig.color + "60" }, // 添加透明度
+            { offset: 1, color: dimConfig.color + "10" }
+          ])
+        }
+      };
+    }
 
     return {
       name: dimConfig.label,
-      type: "bar",
+      type: chartType,
       data: routeData.value.map((item) => {
         // 计算归一化值（保持原逻辑）
         let value;
@@ -417,25 +427,30 @@ const getSeriesData = () => {
           riskLevel: getRiskLevel(value) // 0-低 1-中 2-高
         };
       }),
-      // 关键优化：取消堆叠，改为分组显示
+      // 取消堆叠，确保图表不叠加
       stack: null, 
-      // 分组显示时的柱宽与间距
-      barWidth: 16,
-      barGap: "20%", // 组内间距
-      barCategoryGap: "40%", // 组间间距
-      // 关键优化：按风险等级动态着色
+      // 按风险等级动态着色
       itemStyle: {
         color: (params) => {
           const level = params.data.riskLevel;
           return riskLevels.value[level].color;
         },
-        borderRadius: [4, 4, 0, 0],
-        borderWidth: 1,
-        borderColor: "rgba(255, 255, 255, 0.1)"
+        ...chartConfig
       },
+      // 线样式配置（仅折线图）
+      lineStyle: chartType === "line" ? chartConfig.lineStyle : undefined,
+      // 区域填充样式（仅折线图）
+      areaStyle: chartType === "line" ? chartConfig.areaStyle : undefined,
+      // 标记点样式（仅折线图）
+      symbol: chartType === "line" ? chartConfig.symbol : undefined,
+      symbolSize: chartType === "line" ? chartConfig.symbolSize : undefined,
+      // 柱状图特定配置
+      barWidth: chartType === "bar" ? chartConfig.barWidth : undefined,
+      barGap: chartType === "bar" ? chartConfig.barGap : undefined,
+      barCategoryGap: chartType === "bar" ? chartConfig.barCategoryGap : undefined,
       // 显示数据标签（直观看到数值）
       label: {
-        show: true,
+        show: chartType === "bar", // 仅柱状图显示标签
         position: "top",
         color: "#e2e8f0",
         fontSize: 10,
@@ -501,18 +516,7 @@ const handleSegmentHover = (params) => {
   }
 };
 
-// 切换风险维度
-const toggleDimension = (value) => {
-  if (activeDimensions.value.includes(value)) {
-    // 至少保留一个维度
-    if (activeDimensions.value.length > 1) {
-      activeDimensions.value = activeDimensions.value.filter(d => d !== value);
-    }
-  } else {
-    activeDimensions.value.push(value);
-  }
-  initChart();
-};
+
 
 // 刷新数据
 const refreshData = async () => {
@@ -541,11 +545,28 @@ const getLevelText = (value) => {
 };
 
 // 初始化与清理
+// 时间变化处理函数
+const handleTimeChange = (eventData) => {
+  console.log('RouterRisk收到时间变化事件:', eventData);
+  // 时间变化时，更新航线分析数据
+  isRefreshing.value = true;
+  
+  // 模拟根据时间偏移量更新航线数据
+  setTimeout(() => {
+    // 重新生成航线数据（根据时间偏移量调整）
+    initChart();
+    isRefreshing.value = false;
+  }, 300);
+};
+
 onMounted(() => {
   nextTick(() => {
     initChart();
     window.addEventListener("resize", handleResize);
   });
+  
+  // 注册时间变化事件监听器
+  eventManager.on('timeChange', handleTimeChange);
 });
 
 onUnmounted(() => {
@@ -553,8 +574,13 @@ onUnmounted(() => {
     riskChart.value.dispose();
   }
   window.removeEventListener("resize", handleResize);
+  clearInterval(refreshInterval);
+  
+  // 移除时间变化事件监听器
+  eventManager.off('timeChange', handleTimeChange);
 });
 
+// 监听仪表盘模块变化，调整图表大小或重新初始化
 watch(
   () => dashboardStore.currentModule,
   () => {
@@ -568,10 +594,19 @@ watch(
   }
 );
 
-// 监听激活维度变化重新绘制图表
-watch(activeDimensions, () => {
-  initChart();
-});
+// 监听标签页切换，当切回图表时重新初始化
+watch(
+  () => globalActiveTab.value,
+  (newTab) => {
+    if (newTab === 'chart') {
+      nextTick(() => {
+        initChart();
+      });
+    }
+  }
+);
+
+
 
 // 应对措施建议
 const recommendations = computed(() => {
@@ -681,10 +716,11 @@ const selectAlternativeRoute = (route) => {
 <style scoped lang="scss">
 // 卡片基础样式
 .route-warning-card {
-  height: 370px;
+  padding: 15px;
   position: relative;
   overflow: auto;
-  
+  background-color: rgba(15, 23, 51, 0.95);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   // 自定义滚动条样式
   &::-webkit-scrollbar {
     width: 6px;

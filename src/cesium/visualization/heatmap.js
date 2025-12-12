@@ -8,7 +8,6 @@ export const addHeatVolume = async (viewer) => {
     const response = await fetch(import.meta.env.VITE_TEM_DATA_URL);
     const data = await response.json();
 
-
     // 转换数据格式为新热力图所需格式
     const heatmapPoints = data.points.map(point => ({
       lnglat: [point.lon, point.lat],
@@ -32,7 +31,6 @@ export const addHeatVolume = async (viewer) => {
   } catch (error) {
     console.error('热力图加载失败:', error);
   }
-
 }
 
 export const create3DHeatmap = (viewer, options = {}) => {
@@ -55,6 +53,8 @@ export const create3DHeatmap = (viewer, options = {}) => {
     heatmapPrimitive: undefined,
     positionHierarchy: [],
     heatmapInstance: null,
+    gridSize: options.canvasWidth || 200,
+    heightMultiplier: options.heightMultiplier || 1000
   };
 
   if (!heatmapState.dataPoints || heatmapState.dataPoints.length < 2) {
@@ -86,6 +86,7 @@ export const create3DHeatmap = (viewer, options = {}) => {
   return {
     destroy: () => destroyHeatmap(heatmapState),
     heatmapState,
+    updateData: (newDataPoints) => updateHeatmapData(heatmapState, newDataPoints)
   };
 }
 
@@ -115,7 +116,15 @@ function initializeHeatmap(heatmapState) {
     }
   );
 
-  heatmapState.heatmapInstance.addData(heatmapPoints);
+  const values = heatmapPoints.map(p => p.value);
+  const maxValue = values.length ? Math.max(...values) : 1;
+  const minValue = values.length ? Math.min(...values) : 0;
+
+  heatmapState.heatmapInstance.setData({
+    max: maxValue,
+    min: minValue,
+    data: heatmapPoints
+  });
 
   const geometryInstance = new Cesium.GeometryInstance({
     geometry: createHeatmapGeometry(heatmapState),
@@ -123,43 +132,43 @@ function initializeHeatmap(heatmapState) {
 
   heatmapState.heatmapPrimitive = heatmapState.viewer.scene.primitives.add(
     new Cesium.Primitive({
-      geometryInstances: geometryInstance,
-      appearance: new Cesium.MaterialAppearance({
-        material: new Cesium.Material({
-          fabric: {
-            type: "Image",
-            uniforms: {
-              image: heatmapState.heatmapInstance.getDataURL(),
-            },
+    geometryInstances: geometryInstance,
+    appearance: new Cesium.MaterialAppearance({
+      material: new Cesium.Material({
+        fabric: {
+          type: "Image",
+          uniforms: {
+            image: heatmapState.heatmapInstance.getDataURL(),
           },
-        }),
-        vertexShaderSource: `
-        in vec3 position3DHigh;
-        in vec3 position3DLow;
-        in vec2 st;
-        in float batchId;
-        uniform sampler2D image_0; 
-        out vec3 v_positionEC;
-        in vec3 normal;
-        out vec3 v_normalEC;
-        out vec2 v_st; 
-        void main(){
-            vec4 p = czm_computePosition();
-           
-            v_normalEC = czm_normal * normal;   
-            v_positionEC = (czm_modelViewRelativeToEye * p).xyz;
-            vec4 positionWC=czm_inverseModelView* vec4(v_positionEC,1.0);
-            v_st = st; 
-            vec4 color = texture(image_0, v_st); 
-            vec3 upDir = normalize(positionWC.xyz); 
-            p += vec4(color.r *upDir * 1000., 0.0); 
-            gl_Position = czm_modelViewProjectionRelativeToEye * p; 
-        }`,
-        translucent: true,
-        flat: true,
+        },
       }),
+      vertexShaderSource: `
+      in vec3 position3DHigh;
+      in vec3 position3DLow;
+      in vec2 st;
+      in float batchId;
+      uniform sampler2D image_0; 
+      out vec3 v_positionEC;
+      in vec3 normal;
+      out vec3 v_normalEC;
+      out vec2 v_st; 
+      void main(){
+          vec4 p = czm_computePosition();
+          
+          v_normalEC = czm_normal * normal;   
+          v_positionEC = (czm_modelViewRelativeToEye * p).xyz;
+          vec4 positionWC=czm_inverseModelView* vec4(v_positionEC,1.0);
+          v_st = st; 
+          vec4 color = texture(image_0, v_st); 
+          vec3 upDir = normalize(positionWC.xyz); 
+          p += vec4(color.r *upDir * 1000., 0.0); 
+          gl_Position = czm_modelViewProjectionRelativeToEye * p; 
+      }`,
+      translucent: true,
+      flat: true,
+    }),
       asynchronous: false,
-        show: true
+      show: true
     })
   );
   heatmapState.heatmapPrimitive.id = "heatmap3d";
@@ -171,7 +180,7 @@ function destroyHeatmap(heatmapState) {
   );
   if (containerElement) containerElement.remove();
   if (heatmapState.heatmapPrimitive) {
-    heatmapState.viewer.scene.primitives.remove(heatmapState.heatmapPrimitive);
+      heatmapState.viewer.scene.primitives.remove(heatmapState.heatmapPrimitive);
     heatmapState.heatmapPrimitive = undefined;
   }
 }
@@ -370,7 +379,7 @@ function createHeatmapGeometry(heatmapState) {
 function generateMeshData(heatmapState) {
   const gridWidth = heatmapState.canvasWidth || 200;
   const gridHeight = heatmapState.canvasWidth || 200;
-  const { maxLongitude, maxLatitude, minLongitude, minLatitude } =
+  const { maxLongitude, maxLatitude, minLongitude, minLatitude } = 
     heatmapState.boundingRect;
 
   const longitudeStep = (maxLongitude - minLongitude) / gridWidth;
@@ -427,4 +436,107 @@ function createHeatmapContainer(heatmapState) {
   heatmapState.containerElement.style.top = "-9999px";
   heatmapState.containerElement.style.left = "-9999px";
   document.body.appendChild(heatmapState.containerElement);
+}
+
+/**
+ * 更新热力图数据
+ * @param {Object} heatmapState - 热力图状态对象
+ * @param {Array} newDataPoints - 新的数据点数组，格式：[{lnglat: [lon, lat], value: number}, ...]
+ */
+export function updateHeatmapData(heatmapState, newDataPoints) {
+  if (!heatmapState || !newDataPoints || newDataPoints.length < 2) {
+    console.log("热力图更新失败：数据点不足或状态无效");
+    return;
+  }
+
+  // 1. 更新数据点（只更新数值，位置保持不变）
+  heatmapState.dataPoints = newDataPoints;
+  
+  // 2. 转换数据格式为热力图所需格式（使用现有位置层次结构）
+  const heatmapPoints = heatmapState.positionHierarchy.map(
+    (position, index) => {
+      const normalizedCoords = computeNormalizedCoordinates(
+        position,
+        heatmapState
+      );
+      return {
+        x: normalizedCoords.x,
+        y: normalizedCoords.y,
+        value: heatmapState.dataPoints[index].value,
+      };
+    }
+  );
+
+  // 3. 更新热力图数据范围
+  const values = heatmapPoints.map(p => p.value);
+  const maxValue = values.length ? Math.max(...values) : 1;
+  const minValue = values.length ? Math.min(...values) : 0;
+
+  // 4. 设置新数据到热力图实例
+  heatmapState.heatmapInstance.setData({
+    max: maxValue,
+    min: minValue,
+    data: heatmapPoints
+  });
+
+  // 5. 直接更新现有图元的材质，避免删除重画（消除闪烁）
+  if (heatmapState.heatmapPrimitive) {
+    // 获取新的热力图数据URL
+    const newDataUrl = heatmapState.heatmapInstance.getDataURL();
+    
+    // 更新现有图元的材质
+    const appearance = heatmapState.heatmapPrimitive.appearance;
+    if (appearance && appearance.material) {
+      // 更新材质的image uniform
+      appearance.material.uniforms.image = newDataUrl;
+    }
+  } else {
+    // 如果图元不存在（首次创建），则创建新图元
+    const geometryInstance = new Cesium.GeometryInstance({
+      geometry: createHeatmapGeometry(heatmapState),
+    });
+
+    heatmapState.heatmapPrimitive = heatmapState.viewer.scene.primitives.add(
+      new Cesium.Primitive({
+      geometryInstances: geometryInstance,
+      appearance: new Cesium.MaterialAppearance({
+        material: new Cesium.Material({
+          fabric: {
+            type: "Image",
+            uniforms: {
+              image: heatmapState.heatmapInstance.getDataURL(),
+            },
+          },
+        }),
+        vertexShaderSource: `
+        in vec3 position3DHigh;
+        in vec3 position3DLow;
+        in vec2 st;
+        in float batchId;
+        uniform sampler2D image_0; 
+        out vec3 v_positionEC;
+        in vec3 normal;
+        out vec3 v_normalEC;
+        out vec2 v_st; 
+        void main(){
+            vec4 p = czm_computePosition();
+            
+            v_normalEC = czm_normal * normal;   
+            v_positionEC = (czm_modelViewRelativeToEye * p).xyz;
+            vec4 positionWC=czm_inverseModelView* vec4(v_positionEC,1.0);
+            v_st = st; 
+            vec4 color = texture(image_0, v_st); 
+            vec3 upDir = normalize(positionWC.xyz); 
+            p += vec4(color.r *upDir * 1000., 0.0); 
+            gl_Position = czm_modelViewProjectionRelativeToEye * p; 
+        }`,
+        translucent: true,
+        flat: true,
+      }),
+        asynchronous: false,
+        show: true
+      })
+    );
+    heatmapState.heatmapPrimitive.id = "heatmap3d";
+  }
 }

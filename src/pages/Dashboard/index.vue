@@ -77,29 +77,13 @@
         <div class="left-panel">
           <div class="main-panel left_bg">
             <div class="panel-header">
-              <span class="panel-title">航路预警</span>
+              <span class="panel-title">航路分析</span>
             </div>
             <div class="panel-content">
               <RouteList />
             </div>
           </div>
         </div>
-        <!-- <div class="right-panel">
-          <div class="main-panel right_bg">
-            <div class="panel-header">
-              <span class="panel-title">飞行任务监测</span>
-            </div>
-            <div class="panel-content">
-              <FlightTasks />
-            </div>
-          </div>
-          <div class="main-panel right_bg">
-            <div class="panel-header">
-              <span class="panel-title">飞行器适配</span>
-            </div>
-            <div class="panel-content"><AircraftAdapt /></div>
-          </div>
-        </div> -->
       </div>
     </transition>
     <!-- 设备监控模块 -->
@@ -116,7 +100,7 @@
           </div>
           <div class="main-panel left_bg">
             <div class="panel-header">
-              <span class="panel-title">报警情况</span>
+              <span class="panel-title">告警情况</span>
             </div>
             <div class="panel-content">
               <EquipmentAlarm />
@@ -154,7 +138,7 @@
           </div>
           <div class="main-panel left_bg">
             <div class="panel-header">
-              <span class="panel-title">实况与未来2小时预报</span>
+              <span class="panel-title">气象预报</span>
             </div>
             <div class="panel-content">
               <div class="dashboard-content">
@@ -229,26 +213,14 @@ const DeviceCount = defineAsyncComponent(() =>
 const EquipmentAlarm = defineAsyncComponent(() =>
   import("@/components/business/EquipmentAlarm/index.vue")
 );
-const ThresholdManagement = defineAsyncComponent(() =>
-  import("@/pages/Setting/views/ThresholdManagement.vue")
-);
 const SurveillanceFootage = defineAsyncComponent(() =>
   import("@/components/business/SurveillanceFootage/index.vue")
 );
 const HistoryData = defineAsyncComponent(() =>
   import("@/components/business/HistoryData/index.vue")
 );
-const CoreIndicators = defineAsyncComponent(() =>
-  import("@/components/business/CoreIndicators/index.vue")
-);
 const MicroscaleWeather = defineAsyncComponent(() =>
   import("@/components/business/MicroscaleWeather/index.vue")
-);
-const FlightTasks = defineAsyncComponent(() =>
-  import("@/components/business/FlightTasks/index.vue")
-);
-const AircraftAdapt = defineAsyncComponent(() =>
-  import("@/components/business/AircraftAdapt/index.vue")
 );
 const FlightSuitableAnalysisPanel = defineAsyncComponent(() =>
   import("@/components/business/FlightSuitableAnalysisPanel/index.vue")
@@ -256,23 +228,11 @@ const FlightSuitableAnalysisPanel = defineAsyncComponent(() =>
 const RiskWarnings = defineAsyncComponent(() =>
   import("@/components/business/RiskWarnings/index.vue")
 );
-const WeatherWarnings = defineAsyncComponent(() =>
-  import("@/components/business/WeatherWarnings/index.vue")
-);
 const RouteList = defineAsyncComponent(() =>
   import("@/components/business/RouteList/index.vue")
 );
 const RealTimeWeatherPanel = defineAsyncComponent(() =>
   import("@/components/business/Real-timeWeatherPanel/index.vue")
-);
-const SystemMessage = defineAsyncComponent(() =>
-  import("@/components/business/SystemMessage/index.vue")
-);
-const MonitoringPoints = defineAsyncComponent(() =>
-  import("@/components/business/MonitoringPoints/index.vue")
-);
-const DeviceTrace = defineAsyncComponent(() =>
-  import("@/components/business/DeviceTrace/index.vue")
 );
 const WeatherForecastPanel = defineAsyncComponent(() =>
   import("@/components/business/WeatherForecastPanel/index.vue")

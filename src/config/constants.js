@@ -104,7 +104,7 @@ export const MODULE_LIST = [
 
   {
     key: DASHBOARD_MODULES.FLIGHT_ANALYSIS,
-    name: "飞行分析",
+    name: "航路分析",
   },
  
   
