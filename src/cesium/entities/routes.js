@@ -185,7 +185,7 @@ class RouteManager {
     const endPoint = route.waypoints[route.waypoints.length - 1];
 
     // 起点上升航路
-    const startHeight = startPoint.height || 1000;
+    const startHeight = startPoint.height || 300;
     enhancedWaypoints.push(
       { ...startPoint, height: 0 },
       { ...startPoint, height: startHeight }
@@ -195,7 +195,7 @@ class RouteManager {
     enhancedWaypoints.push(...route.waypoints);
 
     // 终点下降航路
-    const endHeight = endPoint.height || 1000;
+    const endHeight = endPoint.height || 300;
     enhancedWaypoints.push(
       { ...endPoint, height: endHeight },
       { ...endPoint, height: 0 }
@@ -206,7 +206,7 @@ class RouteManager {
       Cesium.Cartesian3.fromDegrees(
         waypoint.longitude,
         waypoint.latitude,
-        waypoint.height || 1000
+        waypoint.height || 300
       )
     )
 
