@@ -13,7 +13,7 @@
   "dependencies": {
     "axios": "^1.12.2",
     "cesium": "^1.122.0",
-    "cesium-wind-layer": "file:./packages/cesium-wind-layer",
+    "cesium-wind-layer": "^0.10.0",
     "echarts": "^5.4.3",
     "echarts-gl": "^2.0.9",
     "element-plus": "^2.11.5",
@@ -37,6 +37,7 @@
     "autoprefixer": "^10.4.0",
     "patch-package": "^8.0.1",
     "postcss": "^8.4.0",
+    "postcss-px-to-viewport": "^1.1.1",
     "postinstall-postinstall": "^2.1.0",
     "sass": "^1.93.2",
     "tailwindcss": "^4.0.0",
