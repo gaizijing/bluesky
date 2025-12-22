@@ -574,7 +574,6 @@ onUnmounted(() => {
     riskChart.value.dispose();
   }
   window.removeEventListener("resize", handleResize);
-  clearInterval(refreshInterval);
   
   // 移除时间变化事件监听器
   eventManager.off('timeChange', handleTimeChange);

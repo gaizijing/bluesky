@@ -194,6 +194,9 @@ watch(
     });
   }
 );
+onMounted(() => {
+   loadData();
+});
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
   chartInstance?.dispose();
