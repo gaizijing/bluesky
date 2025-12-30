@@ -13,7 +13,7 @@
     class="region-container"
     @click="toggleFocus(index)"
     :class="{ 'region-container--focused': activeIndex === index }"
-    v-for="(region, index) in regionMonitorList"
+    v-for="(region, index) in areaList"
     :key="index"
   >
     <div class="region-title">
@@ -49,16 +49,15 @@
 
 <script setup>
 import { ref, defineProps, onMounted, computed, watch } from "vue";
-import mockRegionMonitorData from "@/mock/regionMonitorData.js";
+import mockAreaData from "@/mock/areaData.js";
 import buildIcon from "@/assets/icons/ic_build.png";
 import { useRegionStore } from "@/store/modules/region"; // 引入store
-import { el } from "element-plus/es/locales.mjs";
 
 // Props定义
 const props = defineProps({
-  regionMonitorList: {
+  areaList: {
     type: Array,
-    default: () => mockRegionMonitorData,
+    default: () => mockAreaData,
   },
   modelValue: {
     type: Array,
@@ -68,7 +67,7 @@ const props = defineProps({
 
 // 使用store
 const regionStore = useRegionStore();
-regionStore.setSelectedRegion(mockRegionMonitorData[0], 0);
+regionStore.setSelectedRegion(mockAreaData[0], 0);
 // 响应式数据
 const activeIndex = ref(-1);
 const next12Hours = ref([]);
@@ -86,8 +85,8 @@ onMounted(() => {
 
 // 监听选中区域变化，同步到store
 watch(activeIndex, (newIndex) => {
-  if (newIndex >= 0 && newIndex < props.regionMonitorList.length) {
-    const selectedRegion = props.regionMonitorList[newIndex];
+  if (newIndex >= 0 && newIndex < props.areaList.length) {
+    const selectedRegion = props.areaList[newIndex];
     regionStore.setSelectedRegion(selectedRegion, newIndex);
   } else {
     regionStore.clearSelectedRegion();

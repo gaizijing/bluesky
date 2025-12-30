@@ -1,23 +1,23 @@
 <template>
-  <div class="monitoring-points-container">
+  <div class="areas-container">
     <div class="stats-header">
       <div class="stats-summary">
         <!-- 统计项保持不变 -->
         <div class="stat-item" @click="setFilter('all')">
           <div class="stat-label">总重点关注区域</div>
-          <div class="stat-value">{{ totalPoints }}</div>
+          <div class="stat-value">{{ totalAreas }}</div>
         </div>
         <div class="stat-item available" @click="setFilter('available')">
           <div class="stat-label">可用</div>
-          <div class="stat-value">{{ availablePoints }}</div>
+          <div class="stat-value">{{ availableAreas }}</div>
         </div>
         <div class="stat-item unavailable" @click="setFilter('unavailable')">
           <div class="stat-label">不可用</div>
-          <div class="stat-value">{{ unavailablePoints }}</div>
+          <div class="stat-value">{{ unavailableAreas }}</div>
         </div>
         <div class="stat-item warning" @click="setFilter('warning')">
           <div class="stat-label">预警中</div>
-          <div class="stat-value">{{ warningPoints }}</div>
+          <div class="stat-value">{{ warningAreas }}</div>
         </div>
       </div>
       <!-- 添加搜索框和类型筛选 -->
@@ -55,12 +55,16 @@
             作业点
           </button>
         </div>
+
+        <button class="add-area-btn" @click="handleAddArea">
+          <span class="add-icon">+</span> 添加新区域
+        </button>
       </div>
     </div>
 
     <!-- 其余部分保持不变 -->
     <!-- 重点关注区域列表 -->
-    <div class="points-table">
+    <div class="areas-table">
       <div class="table-header">
         <div class="table-cell">名称</div>
         <div class="table-cell">位置</div>
@@ -76,7 +80,7 @@
       </div>
 
       <!-- 空状态 -->
-      <div v-if="!isLoading && filteredPoints.length === 0" class="empty-state">
+      <div v-if="!isLoading && filteredAreas.length === 0" class="empty-state">
         <div class="empty-icon">📌</div>
         <p>没有找到匹配的重点关注区域</p>
         <button class="reset-btn" @click="resetFilters">重置筛选条件</button>
@@ -85,37 +89,37 @@
       <!-- 重点关注区域列表项 -->
       <div class="table-body">
         <div
-          v-for="point in filteredPoints"
-          :key="point.id"
+          v-for="area in filteredAreas"
+          :key="area.id"
           class="table-row"
-          :class="point.status"
+          :class="area.status"
         >
           <div class="table-cell name">
-            <div class="point-name">{{ point.name }}</div>
+            <div class="area-name">{{ area.name }}</div>
           </div>
           <div class="table-cell location">
-            <div class="point-location">{{ point.location }}</div>
+            <div class="area-location">{{ area.location }}</div>
           </div>
           <div class="table-cell type">
-            <span class="type-badge" :class="point.type">
-              {{ point.type === "takeoff" ? "起降点" : "作业点" }}
+            <span class="type-badge" :class="area.type">
+              {{ area.type === "takeoff" ? "起降点" : "作业点" }}
             </span>
           </div>
           <div class="table-cell status">
             <div class="status-indicator"></div>
             <span class="status-text">
-              {{ getStatusText(point.status) }}
+              {{ getStatusText(area.status) }}
             </span>
             <span
-              v-if="point.warningReason"
+              v-if="area.warningReason"
               class="warning-tooltip"
-              :title="point.warningReason"
+              :title="area.warningReason"
             >
               ⓘ
             </span>
           </div>
           <div class="table-cell actions">
-            <button class="detail-btn" @click="switchPoint(point)">
+            <button class="detail-btn" @click="switchArea(area)">
               切换到此地点
             </button>
           </div>
@@ -126,57 +130,57 @@
 </template>
 <script setup>
 import { ref, computed, onMounted, onBeforeMount } from "vue";
-import { useMonitoringPointStore } from "@/store/modules/monitoringPoints";
-import { updateSelectedPoint } from "@/api";
+import { useAreaStore } from "@/store/modules/area";
+import { updateSelectedArea } from "@/api";
 
 // 使用组合函数
-const monitoringPointStore= useMonitoringPointStore();
+const areaStore= useAreaStore();
 
 // 状态管理
 const searchKeyword = ref("");
 const typeFilter = ref("all");
-const currentPoint = ref(null);
+const currentArea = ref(null);
 const statusFilter = ref("all");
 
 // 添加 emit
-const emit = defineEmits(["point-selected"]);
+const emit = defineEmits(["area-selected", "add-area"]);
 
 // 过滤后的重点关注区域列表（从store中获取）
-const filteredPoints = computed(() => {
-  return monitoringPointStore.pointsList.filter((point) => {
+const filteredAreas = computed(() => {
+  return areaStore.areaList.filter((area) => {
     // 类型过滤
     const typeMatch =
-      typeFilter.value === "all" || point.type === typeFilter.value;
+      typeFilter.value === "all" || area.type === typeFilter.value;
 
     // 状态过滤
     const statusMatch =
-      statusFilter.value === "all" || point.status === statusFilter.value;
+      statusFilter.value === "all" || area.status === statusFilter.value;
 
     // 搜索过滤
     const searchMatch =
       !searchKeyword.value ||
-      point.name.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
-      point.location.toLowerCase().includes(searchKeyword.value.toLowerCase());
+      area.name.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
+      area.location.toLowerCase().includes(searchKeyword.value.toLowerCase());
 
     return typeMatch && searchMatch && statusMatch;
   });
 });
 
 // 统计数据
-const totalPoints = computed(() => monitoringPointStore.pointsList.length);
-const availablePoints = computed(
+const totalAreas = computed(() => areaStore.areaList.length);
+const availableAreas = computed(
   () =>
-    monitoringPointStore.pointsList.filter((p) => p.status === "available")
+    areaStore.areaList.filter((a) => a.status === "available")
       .length
 );
-const unavailablePoints = computed(
+const unavailableAreas = computed(
   () =>
-    monitoringPointStore.pointsList.filter((p) => p.status === "unavailable")
+    areaStore.areaList.filter((a) => a.status === "unavailable")
       .length
 );
-const warningPoints = computed(
+const warningAreas = computed(
   () =>
-    monitoringPointStore.pointsList.filter((p) => p.status === "warning").length
+    areaStore.areaList.filter((a) => a.status === "warning").length
 );
 
 // 重置筛选条件
@@ -185,23 +189,27 @@ const resetFilters = () => {
   typeFilter.value = "all";
   statusFilter.value = "all";
 };
-
-const switchPoint = async (point) => {
-  currentPoint.value = { ...point };
+const switchArea = async (area) => {
+  currentArea.value = { ...area };
 
   // 保存到全局状态
-  monitoringPointStore.setSelectedPoint(point);
+  areaStore.setSelectedArea(area);
 
   try {
     // 调用API保存到后台
-    await updateSelectedPoint(point);
+    await updateSelectedArea(area);
   } catch (error) {
     console.error('保存重点关注区域信息失败:', error);
     // 即使保存失败，也继续执行后续操作
   }
 
   // 触发事件通知父组件
-  emit("point-selected", point);
+  emit("area-selected", area);
+};
+
+// 处理添加新区域
+const handleAddArea = () => {
+  emit("add-area");
 };
 
 // 获取状态文本
@@ -223,7 +231,7 @@ const setFilter = (status) => {
 
 </script>
 <style scoped lang="scss">
-.monitoring-points-container {
+.area-container {
   overflow: hidden;
 }
 
@@ -278,7 +286,7 @@ const setFilter = (status) => {
 }
 
 /* 表格样式 */
-.points-table {
+.areas-table {
   display: flex;
   flex-direction: column;
   height: 200px;
@@ -411,6 +419,34 @@ const setFilter = (status) => {
       &:hover:not(.active) {
         background-color: rgba(255, 255, 255, 0.1);
       }
+    }
+  }
+
+  .add-area-btn {
+    padding: 6px 12px;
+    background-color: rgba(16, 185, 129, 0.2);
+    border: 1px solid #10b981;
+    color: #10b981;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    .add-icon {
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    &:hover {
+      background-color: rgba(16, 185, 129, 0.3);
+      transform: translateY(-1px);
+    }
+
+    &:active {
+      transform: translateY(0);
     }
   }
 }

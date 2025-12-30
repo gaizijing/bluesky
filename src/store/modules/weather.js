@@ -106,7 +106,7 @@ export const useWeatherStore = defineStore('weather', {
       this.statistics = { ...this.statistics, ...data }
     },
     // 设置当前重点关注区域的实时天气数据
-    setCurrentPointWeather(weatherData) {
+    setCurrentAreaWeather(weatherData) {
       this.currentPointWeather = weatherData
     },
     

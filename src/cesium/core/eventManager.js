@@ -10,6 +10,13 @@ class EventManager {
     this.defaultHandlers = []; // 存储默认处理器，总是在最后执行
     this.initializedViewers = new Set(); // 已初始化的viewer实例集合
     this.eventListeners = new Map(); // 存储普通事件监听器
+    // 矩形绘制相关状态
+    this.rectangleDrawing = false;
+    this.startPosition = null;
+    this.currentPosition = null;
+    this.rectanglePrimitive = null;
+    this.viewer = null;
+    this.drawCompleteCallback = null;
   }
 
   /**
@@ -108,12 +115,212 @@ class EventManager {
       return;
     }
 
+    this.viewer = viewer;
+
     // 注册统一的LEFT_CLICK事件处理器
     viewer.screenSpaceEventHandler.setInputAction((movement) => {
       this.handleClick(viewer, movement);
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
+    // 注册鼠标移动事件
+    viewer.screenSpaceEventHandler.setInputAction((movement) => {
+      this.handleMouseMove(viewer, movement);
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+    // 注册鼠标左键按下事件
+    viewer.screenSpaceEventHandler.setInputAction((movement) => {
+      this.handleLeftDown(viewer, movement);
+    }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+
+    // 注册鼠标左键释放事件
+    viewer.screenSpaceEventHandler.setInputAction((movement) => {
+      this.handleLeftUp(viewer, movement);
+    }, Cesium.ScreenSpaceEventType.LEFT_UP);
+
     this.initializedViewers.add(viewer);
+  }
+
+  /**
+   * 开始绘制矩形
+   * @param {Function} callback - 绘制完成后的回调函数
+   */
+  startRectangleDrawing(callback) {
+    if (!this.viewer) {
+      console.error('Viewer not initialized');
+      return;
+    }
+
+    this.rectangleDrawing = true;
+    this.drawCompleteCallback = callback;
+    // 改变鼠标样式
+    this.viewer.container.style.cursor = 'crosshair';
+    
+    // 保存原始的相机控制模式
+    this.originalCameraMode = this.viewer.scene.screenSpaceCameraController.enableInputs;
+    // 禁用相机控制，防止拖动时地图移动
+    this.viewer.scene.screenSpaceCameraController.enableInputs = false;
+  }
+
+  /**
+   * 停止绘制矩形
+   */
+  stopRectangleDrawing() {
+    this.rectangleDrawing = false;
+    this.startPosition = null;
+    this.currentPosition = null;
+    this.removeRectanglePrimitive();
+    if (this.viewer) {
+      this.viewer.container.style.cursor = '';
+      // 恢复原始的相机控制模式
+      this.viewer.scene.screenSpaceCameraController.enableInputs = this.originalCameraMode;
+    }
+    this.drawCompleteCallback = null;
+  }
+
+  /**
+   * 取消绘制矩形
+   */
+  cancelRectangleDrawing() {
+    this.stopRectangleDrawing();
+  }
+
+  /**
+   * 移除矩形绘制对象
+   */
+  removeRectanglePrimitive() {
+    if (this.rectanglePrimitive && this.viewer) {
+      this.viewer.scene.primitives.remove(this.rectanglePrimitive);
+      this.rectanglePrimitive = null;
+    }
+  }
+
+  /**
+   * 处理鼠标移动事件
+   * @param {Cesium.Viewer} viewer - Cesium viewer实例
+   * @param {Object} movement - 鼠标移动信息
+   */
+  handleMouseMove(viewer, movement) {
+    if (!this.rectangleDrawing || !this.startPosition) {
+      return;
+    }
+
+    this.currentPosition = movement.endPosition;
+    this.updateRectanglePrimitive();
+  }
+
+  /**
+   * 处理鼠标左键按下事件
+   * @param {Cesium.Viewer} viewer - Cesium viewer实例
+   * @param {Object} movement - 鼠标按下信息
+   */
+  handleLeftDown(viewer, movement) {
+    if (!this.rectangleDrawing) {
+      return;
+    }
+
+    this.startPosition = movement.position;
+  }
+
+  /**
+   * 处理鼠标左键释放事件
+   * @param {Cesium.Viewer} viewer - Cesium viewer实例
+   * @param {Object} movement - 鼠标释放信息
+   */
+  handleLeftUp(viewer, movement) {
+    if (!this.rectangleDrawing || !this.startPosition) {
+      return;
+    }
+
+    this.currentPosition = movement.position;
+    
+    // 计算矩形的边界框
+    const rectangle = this.calculateRectangle();
+    if (rectangle) {
+      // 调用回调函数，传递矩形信息，将弧度转换为度
+      if (this.drawCompleteCallback) {
+        const bbox = {
+          west: Cesium.Math.toDegrees(rectangle.west),
+          south: Cesium.Math.toDegrees(rectangle.south),
+          east: Cesium.Math.toDegrees(rectangle.east),
+          north: Cesium.Math.toDegrees(rectangle.north)
+        };
+        this.drawCompleteCallback(bbox);
+      }
+    }
+
+    this.stopRectangleDrawing();
+  }
+
+  /**
+   * 更新矩形绘制对象
+   */
+  updateRectanglePrimitive() {
+    if (!this.viewer || !this.startPosition || !this.currentPosition) {
+      return;
+    }
+
+    const rectangle = this.calculateRectangle();
+    if (!rectangle) {
+      return;
+    }
+
+    // 移除旧的矩形
+    this.removeRectanglePrimitive();
+
+    // 创建新的矩形
+    this.rectanglePrimitive = this.viewer.scene.primitives.add(new Cesium.Primitive({
+      geometryInstances: new Cesium.GeometryInstance({
+        geometry: new Cesium.RectangleGeometry({
+          rectangle: rectangle,
+          vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
+        }),
+        attributes: {
+          color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+            Cesium.Color.fromCssColorString('rgba(59, 130, 246, 0.3)')
+          )
+        }
+      }),
+      appearance: new Cesium.PerInstanceColorAppearance({
+        translucent: true,
+        closed: true,
+        flat: true
+      }),
+      show: true
+    }));
+  }
+
+  /**
+   * 计算矩形的边界框
+   * @returns {Cesium.Rectangle} 矩形边界框
+   */
+  calculateRectangle() {
+    if (!this.viewer || !this.startPosition || !this.currentPosition) {
+      return null;
+    }
+
+    // 将屏幕坐标转换为世界坐标
+    const startCartesian = this.viewer.scene.pickPosition(this.startPosition);
+    const endCartesian = this.viewer.scene.pickPosition(this.currentPosition);
+
+    if (!startCartesian || !endCartesian) {
+      return null;
+    }
+
+    // 将世界坐标转换为经纬度
+    const startCartographic = Cesium.Cartographic.fromCartesian(startCartesian);
+    const endCartographic = Cesium.Cartographic.fromCartesian(endCartesian);
+
+    if (!startCartographic || !endCartographic) {
+      return null;
+    }
+
+    // 计算矩形边界，并将弧度转换为度
+    const west = Cesium.Math.toDegrees(Math.min(startCartographic.longitude, endCartographic.longitude));
+    const east = Cesium.Math.toDegrees(Math.max(startCartographic.longitude, endCartographic.longitude));
+    const south = Cesium.Math.toDegrees(Math.min(startCartographic.latitude, endCartographic.latitude));
+    const north = Cesium.Math.toDegrees(Math.max(startCartographic.latitude, endCartographic.latitude));
+
+    return new Cesium.Rectangle(Cesium.Math.toRadians(west), Cesium.Math.toRadians(south), Cesium.Math.toRadians(east), Cesium.Math.toRadians(north));
   }
 
   /**
@@ -142,7 +349,7 @@ class EventManager {
           (!pickedObject.id?.properties?.isRouteSegment &&
             !(pickedObject.id?.id &&
               typeof pickedObject.id.id === 'string' &&
-              pickedObject.id.id.startsWith('monitor_')))) {
+              pickedObject.id.id.startsWith('area_')))) {
 
           // 触发全局点击空白区域事件，可以通过自定义事件系统通知其他模块
           const customEvent = new CustomEvent('cesium-click-blank', {

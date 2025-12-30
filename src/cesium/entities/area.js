@@ -2,24 +2,24 @@ import * as Cesium from 'cesium'
 import { flyToRegion } from '@/cesium/core/camera'
 import eventManager from '@/cesium/core/eventManager'
 
-class MonitorPointManager {
+class AreaManager {
    // 静态属性存储唯一实例
   static instance = null
 
   /**
    * 私有构造函数，防止外部直接实例化
    * @param {Cesium.Viewer} viewer - Cesium viewer实例
-   * @param {Object} monitorStore - 监测点状态管理对象
+   * @param {Object} areaStore - 重点关注区域状态管理对象
    */
-  constructor(viewer, monitorStore) {
+  constructor(viewer, areaStore) {
     // 防止通过new关键字重复创建
-    if (MonitorPointManager.instance) {
-      return MonitorPointManager.instance
+    if (AreaManager.instance) {
+      return AreaManager.instance
     }
 
     this.viewer = viewer
-    this.monitorStore = monitorStore
-    this.monitorEntities = new Map() // 存储监测点实体
+    this.areaStore = areaStore
+    this.areaEntities = new Map() // 存储重点关注区域实体
     this.originalBillboardStyle = new Map() // 存储原始样式
     this.hoveredEntity = null
     this.selectedEntity = null
@@ -30,49 +30,49 @@ class MonitorPointManager {
     this._bindEvents()
 
     // 存储实例
-    MonitorPointManager.instance = this
+    AreaManager.instance = this
   }
 
   /**
    * 静态方法：获取单例实例（推荐使用此方法获取实例）
    * @param {Cesium.Viewer} viewer - Cesium viewer实例（首次调用时必传）
-   * @param {Object} monitorStore - 监测点状态管理对象（首次调用时必传）
-   * @returns {MonitorPointManager} 单例实例
+   * @param {Object} areaStore - 重点关注区域状态管理对象（首次调用时必传）
+   * @returns {AreaManager} 单例实例
    */
-  static getInstance(viewer, monitorStore) {
-    if (!MonitorPointManager.instance) {
+  static getInstance(viewer, areaStore) {
+    if (!AreaManager.instance) {
       // 首次调用时创建实例
-      new MonitorPointManager(viewer, monitorStore)
+      new AreaManager(viewer, areaStore)
     }
-    return MonitorPointManager.instance
+    return AreaManager.instance
   }
 
   /**
-   * 渲染监测点
-   * @param {Array} monitorPoints - 监测点数据数组
+   * 渲染重点关注区域
+   * @param {Array} areas - 重点关注区域数据数组
    */
-  render(monitorPoints) {
-    if (!monitorPoints || !this.viewer) return
+  render(areas) {
+    if (!areas || !this.viewer) return
 
     // 清除现有实体
     this._clearExistingEntities()
 
     // 移除旧聚合数据源
-    const oldDataSource = this.viewer.dataSources.getByName('monitorClustering')[0]
+    const oldDataSource = this.viewer.dataSources.getByName('areaClustering')[0]
     if (oldDataSource) {
       this.viewer.dataSources.remove(oldDataSource)
     }
 
     // 创建新的聚合数据源
-    const dataSource = new Cesium.CustomDataSource('monitorClustering')
+    const dataSource = new Cesium.CustomDataSource('areaClustering')
     this.viewer.dataSources.add(dataSource)
 
     // 配置聚合参数
     this._configureClustering(dataSource)
 
-    // 创建并添加监测点实体
-    monitorPoints.forEach(point => {
-      const entity = this._createMonitorPoint(dataSource, point)
+    // 创建并添加重点关注区域实体
+    areas.forEach(area => {
+      const entity = this._createAreaEntity(dataSource, area)
       dataSource.entities.add(entity)
     })
 
@@ -80,22 +80,21 @@ class MonitorPointManager {
   }
 
   /**
-   * 设置选中的监测点
-   * @param {String} entityId - 监测点实体ID（格式: monitor_${id}）
+   * 设置选中的重点关注区域
+   * @param {String} entityId - 重点关注区域实体ID（格式: area_${id}）
    */
   setSelected(entityId) {
     if (!entityId || !this.viewer) return
 
-    const entity = this.monitorEntities.get(entityId)
-    if (!entity || !this._isMonitorEntity(entity)) return
+    const entity = this.areaEntities.get(entityId)
 
     this.selectedEntity = this._setEntityAsSelected(entity)
     
     // 飞行到选中点
-    const pointData = entity.properties.pointData
-    const point = pointData && pointData.getValue ? pointData.getValue() : pointData
-    if (point?.coordinates) {
-      flyToRegion(this.viewer, { coordinates: point.coordinates, duration: 1.5 })
+    const areaData = entity.properties.areaData
+    const area = areaData && areaData.getValue ? areaData.getValue() : areaData
+    if (area?.coordinates) {
+      flyToRegion(this.viewer, { coordinates: area.coordinates, duration: 1.5 })
     }
   }
   /**
@@ -116,10 +115,10 @@ class MonitorPointManager {
 
     // 4. 可选：重置单例实例（方便后续重新初始化）
     if (resetInstance) {
-      MonitorPointManager.instance = null
+      AreaManager.instance = null
     }
 
-    console.log('监测点已完全卸载，资源清理完成')
+    console.log('重点关注区域已完全卸载，资源清理完成')
   }
 
 
@@ -155,12 +154,12 @@ class MonitorPointManager {
     }
 
     // 处理单个监测点点击
-    if (pickedObject && pickedObject.id && this._isMonitorEntity(pickedObject.id)) {
+    if (pickedObject && pickedObject.id && this._isAreaEntity(pickedObject.id)) {
       this.selectedEntity = this._setEntityAsSelected(pickedObject.id)
-      const pointData = pickedObject.id.properties.pointData
-      const point = pointData && pointData.getValue ? pointData.getValue() : pointData
-      if (point?.coordinates) {
-        flyToRegion(this.viewer, { coordinates: point.coordinates, duration: 1.5 })
+      const areaData = pickedObject.id.properties.areaData
+      const area = areaData && areaData.getValue ? areaData.getValue() : areaData
+      if (area?.coordinates) {
+        flyToRegion(this.viewer, { coordinates: area.coordinates, duration: 1.5 })
       }
       return true
     }
@@ -189,7 +188,7 @@ class MonitorPointManager {
       )
     })
 
-    const dataSource = this.viewer.dataSources.getByName('monitorClustering')[0]
+    const dataSource = this.viewer.dataSources.getByName('areaClustering')[0]
     if (dataSource) {
       dataSource.clustering.enabled = false
       setTimeout(() => {
@@ -217,8 +216,9 @@ class MonitorPointManager {
         }
       }
 
+      // 处理重点关注区域悬停 
       // 处理监测点悬停
-      if (Cesium.defined(pickedObject) && this._isMonitorEntity(pickedObject.id)) {
+      if (Cesium.defined(pickedObject) && this._isAreaEntity(pickedObject.id)) {
         this.viewer.canvas.style.cursor = 'pointer'
 
         if (pickedObject.id === this.selectedEntity) {
@@ -239,13 +239,13 @@ class MonitorPointManager {
     }
   }
 
-  // 私有方法：创建监测点实体
-  _createMonitorPoint(dataSource, point) {
-    if (!dataSource || !point?.coordinates) return    
-    const entityId = `monitor_${point.id}`
+  // 私有方法：创建重点关注区域实体
+  _createAreaEntity(dataSource, area) {
+    if (!dataSource || !area?.coordinates) return    
+    const entityId = `area_${area.id}`
     // 移除旧实体
-    if (this.monitorEntities.has(entityId)) {
-      const old = this.monitorEntities.get(entityId)
+    if (this.areaEntities.has(entityId)) {
+      const old = this.areaEntities.get(entityId)
       try { dataSource.entities.remove(old) } catch (e) { }
       this.originalBillboardStyle.delete(entityId)
     }
@@ -253,7 +253,7 @@ class MonitorPointManager {
     // 创建新实体
     const entity = new Cesium.Entity({
       id: entityId,
-      position: Cesium.Cartesian3.fromDegrees(point.coordinates[0], point.coordinates[1], 50),
+      position: Cesium.Cartesian3.fromDegrees(area.coordinates[0], area.coordinates[1], 50),
       billboard: new Cesium.BillboardGraphics({
         image: '/image/ic_point.png',
         width: 60,
@@ -262,7 +262,7 @@ class MonitorPointManager {
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       }),
       label: new Cesium.LabelGraphics({
-        text: point.name,
+        text: area.name,
         font: '14px sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
@@ -274,11 +274,11 @@ class MonitorPointManager {
       }),
       
       
-      properties: { pointData: point }
+      properties: { areaData: area }
     })
 
     this._saveOriginalBillboardStyle(entity)
-    this.monitorEntities.set(entityId, entity)
+    this.areaEntities.set(entityId, entity)
     return entity
   }
 
@@ -301,11 +301,11 @@ class MonitorPointManager {
 
   // 私有方法：清除现有实体
   _clearExistingEntities() {
-    this.monitorEntities.forEach(entity => {
+    this.areaEntities.forEach(entity => {
       try { this.viewer.entities.remove(entity) } catch (e) { }
       this.originalBillboardStyle.delete(entity.id)
     })
-    this.monitorEntities.clear()
+    this.areaEntities.clear()
   }
 
   // 私有方法：设置实体为选中状态
@@ -322,23 +322,23 @@ class MonitorPointManager {
       this.viewer.canvas.style.cursor = 'pointer'
 
       try {
-        const point = entity.properties?.pointData?.getValue
-          ? entity.properties.pointData.getValue()
-          : entity.properties?.pointData
-        this.monitorStore.setSelectedPoint(point)
+        const area = entity.properties?.areaData?.getValue
+          ? entity.properties.areaData.getValue()
+          : entity.properties?.areaData
+        this.areaStore.setSelectedArea(area)
       } catch (e) {
-        this.monitorStore.setSelectedPoint(null)
+        this.areaStore.setSelectedArea(null)
       }
     } else {
-      this.monitorStore.setSelectedPoint(null)
+      this.areaStore.setSelectedArea(null)
       this.viewer.canvas.style.cursor = 'default'
     }
     return entity
   }
 
-  // 私有方法：判断是否为监测点实体
-  _isMonitorEntity(entity) {
-    return entity?.id?.startsWith && entity.id.startsWith('monitor_')
+  // 私有方法：判断是否为重点关注区域实体
+  _isAreaEntity(entity) {
+    return entity?.id?.startsWith && entity.id.startsWith('area_')
   }
 
   // 私有方法：恢复实体原始样式
@@ -364,7 +364,7 @@ class MonitorPointManager {
 
   // 私有方法：恢复所有实体原始样式
   _restoreAllBillboardStyles() {
-    this.monitorEntities.forEach(entity => {
+    this.areaEntities.forEach(entity => {
       try {
         this._restoreOriginalBillboardStyle(entity)
       } catch (e) {
@@ -432,11 +432,11 @@ class MonitorPointManager {
 
   // 私有方法：清理Cesium资源（实体/数据源）
   _clearCesiumResources() {
-    // 1. 移除所有监测点实体
-    this.monitorEntities.forEach(entity => {
+    // 1. 移除所有重点关注区域实体
+    this.areaEntities.forEach(entity => {
       try {
         // 先从数据源移除，再从viewer移除（双重保障）
-        const dataSource = this.viewer.dataSources.getByName('monitorClustering')[0]
+        const dataSource = this.viewer.dataSources.getByName('areaClustering')[0]
         if (dataSource) {
           dataSource.entities.remove(entity)
         }
@@ -447,7 +447,7 @@ class MonitorPointManager {
     })
 
     // 2. 移除并销毁聚合数据源
-    const dataSource = this.viewer.dataSources.getByName('monitorClustering')[0]
+    const dataSource = this.viewer.dataSources.getByName('areaClustering')[0]
     if (dataSource) {
       this.viewer.dataSources.remove(dataSource, true) // true：销毁数据源，释放内存
     }
@@ -456,7 +456,7 @@ class MonitorPointManager {
   // 私有方法：重置内部状态
   _resetState() {
     // 清空实体缓存
-    this.monitorEntities.clear()
+    this.areaEntities.clear()
     // 清空样式缓存
     this.originalBillboardStyle.clear()
     // 重置交互状态
@@ -464,13 +464,13 @@ class MonitorPointManager {
     this.selectedEntity = null
     this.lastMouseMoveTime = 0
     // 清空store选中状态
-    if (this.monitorStore) {
-      this.monitorStore.setSelectedPoint(null)
+    if (this.areaStore) {
+      this.areaStore.setSelectedArea(null)
     }
   }
-   setMonitoringPointsVisibility(visible) {
+   setareasVisibility(visible) {
 
-    this.monitorEntities.forEach((entity) => {
+    this.areaEntities.forEach((entity) => {
       if (entity) {
         entity.show = visible;
       }
@@ -478,4 +478,4 @@ class MonitorPointManager {
   };
 }
 
-export { MonitorPointManager }
+export { AreaManager }

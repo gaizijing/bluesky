@@ -140,8 +140,8 @@ const toggleLayerVisibility = (key: string, event: Event) => {
       case "wind":
         props.layerControls.setWindVisibility?.(visible);
         break;
-      case "monitoringPoints":
-        props.layerControls.setMonitoringPointsVisibility?.(visible);
+      case "areas":
+        props.layerControls.setAreasVisibility?.(visible);
         break;
       case "temperature":
         props.layerControls.setTemperatureVisibility?.(visible);

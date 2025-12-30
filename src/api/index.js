@@ -4,7 +4,7 @@ import cacheUtils, { cacheAsync } from '../utils/cacheUtils';
 import { fetchWeatherApi } from "openmeteo";
 
 // 获取重点关注区域列表
-export const fetchMonitoringPoints = async () => {
+export const fetchAreaList = async () => {
   try {
 
     // 在实际项目中，这里会是真实的API调用:
@@ -127,7 +127,7 @@ export const fetchMonitoringPoints = async () => {
 }
 
 // 获取当前选中的重点关注区域
-export const fetchCurrentMonitoringPoint = async () => {
+export const fetchCurrentSelectedArea = async () => {
   try {
     // 在实际项目中，这里会是真实的API调用:
     // const response = await axios.get('/api/monitoring-points/selected')
@@ -159,7 +159,7 @@ export const fetchCurrentMonitoringPoint = async () => {
   }
 }
 // 更新选中的重点关注区域
-export const updateSelectedPoint = async (point) => {
+export const updateSelectedArea = async (area) => {
   try {
     // 在实际项目中，这里会是真实的API调用:
     // const response = await axios.post('/api/monitoring-points/selected', { pointId: point.id })

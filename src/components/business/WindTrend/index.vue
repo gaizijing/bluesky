@@ -10,12 +10,12 @@
 import * as echarts from "echarts";
 import { ref, onMounted, onUnmounted, watch, nextTick } from "vue";
 import { useDashboardStore } from "@/store/modules/dashboard";
-import { useMonitoringPointStore } from "@/store/modules/monitoringPoints";
+import { useAreaStore } from "@/store/modules/area";
 import { fetchCurrentPointWindTrend } from "@/api/weather";
 import { intersection } from "lodash";
 
 const dashboardStore = useDashboardStore();
-const monitoringPointStore = useMonitoringPointStore();
+const areaStore = useAreaStore();
 
 // 图表实例与状态
 const chartRef = ref(null);
@@ -27,9 +27,9 @@ const trendData = ref([]);
 // 获取风向趋势数据
 const loadWindTrendData = async () => {
   try {
-    if (monitoringPointStore.hasSelectedPoint) {
+    if (areaStore.hasSelectedArea) {
       const data = await fetchCurrentPointWindTrend(
-        monitoringPointStore.selectedPoint
+        areaStore.selectedArea
       );
       trendData.value = data;
 
@@ -238,9 +238,9 @@ onUnmounted(() => {
 
 // 监听选中重点关注区域变化
 watch(
-  () => monitoringPointStore.selectedPoint,
-  (newPoint) => {
-    if (newPoint) {
+  () => areaStore.selectedArea,
+  (newArea) => {
+    if (newArea) {
       loadWindTrendData();
     }
   }

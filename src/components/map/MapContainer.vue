@@ -30,16 +30,22 @@ import { onMounted, onUnmounted, watch, ref } from 'vue'
 import { useCesium } from '@/hooks/useCesium'
 import { useCesiumStore } from '@/store/modules/cesium'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
+import { useAreaStore } from '@/store/modules/area'
 import ControlPanel from "@/components/map/ControlPanel.vue"
 import TimeProgressBar from "@/components/map/TimeProgressBar.vue"
 import { useRouteStore } from '@/store/modules/routeStore'
 import eventManager from '@/cesium/core/eventManager' // 导入独立的事件管理器
+import { ElMessage } from 'element-plus'
 
 // 地图容器ID
 const CESIUM_CONTAINER_ID = 'cesiumContainer'
 const layerSettingsStore = useLayerSettingsStore()
 const cesiumStore = useCesiumStore()
 const routeStore = useRouteStore()
+const areaStore = useAreaStore()
+
+// 模式切换状态
+const currentMode = ref('overview') // 默认概览模式
 
 // Cesium实例和控制方法
 let cesiumHooks = null
@@ -57,8 +63,8 @@ const applyLayerVisibilitySettings = () => {
         case "wind":
           cesiumHooks.setWindVisibility?.(layer.visible)
           break
-        case "monitoringPoints":
-          cesiumHooks.setMonitoringPointsVisibility?.(layer.visible)
+        case "areas":
+          cesiumHooks.setAreasVisibility?.(layer.visible)
           break
         case "temperature":
           cesiumHooks.setTemperatureVisibility?.(layer.visible)
@@ -125,9 +131,45 @@ const clearRoute = () => {
   cesiumHooks.clearAllRoutes()
   routeStore.clearCurrentRoute()
 }
+
+// 切换相机模式
+const switchMode = (mode) => {
+  currentMode.value = mode
+  if (cesiumHooks) {
+    if (mode === 'overview') {
+      // 概览模式：显示所有监测点
+      cesiumHooks.switchToOverviewMode()
+    } else if (mode === 'focus') {
+      // 重点关注模式：切换到当前选中的关注区域
+      const selectedArea = areaStore.selectedArea
+      if (selectedArea) {
+        // 如果有选中的重点关注区域，切换到该点
+        cesiumHooks.switchToFocusMode(selectedArea)
+      } else {
+        // 如果没有选中的重点关注区域，显示提示信息
+        console.warn('没有选中的重点关注区域，无法切换到重点关注模式')
+        // 使用Element Plus的Message提示框
+        ElMessage.warning('请先选择一个重点关注区域，然后再切换到重点关注模式')
+        // 切换回概览模式
+        currentMode.value = 'overview'
+      }
+    }
+  }
+}
+
+// 切换模式函数
+const toggleMode = () => {
+  const newMode = currentMode.value === 'overview' ? 'focus' : 'overview'
+  switchMode(newMode)
+}
 // 组件挂载时初始化地图和设置事件监听
 onMounted(() => {
   initializeMap()
+  
+  // 监听模式切换事件
+  eventManager.on('modeChange', (mode) => {
+    switchMode(mode)
+  })
 })
 onUnmounted(() => {
   if (cesiumHooks) {
@@ -218,4 +260,7 @@ onUnmounted(() => {
   border-radius: 4px;
   cursor: pointer;
 }
+
+/* 模式切换按钮样式已移至Header组件 */
+
 </style>

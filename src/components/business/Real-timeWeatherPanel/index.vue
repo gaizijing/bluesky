@@ -1,6 +1,6 @@
 <template>
   <div class="landing-point-card">
-    <div v-if="weatherStore.isLoading || weatherStore.currentPointWeather==null" class="loading-overlay">
+    <div v-if="weatherStore.isLoading || weatherStore.currentPointWeather==null" class="loading-overlay">  
       <div class="loading-content">
         <div class="loading-spinner"></div>
         <div class="loading-text">加载中...</div>
@@ -55,11 +55,10 @@
 
 <script setup>
 import { onMounted, ref, watch } from "vue";
-import { fetchCurrentPointWeather } from "@/api";
 import { useWeatherStore } from "@/store/modules/weather";
 const weatherStore = useWeatherStore();
-import { useMonitoringPointStore } from "@/store/modules/monitoringPoints";
-const monitoringPointStore = useMonitoringPointStore();
+import { useAreaStore } from "@/store/modules/area";
+const areaStore = useAreaStore();
 const isRefreshing = ref(false);
 
 const WIND_SHEAR_MAP = {
@@ -96,50 +95,54 @@ const getWindSpeedLevel = (windSpeed) => {
   if (speed < 15) return "high";
   return "extreme";
 };
-// const refreshData = async () => {
-//   // 如果没有选中的重点关注区域，不执行刷新
-//   if (!monitoringPointStore.hasSelectedPoint) {
-//     return;
-//   }
-
-//   isRefreshing.value = true;
-//   try {
-//     // 从API获取天气数据
-//     const data = await fetchCurrentPointWeather(
-//       monitoringPointStore.selectedPoint
-//     );
-//     // 更新天气数据
-//     weatherStore.currentPointWeather.value = data.weather;
-//   } catch (err) {
-//     console.error("数据刷新失败", err);
-//     // 可以设置默认值或显示错误信息
-//   } finally {
-//     isRefreshing.value = false;
-//   }
-// };
-//监听重点关注区域的变化修改数据
-// watch(
-//   () => monitoringPointStore.selectedPoint,
-//   (newPoint) => {
-//     if (newPoint) {
-//       refreshData();
-//     }
-//   }
-// );
-// onMounted(() => {
-//   refreshData();
-// });
-// 对外暴露方法,传入点的id获取点的实时气象
-// defineExpose({
-//   updateLandingPoint: (pointName, newData) => {
-//     currentLandingPoint.value = pointName;
-//     if (newData) weatherStore.currentPointWeather.value = newData;
-//   },
-// });
 </script>
 
 <style scoped lang="scss">
-.landing-point-card {}
+.landing-point-card {
+  position: relative;
+  min-height: 200px;
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 // 核心数据区（三列布局）
 .card-body {

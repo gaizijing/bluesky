@@ -431,30 +431,30 @@ body {
 }
 
 /* 重点关注区域弹窗样式 */
-.monitor-info {
+.area-info {
   font-family: sans-serif;
   padding: 8px;
 }
 
-.monitor-info h3 {
+.area-info h3 {
   margin: 0 0 8px 0;
   color: #333;
   border-bottom: 1px solid #eee;
   padding-bottom: 4px;
 }
 
-.monitor-info table {
+.area-info table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 12px;
 }
 
-.monitor-info td {
+.area-info td {
   padding: 4px 6px;
   font-size: 14px;
 }
 
-.monitor-info td:first-child {
+.area-info td:first-child {
   font-weight: bold;
   color: #666;
 }

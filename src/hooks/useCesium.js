@@ -1,26 +1,27 @@
-import { onMounted, ref, onUnmounted, watch, toRefs } from 'vue'
+import {  ref, watch, toRefs } from 'vue'
 import * as Cesium from 'cesium'
 import { useCesiumStore } from '@/store/modules/cesium'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
-import { useMonitoringPointStore } from '@/store/modules/monitoringPoints'
+import { useAreaStore } from '@/store/modules/area'
 import { createViewer, destroyViewer } from '@/cesium/core/viewer'
-import { handleCameraMove } from '@/cesium/core/camera'
-import {  getCurrentCameraParams, flyToRegion, flyToRectangle } from '@/cesium/core/camera'
+import { handleCameraMove, getCurrentCameraParams, flyToRegion, flyToRectangle, limitCameraRange, switchToOverviewMode, switchToFocusMode, flyToQingdaoOverview } from '@/cesium/core/camera'
 import { addTiandituLayer, addTiandituWithGaodeOverlay } from '@/cesium/layers/tianditu'
 import { loadTerrain } from '@/cesium/layers/terrain'
 import { addWhiteModel } from '@/cesium/layers/model3d'
-import { MonitorPointManager } from '@/cesium/entities/monitoringPoints.js'
+import { AreaManager } from '@/cesium/entities/area.js'
 import { initWind } from '@/cesium/visualization/wind'
 import { addHeatVolume } from '@/cesium/visualization/heatmap'
 import generateHeatmapData from '@/mock/heatmapData'
 import { routeManager } from '@/cesium/entities/routes' // 引入航线管理器
 import { useRouteStore } from '@/store/modules/routeStore'
 import { addDistrictInfo, addBoundGeo } from '@/cesium/layers/district'
+import eventManager from '@/cesium/core/eventManager' // 引入事件管理器
+import SkyBoxOnGround from '@/cesium/volumeCloud/skybox_nearground.js'; // 修改导入方式
 
 export function useCesium(containerId) {
   // Store实例
   const cesiumStore = useCesiumStore()
-  const monitorStore = useMonitoringPointStore()
+  const areaStore = useAreaStore()
   const layerSettingsStore = useLayerSettingsStore()
   const routeStore = useRouteStore()
 
@@ -36,12 +37,13 @@ export function useCesium(containerId) {
     districtPrimitive: null,
     modelTileset: null,
     heatMapInstance: null,
-    monitorManager: null,
-    cameraMoveHandler: null
+    areaManager: null,
+    cameraMoveHandler: null,
+    cameraRangeCleanup: null
   })
   
   // 监测点相关响应式数据
-  const { pointsList: monitorPoints } = toRefs(monitorStore)
+  const { areaList } = toRefs(areaStore)
 
   // ==================== 初始化步骤 ====================
   
@@ -49,9 +51,38 @@ export function useCesium(containerId) {
    * 初始化Cesium Viewer
    */
   const initViewer = () => {
+    
+    let currSkyBox; // 当前生效的Skybox
+    let defaultSkybox; // cesium自带的Skybox
     viewer.value = createViewer(containerId)
     // 隐藏Cesium logo
     viewer.value.cesiumWidget.creditContainer.style.display = 'none'
+    // console.log(Cesium.FeatureDetection.supportsWebgl2(viewer.value.scene));
+const lantianSkybox = new SkyBoxOnGround({
+  sources: {
+    positiveX: "/texture/qingtian/rightav9.jpg",
+    negativeX: "/texture/qingtian/leftav9.jpg",
+    positiveY: "/texture/qingtian/frontav9.jpg",
+    negativeY: "/texture/qingtian/backav9.jpg",
+    positiveZ: "/texture/qingtian/topav9.jpg",
+    negativeZ: "/texture/qingtian/bottomav9.jpg",
+  },
+});
+
+ defaultSkybox = viewer.value .scene.skyBox; //先把系统默认的天空盒保存下来
+  currSkyBox = lantianSkybox; //默认近地时使用个晴天天空盒
+  viewer.value .scene.preUpdate.addEventListener(() => {
+    //获取相机高度
+    let position = viewer.value .scene.camera.position;
+    let cameraHeight = Cesium.Cartographic.fromCartesian(position).height;
+    if (cameraHeight < 240000) {      
+      viewer.value .scene.skyBox = currSkyBox;
+      viewer.value .scene.skyAtmosphere.show = false; //关闭地球大气层
+    } else {
+      viewer.value .scene.skyBox = defaultSkybox; //使用系统默认星空天空盒
+      viewer.value .scene.skyAtmosphere.show = true; //显示大气层
+    }
+  });
   }
   
   /**
@@ -87,8 +118,8 @@ export function useCesium(containerId) {
    */
   const initEntitiesAndVisualizations = async () => {
     // 初始化监测点管理器
-    resources.value.monitorManager = MonitorPointManager.getInstance(viewer.value, monitorStore)
-    resources.value.monitorManager.render(monitorPoints.value)
+    resources.value.areaManager = AreaManager.getInstance(viewer.value, areaStore)    
+    resources.value.areaManager.render(areaList.value)
     
     // 初始化风场
     resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
@@ -108,11 +139,11 @@ export function useCesium(containerId) {
   const setupReactiveWatchers = () => {
     // 监听选中监测点变化
     watch(
-      () => monitorStore.selectedPoint,
-      (newPoint) => {
-        if (newPoint && viewer.value) {
-          resources.value.monitorManager.setSelected(`monitor_${newPoint.id}`)
-          flyToRegion(viewer.value, { coordinates: newPoint.coordinates, duration: 1.0 })
+      () => areaStore.selectedArea,
+      (newArea) => {
+        if (newArea && viewer.value) {
+          resources.value.areaManager.setSelected(`area_${newArea.id}`)
+          flyToRegion(viewer.value, { coordinates: newArea.coordinates, duration: 1.0 })
         }
       },
       { deep: true }
@@ -126,6 +157,17 @@ export function useCesium(containerId) {
           routeManager.render(newRoute)
         }
       }
+    )
+    
+    // 监听监测点列表变化
+    watch(
+      () => areaStore.areaList,
+      (newAreas) => {
+        if (newAreas && viewer.value && resources.value.areaManager) {
+          resources.value.areaManager.render(newAreas)
+        }
+      },
+      { deep: true }
     )
   }
   
@@ -144,9 +186,8 @@ export function useCesium(containerId) {
       await initEntitiesAndVisualizations() // 异步函数，需要await
       setupReactiveWatchers() // 同步函数，不需要await
       
-    } catch (error) {
-      errorMsg.value = `初始化失败: ${error.message}`
-      console.error('Cesium初始化失败:', error)
+      // 在所有资源加载完成后，初始化相机范围限制
+      // resources.value.cameraRangeCleanup = limitCameraRange(viewer.value)
     } finally {
       isLoading.value = false
     }
@@ -164,14 +205,20 @@ export function useCesium(containerId) {
       resources.value.cameraMoveHandler = null
     }
     
+    // // 清理相机范围限制
+    // if (resources.value.cameraRangeCleanup) {
+    //   resources.value.cameraRangeCleanup()
+    //   resources.value.cameraRangeCleanup = null
+    // }
+    
     if (viewer.value) {
       // 清理航线
       routeManager.destroy()
       
       // 清理监测点
-      if (resources.value.monitorManager) {
-        resources.value.monitorManager.destroy()
-        resources.value.monitorManager = null
+      if (resources.value.areaManager) {
+        resources.value.areaManager.destroy()
+        resources.value.areaManager = null
       }
       
       // 清理热力图
@@ -215,9 +262,9 @@ export function useCesium(containerId) {
   /**
    * 设置监测点图层可见性
    */
-  const setMonitoringPointsVisibility = (visible) => {
-    if (resources.value.monitorManager) {
-      resources.value.monitorManager.setMonitoringPointsVisibility(visible)
+  const setAreaPointsVisibility = (visible) => {
+    if (resources.value.areaManager) {
+      resources.value.areaManager.setAreaPointsVisibility(visible)
     }
   };
 
@@ -284,6 +331,19 @@ export function useCesium(containerId) {
     }
   };
 
+  // 矩形绘制功能
+  const startRectangleDrawing = (callback) => {
+    eventManager.startRectangleDrawing(callback);
+  };
+
+  const stopRectangleDrawing = () => {
+    eventManager.stopRectangleDrawing();
+  };
+
+  const cancelRectangleDrawing = () => {
+    eventManager.cancelRectangleDrawing();
+  };
+
   // 暴露公共方法
   return {
     viewer,
@@ -295,15 +355,22 @@ export function useCesium(containerId) {
     flyToRegion: (region) => flyToRegion(viewer.value, region),
     flyToRectangle: (region) => flyToRectangle(viewer.value, region),
     getCurrentCameraParams: () => getCurrentCameraParams(viewer.value),
+    // 模式切换
+    switchToOverviewMode: () => switchToOverviewMode(viewer.value),
+    switchToFocusMode: (region) => switchToFocusMode(viewer.value, region),
     // 图层控制
     setModelVisibility,
     setWindVisibility,
-    setMonitoringPointsVisibility,
+    setAreaPointsVisibility,
     setTemperatureVisibility,
     // 可视化更新
     updateHeatmapTime,
     updateWindOptions,
     // 时间控制
-    setCurrentTime
+    setCurrentTime,
+    // 矩形绘制
+    startRectangleDrawing,
+    stopRectangleDrawing,
+    cancelRectangleDrawing
   }
 }

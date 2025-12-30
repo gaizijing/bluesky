@@ -22,55 +22,6 @@
       </div>
     </div>
 
-    <!-- 4. 模块显示区域 -->
-    <!-- 区域监测模块 -->
-    <transition name="module-fade" mode="out-in">
-      <div v-show="currentModule === DASHBOARD_MODULES.REGION_MONITOR">
-        <div class="left-panel">
-          <div class="main-panel left_bg">
-            <div class="panel-header">
-              <span class="panel-title">核心区域</span>
-            </div>
-            <div class="panel-content">
-              <region-moniter-list />
-            </div>
-          </div>
-          <div class="main-panel left_bg">
-            <div class="panel-header">
-              <span class="panel-title"
-                >{{ selectedRegionDetail.regionName }}详情</span
-              >
-            </div>
-            <div class="panel-content">
-              <region-detail :regionDetail="selectedRegionDetail" />
-              <!-- <div class="weather-panel">
-                <weather-element-selector v-model="currentElement" />
-              </div> -->
-            </div>
-          </div>
-        </div>
-        <div class="right-panel">
-          <div class="main-panel right_bg">
-            <div class="panel-header">
-              <span class="panel-title">垂直</span>
-            </div>
-            <div class="panel-content">
-              <FlightSuitableAnalysisPanel />
-            </div>
-          </div>
-
-          <div class="main-panel right_bg">
-            <div class="panel-header">
-              <span class="panel-title">微尺度天气</span>
-            </div>
-            <div class="panel-content">
-              <MicroscaleWeather />
-            </div>
-          </div>
-        </div>
-      </div>
-    </transition>
-
     <!-- 飞行分析模块 -->
     <transition name="module-fade" mode="out-in">
       <div v-show="currentModule === DASHBOARD_MODULES.FLIGHT_ANALYSIS">

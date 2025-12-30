@@ -10,15 +10,19 @@ import { ref, onMounted, watch, onUnmounted, nextTick } from 'vue';
 import * as echarts from 'echarts';
 import { useDashboardStore } from "@/store/modules/dashboard";
 import { getWeatherSuitability } from "@/api";
-import { useMonitoringPointStore } from "@/store/modules/monitoringPoints";
-const monitoringPointStore = useMonitoringPointStore();
+import { useAreaStore } from "@/store/modules/area";
+const areaStore = useAreaStore();
 const dashboardStore = useDashboardStore();
 const chartRef = ref(null);
 const chartData = ref(null);
 let chartInstance = null;
 const loadData = async () => {
   try {
-    const data = await getWeatherSuitability(monitoringPointStore.selectedPoint);
+    if(!areaStore.selectedArea) {
+      console.warn('No selected area available');
+      return;
+    }
+    const data = await getWeatherSuitability(areaStore.selectedArea);
 
     // 适配新的数据结构格式
     // 从suitabilityList中提取factors、statusData和valueData
@@ -203,9 +207,9 @@ onUnmounted(() => {
 });
 // 监听选中重点关注区域变化
 watch(
-  () => monitoringPointStore.selectedPoint,
-  (newPoint) => {
-    if (newPoint) {
+  () => areaStore.selectedArea,
+  (newArea) => {
+    if (newArea) {
       loadData();
     }
   }

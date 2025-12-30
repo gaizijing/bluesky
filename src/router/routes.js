@@ -41,14 +41,6 @@ export const routes = [
             meta: {
               title: '阈值管理'
             }
-          },
-          {
-            path: '/setting/monitoring-points',
-            name: 'MonitoringPointsManagement',
-            component: () => import('@/pages/Setting/views/MonitoringPointsManagement.vue'),
-            meta: {
-              title: '重点关注区域管理'
-            }
           }
         ]
       }

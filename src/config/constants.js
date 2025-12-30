@@ -81,7 +81,6 @@ export const BASE_LAYER_TYPES = {
 // src/constants/dashboardModules.js
 export const DASHBOARD_MODULES = {
   DEVICE_MONITOR: 'deviceMonitor',
-  REGION_MONITOR: 'regionMonitor',
   FLIGHT_ANALYSIS: 'flightAnalysis',
   LANDING_MONITOR: 'mapController',
 
@@ -97,10 +96,6 @@ export const MODULE_LIST = [
     key: DASHBOARD_MODULES.LANDING_MONITOR,
     name: "气象态势",
   },
-  // {
-  //   key: DASHBOARD_MODULES.REGION_MONITOR,
-  //   name: "空域气象",
-  // },
 
   {
     key: DASHBOARD_MODULES.FLIGHT_ANALYSIS,

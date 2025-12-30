@@ -78,9 +78,9 @@
 <script setup>
 import { ref, onMounted, computed, defineAsyncComponent,watch  } from "vue";
 import { getRiskWarnings } from "@/api";
-import { useMonitoringPointStore } from "@/store/modules/monitoringPoints";
+import { useAreaStore } from "@/store/modules/area";
 
-const monitoringPointStore = useMonitoringPointStore();
+const areaStore = useAreaStore();
 const WeatherWarnings = defineAsyncComponent(() =>
   import("@/components/business/WeatherWarnings/index.vue")
 );
@@ -184,9 +184,9 @@ const closeHistoryDialog = () => {
 };
 
 watch(
-  () => monitoringPointStore.selectedPoint,
-  (newPoint) => {
-    if (newPoint) {
+  () => areaStore.selectedArea,
+  (newArea) => {
+    if (newArea) {
       fetchData();
     }
   }

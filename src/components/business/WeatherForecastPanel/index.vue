@@ -32,14 +32,14 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import * as echarts from "echarts";
-import { useMonitoringPointStore } from "@/store/modules/monitoringPoints";
+import { useAreaStore } from "@/store/modules/area";
 import { getWeatherForecastTrend, getWeatherForecastHeatmap } from "@/api";
 import { useDashboardStore } from "@/store/modules/dashboard";
 
 const dashboardStore = useDashboardStore();
 
 // Store引用
-const monitoringPointStore = useMonitoringPointStore();
+const areaStore = useAreaStore();
 
 // 图表实例
 let trendChartInstance = null;
@@ -112,13 +112,13 @@ const loadData = async () => {
     // 获取时间范围
     const timeRange = getTimeRange();
     // 获取选中的重点关注区域信息
-    const selectedPoint = monitoringPointStore.selectedPoint;
-    const pointId = selectedPoint?.id || 'BJ-001';
-    const coordinates = selectedPoint?.coordinates || [116.403874, 39.914885];
+    const selectedArea = areaStore.selectedArea;
+    const pointId = selectedArea?.id || 'BJ-001';
+    const coordinates = selectedArea?.coordinates || [116.403874, 39.914885];
 
     // 调用模拟API获取数据
     const trendData = await getWeatherForecastTrend({
-      monitoringPointId: pointId,
+      areaId: pointId,
       longitude: coordinates[0],
       latitude: coordinates[1],
       altitude: 50.0, // 固定高度
@@ -128,7 +128,7 @@ const loadData = async () => {
       timeInterval: timeRange.timeInterval
     });
     const profileData = await getWeatherForecastHeatmap({
-      pointId: monitoringPointStore.selectedPoint?.id || 'mock-point',
+      areaId: pointId,
       // timeRange: selectedTimeRange.value
     });
 
@@ -586,9 +586,9 @@ const initCharts = () => {
 
 // 监听选中重点关注区域变化
 watch(
-  () => monitoringPointStore.selectedPoint,
-  (newPoint) => {
-    if (newPoint) {
+  () => areaStore.selectedArea,
+  (newArea) => {
+    if (newArea) {
       loadData();
     }
   }

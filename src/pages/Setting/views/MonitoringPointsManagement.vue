@@ -1,5 +1,5 @@
 <template>
-  <div class="monitoring-points-management">
+  <div class="area-management">
     <div class="page-header">
       <h1>重点关注区域管理</h1>
       <p>管理系统中的气象重点关注区域</p>
@@ -27,30 +27,30 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="point in monitorPoints" :key="point.id">
-              <td>{{ point.name }}</td>
-              <td>{{ point.code }}</td>
-              <td>{{ point.location }}</td>
-              <td>{{ point.longitude }}</td>
-              <td>{{ point.latitude }}</td>
-              <td>{{ point.altitude }}</td>
+            <tr v-for="area in areaPoints" :key="area.id">
+              <td>{{ area.name }}</td>
+              <td>{{ area.code }}</td>
+              <td>{{ area.location }}</td>
+              <td>{{ area.longitude }}</td>
+              <td>{{ area.latitude }}</td>
+              <td>{{ area.altitude }}</td>
               <td>
-                <span :class="['status-tag', getStatusClass(point.status)]">
-                  {{ point.status }}
+                <span :class="['status-tag', getStatusClass(area.status)]">
+                  {{ area.status }}
                 </span>
               </td>
               <td>
                 <div class="table-actions">
-                  <button class="btn btn-link" @click="editMonitorPoint(point)">
+                  <button class="btn btn-link" @click="editArea(area)">
                     编辑
                   </button>
-                  <button class="btn btn-link btn-danger" @click="deleteMonitorPoint(point)">
+                  <button class="btn btn-link btn-danger" @click="deleteArea(area)">
                     删除
                   </button>
                 </div>
               </td>
             </tr>
-            <tr v-if="monitorPoints.length === 0">
+            <tr v-if="areaPoints.length === 0">
               <td colspan="8" class="empty-row">
                 暂无重点关注区域数据
               </td>
@@ -68,7 +68,7 @@
           <button class="dialog-close" @click="closeDialog">×</button>
         </div>
         <div class="dialog-body">
-          <form @submit.prevent="saveMonitorPoint">
+          <form @submit.prevent="saveAreaPoint">
             <div class="form-row">
               <div class="form-item">
                 <label class="form-label">重点关注区域名称 <span class="required">*</span></label>
@@ -153,7 +153,7 @@
         </div>
         <div class="dialog-footer">
           <button class="btn btn-default" @click="closeDialog">取消</button>
-          <button class="btn btn-primary" @click="saveMonitorPoint">确认</button>
+          <button class="btn btn-primary" @click="saveAreaPoint">确认</button>
         </div>
       </div>
     </div>
@@ -162,13 +162,14 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useMonitoringPointStore } from '@/store/modules/monitoringPoints'
+import { useAreaStore } from '@/store/modules/area'
+import { ElMessage } from 'element-plus'
 
 // 状态管理
-const monitoringPointStore = useMonitoringPointStore()
+const areaStore = useAreaStore()
 
 // 重点关注区域数据
-const monitorPoints = computed(() => monitoringPointStore.pointsList)
+const areaPoints = computed(() => areaStore.areaPointsList)
 
 // 对话框状态
 const showDialog = ref(false)
@@ -187,7 +188,7 @@ const currentPoint = reactive({
 // 初始化数据
 onMounted(() => {
   // 确保有模拟数据
-  if (monitorPoints.value.length === 0) {
+  if (areaPoints.value.length === 0) {
     const mockData = [
       {
         id: 'point-1',
@@ -220,7 +221,7 @@ onMounted(() => {
         status: '维护中'
       }
     ]
-    monitoringPointStore.setPointsList(mockData)
+    areaStore.setAreaPointsList(mockData)
   }
 })
 
@@ -245,7 +246,7 @@ const showAddDialog = computed({
 })
 
 // 编辑重点关注区域
-const editMonitorPoint = (point) => {
+const editAreaPoint = (point) => {
   Object.assign(currentPoint, { ...point })
   isEditMode.value = true
   showDialog.value = true
@@ -257,44 +258,44 @@ const closeDialog = () => {
 }
 
 // 删除重点关注区域
-const deleteMonitorPoint = (point) => {
+const deleteAreaPoint = (point) => {
   if (confirm(`确定要删除重点关注区域「${point.name}」吗？`)) {
-    const updatedList = monitoringPointStore.pointsList.filter(p => p.id !== point.id)
-    monitoringPointStore.setPointsList(updatedList)
-    alert('删除成功')
+    const updatedList = areaPoints.value.filter(p => p.id !== point.id)
+    areaStore.setAreaPointsList(updatedList)
+    ElMessage.success('删除成功')
   }
 }
 
 // 保存重点关注区域
-const saveMonitorPoint = () => {
+const saveAreaPoint = () => {
   // 简单验证
   if (!currentPoint.name || !currentPoint.code || !currentPoint.longitude || !currentPoint.latitude) {
-    alert('请填写必填项')
+    ElMessage.warning('请填写必填项')
     return
   }
   
   try {
     if (isEditMode.value) {
       // 编辑模式
-      const updatedList = monitoringPointStore.pointsList.map(point => 
+      const updatedList = areaPoints.value.map(point => 
         point.id === currentPoint.id ? { ...currentPoint } : point
       )
-      monitoringPointStore.setPointsList(updatedList)
-      alert('更新成功')
+      areaStore.setAreaPointsList(updatedList)
+      ElMessage.success('更新成功')
     } else {
       // 添加模式
       const newPoint = {
         ...currentPoint,
         id: `point-${Date.now()}`,
       }
-      monitoringPointStore.setPointsList([...monitoringPointStore.pointsList, newPoint])
-      alert('添加成功')
+      areaStore.setAreaPointsList([...areaPoints.value, newPoint])
+      ElMessage.success('添加成功')
     }
     
     showDialog.value = false
   } catch (error) {
     console.error('保存失败:', error)
-    alert('保存失败，请重试')
+    ElMessage.error('保存失败，请重试')
   }
 }
 
@@ -321,7 +322,7 @@ $warning-color: #faad14;
 $danger-color: #f5222d;
 $shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
-.monitoring-points-management {
+.area-points-management {
   width: 100%;
   min-height: 100%;
   background-color: $bg-color;
@@ -643,7 +644,7 @@ $shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 // 响应式设计
 @media (max-width: 768px) {
-  .monitoring-points-management {
+  .area-points-management {
     padding: 10px;
   }
   
@@ -720,7 +721,7 @@ $shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
-  .monitoring-points-management {
+  .area-points-management {
     padding: 15px;
   }
   
@@ -754,7 +755,7 @@ $shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
 // 打印样式
 @media print {
-  .monitoring-points-management {
+  .area-points-management {
     padding: 0;
   }
   

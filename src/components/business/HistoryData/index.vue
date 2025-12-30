@@ -1,8 +1,8 @@
 <template>
-  <div class="history-monitor-container">
+  <div class="history-area-container">
     <!-- 顶部标题栏 -->
 
-    <!-- 测点切换栏 -->
+    <!-- 区域切换栏 -->
     <div class="point-tabs">
       <div
         v-for="(point, idx) in points"
@@ -339,7 +339,7 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 /* 父容器固定高度，确保整体空间充足 */
-.history-monitor-container {
+.history-area-container {
   width: 100%;
   height: 900px; /* 整体高度提升，给底部图表更多空间 */
   min-height: 900px;
@@ -440,7 +440,7 @@ onUnmounted(() => {
 
 /* 响应式适配：小屏幕垂直排列底部双图 */
 @media (max-width: 992px) {
-  .history-monitor-container {
+  .history-area-container {
     height: 1400px;
     min-height: 1400px;
   }
@@ -459,7 +459,7 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
-  .history-monitor-container {
+  .history-area-container {
     height: 1600px;
     min-height: 1600px;
   }
