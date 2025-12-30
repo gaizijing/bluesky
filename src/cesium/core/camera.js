@@ -42,6 +42,35 @@ export const getCurrentCameraParams = (viewer) => {
   };
 };
 
+export const printCameraParams = (viewer) => {
+  const params = getCurrentCameraParams(viewer);
+  if (params) {
+    console.log('========== 当前相机参数 ==========');
+    console.log('位置信息:');
+    console.log(`  经度: ${params.position.longitude.toFixed(6)}°`);
+    console.log(`  纬度: ${params.position.latitude.toFixed(6)}°`);
+    console.log(`  高度: ${params.position.height.toFixed(2)}米`);
+    console.log(`  笛卡尔坐标: x=${params.position.x.toFixed(2)}, y=${params.position.y.toFixed(2)}, z=${params.position.z.toFixed(2)}`);
+    console.log('方向信息:');
+    console.log(`  航向角(Heading): ${params.orientation.heading.toFixed(2)}°`);
+    console.log(`  俯仰角(Pitch): ${params.orientation.pitch.toFixed(2)}°`);
+    console.log(`  翻滚角(Roll): ${params.orientation.roll.toFixed(2)}°`);
+    console.log('====================================');
+  } else {
+    console.error('无法获取相机参数，viewer未初始化');
+  }
+};
+
+export const setupCameraPrintKeydown = (viewer) => {
+  const keydownHandler = (event) => {
+    if (event.key === 'p' || event.key === 'P') {
+      printCameraParams(viewer);
+    }
+  };
+  document.addEventListener('keydown', keydownHandler);
+  return keydownHandler;
+};
+
 export const getFlyToOptions = (options) => ({
   duration: options.duration || (options.isRegion ? 1.5 : 2),
   orientation: {
@@ -81,23 +110,19 @@ export const flyToRegion = (viewer, region) => {
   if (!viewer || !region) return;
 
   try {
-    if (region.coordinates?.length >= 2) {
-      const [longitude, latitude] = region.coordinates;
-      // 创建中心点的笛卡尔坐标
-      const center = Cesium.Cartesian3.fromDegrees(longitude, latitude, 0);
-      // 创建边界球，半径根据需要调整
+    if (region.bbox?.length >= 2) {
+      const [[west, south], [east, north]] = region.bbox;
+      const center = Cesium.Cartesian3.fromDegrees((west + east) / 2, (south + north) / 2, 0);
       const boundingSphere = new Cesium.BoundingSphere(center, region.radius || 1000);
       
-      // 计算合适的相机距离（关键改进：使用合理的距离计算）
       const range = Math.max(
         boundingSphere.radius * 2.2,
         1200
       );
       
-      // 设置相机偏移参数，使用更合理的默认值
       const offset = new Cesium.HeadingPitchRange(
         Cesium.Math.toRadians(region.heading || 0),
-        Cesium.Math.toRadians(region.pitch || -55), // 更陡的俯仰角，更好的俯瞰效果
+        Cesium.Math.toRadians(region.pitch || -12),
         range
       );
       

@@ -4,7 +4,7 @@
       <div class="stats-summary">
         <!-- 统计项保持不变 -->
         <div class="stat-item" @click="setFilter('all')">
-          <div class="stat-label">总重点关注区域</div>
+          <div class="stat-label">总区域</div>
           <div class="stat-value">{{ totalAreas }}</div>
         </div>
         <div class="stat-item available" @click="setFilter('available')">
@@ -27,7 +27,7 @@
             ref="searchInputRef"
             v-model="searchKeyword"
             type="text"
-            placeholder="搜索重点关注区域名称或位置..."
+            placeholder="搜索区域名称..."
             class="search-input"
           />
         </div>
@@ -76,13 +76,13 @@
       <!-- 加载状态 -->
       <div v-if="isLoading" class="loading-state">
         <div class="spinner"></div>
-        <p>加载重点关注区域数据中...</p>
+        <p>加载区域数据中...</p>
       </div>
 
       <!-- 空状态 -->
       <div v-if="!isLoading && filteredAreas.length === 0" class="empty-state">
         <div class="empty-icon">📌</div>
-        <p>没有找到匹配的重点关注区域</p>
+        <p>没有找到匹配的区域</p>
         <button class="reset-btn" @click="resetFilters">重置筛选条件</button>
       </div>
 

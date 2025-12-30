@@ -4,7 +4,7 @@ import { useCesiumStore } from '@/store/modules/cesium'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import { useAreaStore } from '@/store/modules/area'
 import { createViewer, destroyViewer } from '@/cesium/core/viewer'
-import { handleCameraMove, getCurrentCameraParams, flyToRegion, flyToRectangle, limitCameraRange, switchToOverviewMode, switchToFocusMode, flyToQingdaoOverview } from '@/cesium/core/camera'
+import { handleCameraMove, getCurrentCameraParams, flyToRegion, flyToRectangle, limitCameraRange, switchToOverviewMode, switchToFocusMode, flyToQingdaoOverview, setupCameraPrintKeydown } from '@/cesium/core/camera'
 import { addTiandituLayer, addTiandituWithGaodeOverlay } from '@/cesium/layers/tianditu'
 import { loadTerrain } from '@/cesium/layers/terrain'
 import { addWhiteModel } from '@/cesium/layers/model3d'
@@ -16,7 +16,7 @@ import { routeManager } from '@/cesium/entities/routes' // 引入航线管理器
 import { useRouteStore } from '@/store/modules/routeStore'
 import { addDistrictInfo, addBoundGeo } from '@/cesium/layers/district'
 import eventManager from '@/cesium/core/eventManager' // 引入事件管理器
-import SkyBoxOnGround from '@/cesium/volumeCloud/skybox_nearground.js'; // 修改导入方式
+import { SkyBoxManager } from '@/cesium/volumeCloud/SkyBoxManager' // 引入天空盒管理器
 
 export function useCesium(containerId) {
   // Store实例
@@ -39,7 +39,9 @@ export function useCesium(containerId) {
     heatMapInstance: null,
     areaManager: null,
     cameraMoveHandler: null,
-    cameraRangeCleanup: null
+    cameraRangeCleanup: null,
+    skyBoxManager: null,
+    cameraPrintKeydownHandler: null
   })
   
   // 监测点相关响应式数据
@@ -51,38 +53,12 @@ export function useCesium(containerId) {
    * 初始化Cesium Viewer
    */
   const initViewer = () => {
-    
-    let currSkyBox; // 当前生效的Skybox
-    let defaultSkybox; // cesium自带的Skybox
     viewer.value = createViewer(containerId)
-    // 隐藏Cesium logo
     viewer.value.cesiumWidget.creditContainer.style.display = 'none'
-    // console.log(Cesium.FeatureDetection.supportsWebgl2(viewer.value.scene));
-const lantianSkybox = new SkyBoxOnGround({
-  sources: {
-    positiveX: "/texture/qingtian/rightav9.jpg",
-    negativeX: "/texture/qingtian/leftav9.jpg",
-    positiveY: "/texture/qingtian/frontav9.jpg",
-    negativeY: "/texture/qingtian/backav9.jpg",
-    positiveZ: "/texture/qingtian/topav9.jpg",
-    negativeZ: "/texture/qingtian/bottomav9.jpg",
-  },
-});
-
- defaultSkybox = viewer.value .scene.skyBox; //先把系统默认的天空盒保存下来
-  currSkyBox = lantianSkybox; //默认近地时使用个晴天天空盒
-  viewer.value .scene.preUpdate.addEventListener(() => {
-    //获取相机高度
-    let position = viewer.value .scene.camera.position;
-    let cameraHeight = Cesium.Cartographic.fromCartesian(position).height;
-    if (cameraHeight < 240000) {      
-      viewer.value .scene.skyBox = currSkyBox;
-      viewer.value .scene.skyAtmosphere.show = false; //关闭地球大气层
-    } else {
-      viewer.value .scene.skyBox = defaultSkybox; //使用系统默认星空天空盒
-      viewer.value .scene.skyAtmosphere.show = true; //显示大气层
-    }
-  });
+    
+    resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
+      cameraHeightThreshold: 240000
+    })
   }
   
   /**
@@ -101,9 +77,9 @@ const lantianSkybox = new SkyBoxOnGround({
     // 添加行政区划边界
     addBoundGeo(viewer.value)
     // TODO: 如需添加天地图，取消以下注释
-    // resources.value.tiandituLayer = addTiandituLayer(viewer.value)
+    //  resources.value.tiandituLayer = addTiandituLayer(viewer.value)
     // TODO: 如需添加完整行政区划信息，取消以下注释
-    // await addDistrictInfo(viewer.value)
+      // addDistrictInfo(viewer.value)
   }
   
   /**
@@ -143,7 +119,7 @@ const lantianSkybox = new SkyBoxOnGround({
       (newArea) => {
         if (newArea && viewer.value) {
           resources.value.areaManager.setSelected(`area_${newArea.id}`)
-          flyToRegion(viewer.value, { coordinates: newArea.coordinates, duration: 1.0 })
+          flyToRegion(viewer.value, { bbox: newArea.bbox, duration: 1.0 })
         }
       },
       { deep: true }
@@ -169,6 +145,9 @@ const lantianSkybox = new SkyBoxOnGround({
       },
       { deep: true }
     )
+    
+    // 键盘事件监听 - 按P键打印相机参数
+    resources.value.cameraPrintKeydownHandler = setupCameraPrintKeydown(viewer.value)
   }
   
   /**
@@ -199,6 +178,12 @@ const lantianSkybox = new SkyBoxOnGround({
   const cleanup = () => {
     console.log('开始清理Cesium资源...')
     
+    // 移除键盘事件监听
+    if (resources.value.cameraPrintKeydownHandler) {
+      document.removeEventListener('keydown', resources.value.cameraPrintKeydownHandler)
+      resources.value.cameraPrintKeydownHandler = null
+    }
+    
     // 移除相机移动事件监听
     if (resources.value.cameraMoveHandler) {
       document.removeEventListener('keydown', resources.value.cameraMoveHandler)
@@ -212,6 +197,12 @@ const lantianSkybox = new SkyBoxOnGround({
     // }
     
     if (viewer.value) {
+      // 清理天空盒管理器
+      if (resources.value.skyBoxManager) {
+        resources.value.skyBoxManager.destroy()
+        resources.value.skyBoxManager = null
+      }
+      
       // 清理航线
       routeManager.destroy()
       
@@ -371,6 +362,8 @@ const lantianSkybox = new SkyBoxOnGround({
     // 矩形绘制
     startRectangleDrawing,
     stopRectangleDrawing,
-    cancelRectangleDrawing
+    cancelRectangleDrawing,
+    // 天空盒控制
+    getSkyBoxManager: () => resources.value.skyBoxManager
   }
 }

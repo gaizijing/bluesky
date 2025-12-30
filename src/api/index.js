@@ -21,6 +21,7 @@ export const fetchAreaList = async () => {
             "type": "takeoff",
             "location": "市南区-五四广场附近",
             "coordinates": [120.3835, 36.0625],
+            "bbox": [[120.3735, 36.0525], [120.3935, 36.0725]],
             "status": "available",
             "warningReason": "",
             "lastUpdate": 1640995200000
@@ -31,6 +32,7 @@ export const fetchAreaList = async () => {
             "type": "takeoff",
             "location": "崂山区-石老人附近",
             "coordinates": [120.4750, 36.1120],
+            "bbox": [[120.4650, 36.1020], [120.4850, 36.1220]],
             "status": "available",
             "warningReason": "",
             "lastUpdate": 1640996400000
@@ -41,6 +43,7 @@ export const fetchAreaList = async () => {
             "type": "operation",
             "location": "西海岸新区-金沙滩附近",
             "coordinates": [120.1680, 35.9950],
+            "bbox": [[120.1580, 35.9850], [120.1780, 36.0050]],
             "status": "warning",
             "warningReason": "信号强度不稳定",
             "lastUpdate": 1640997300000
@@ -51,6 +54,7 @@ export const fetchAreaList = async () => {
             "type": "takeoff",
             "location": "即墨区-蓝谷附近",
             "coordinates": [120.4820, 36.3780],
+            "bbox": [[120.4720, 36.3680], [120.4920, 36.3880]],
             "status": "available",
             "warningReason": "",
             "lastUpdate": 1640988000000
@@ -61,6 +65,7 @@ export const fetchAreaList = async () => {
             "type": "operation",
             "location": "城阳区-流亭附近",
             "coordinates": [120.3560, 36.3050],
+            "bbox": [[120.3460, 36.2950], [120.3660, 36.3150]],
             "status": "unavailable",
             "warningReason": "设备维护中",
             "lastUpdate": 1640916000000
@@ -71,6 +76,7 @@ export const fetchAreaList = async () => {
             "type": "takeoff",
             "location": "城阳区-流亭国际机场",
             "coordinates": [120.3850, 36.3180],
+            "bbox": [[120.3750, 36.3080], [120.3950, 36.3280]],
             "status": "warning",
             "warningReason": "温度异常",
             "lastUpdate": 1640998200000
@@ -81,6 +87,7 @@ export const fetchAreaList = async () => {
             "type": "operation",
             "location": "高新区-红岛附近",
             "coordinates": [120.3150, 36.2320],
+            "bbox": [[120.3050, 36.2220], [120.3250, 36.2420]],
             "status": "available",
             "warningReason": "",
             "lastUpdate": 1640996800000
@@ -91,6 +98,7 @@ export const fetchAreaList = async () => {
             "type": "takeoff",
             "location": "李沧区-世园会附近",
             "coordinates": [120.4480, 36.1850],
+            "bbox": [[120.4380, 36.1750], [120.4580, 36.1950]],
             "status": "available",
             "warningReason": "",
             "lastUpdate": 1640998500000
@@ -101,6 +109,7 @@ export const fetchAreaList = async () => {
             "type": "operation",
             "location": "胶州市-胶州湾附近",
             "coordinates": [120.0560, 36.2950],
+            "bbox": [[120.0460, 36.2850], [120.0660, 36.3050]],
             "status": "available",
             "warningReason": "",
             "lastUpdate": 1640994300000
@@ -111,6 +120,7 @@ export const fetchAreaList = async () => {
             "type": "takeoff",
             "location": "市南区-青岛港附近",
             "coordinates": [120.3920, 36.0880],
+            "bbox": [[120.3820, 36.0780], [120.4020, 36.0980]],
             "status": "unavailable",
             "warningReason": "强风天气",
             "lastUpdate": 1640998440000
@@ -146,6 +156,7 @@ export const fetchCurrentSelectedArea = async () => {
         "type": "takeoff",
         "location": "市南区-五四广场附近",
         "coordinates": [120.3835, 36.0625],
+        "bbox": [[120.3735, 36.0525], [120.3935, 36.0725]],
         "status": "available",
         "warningReason": "",
         "lastUpdate": 1640995200000
@@ -173,7 +184,7 @@ export const updateSelectedArea = async (area) => {
       "code": 200,
       "message": "success",
       "data": {
-        "pointId": point.id,
+        "pointId": area.id,
         "selectedTime": new Date().toISOString(),
         "status": "updated"
       }

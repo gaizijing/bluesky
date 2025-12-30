@@ -194,13 +194,9 @@ class EventManager {
     }
   }
 
-  /**
-   * 处理鼠标移动事件
-   * @param {Cesium.Viewer} viewer - Cesium viewer实例
-   * @param {Object} movement - 鼠标移动信息
-   */
   handleMouseMove(viewer, movement) {
     if (!this.rectangleDrawing || !this.startPosition) {
+      this.emit('mouse-move', movement);
       return;
     }
 

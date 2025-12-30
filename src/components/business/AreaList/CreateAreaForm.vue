@@ -24,7 +24,6 @@
             <div class="form-item full-width">
               <label class="form-label">区域范围 <span class="required">*</span></label>
               <div class="bbox-info">
-                <p>已选择范围：</p>
                 <p>西：{{ areaData.bbox.west.toFixed(6) }}, 南：{{ areaData.bbox.south.toFixed(6) }}</p>
                 <p>东：{{ areaData.bbox.east.toFixed(6) }}, 北：{{ areaData.bbox.north.toFixed(6) }}</p>
               </div>
@@ -147,6 +146,8 @@ defineExpose({
   width: 90%;
   max-width: 500px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  font-family: "Noto Sans SC", sans-serif;
+  font-style: normal;
 }
 
 /* 对话框头部 */

@@ -19,10 +19,12 @@ class AreaManager {
 
     this.viewer = viewer
     this.areaStore = areaStore
-    this.areaEntities = new Map() // 存储重点关注区域实体
-    this.originalBillboardStyle = new Map() // 存储原始样式
+    this.areaEntities = new Map()
+    this.originalBillboardStyle = new Map()
     this.hoveredEntity = null
     this.selectedEntity = null
+    this.selectedAreaPolygon = null
+    this.hoveredAreaPolygon = null
     this.MOUSE_MOVE_THROTTLE_MS = 50
     this.lastMouseMoveTime = 0
 
@@ -90,11 +92,11 @@ class AreaManager {
 
     this.selectedEntity = this._setEntityAsSelected(entity)
     
-    // 飞行到选中点
     const areaData = entity.properties.areaData
     const area = areaData && areaData.getValue ? areaData.getValue() : areaData
-    if (area?.coordinates) {
-      flyToRegion(this.viewer, { coordinates: area.coordinates, duration: 1.5 })
+    if (area?.bbox) {
+      flyToRegion(this.viewer, { bbox: area.bbox, duration: 1.5 })
+      this._showSelectedAreaPolygon(area.bbox)
     }
   }
   /**
@@ -122,11 +124,9 @@ class AreaManager {
   }
 
 
-  // 私有方法：绑定事件
   _bindEvents() {
     if (!this.viewer) return
 
-    // 相机移动结束保持选中样式
     this.viewer.scene.camera.moveEnd.addEventListener(() => {
       if (this.selectedEntity?.billboard) {
         this.selectedEntity.billboard.image = '/image/ic_select_point.png'
@@ -134,32 +134,29 @@ class AreaManager {
       }
     })
 
-    // 注册点击事件处理器
     eventManager.registerClickHandler((viewer, movement) => this._clusterClickHandler(movement), 3)
 
-    // 鼠标移动事件
-    this.viewer.screenSpaceEventHandler.setInputAction((movement) => {
+    this._mouseMoveUnregister = eventManager.on('mouse-move', (movement) => {
       this._handleMouseMove(movement)
-    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE)
+    })
   }
 
   // 私有方法：聚合点点击处理
   _clusterClickHandler(movement) {
     const pickedObject = this.viewer.scene.pick(movement.position)
 
-    // 处理聚合集群点击
     if (pickedObject && pickedObject.id && Array.isArray(pickedObject.id)) {
       this._handleClusterClick(pickedObject.id)
       return true
     }
 
-    // 处理单个监测点点击
     if (pickedObject && pickedObject.id && this._isAreaEntity(pickedObject.id)) {
       this.selectedEntity = this._setEntityAsSelected(pickedObject.id)
       const areaData = pickedObject.id.properties.areaData
       const area = areaData && areaData.getValue ? areaData.getValue() : areaData
-      if (area?.coordinates) {
-        flyToRegion(this.viewer, { coordinates: area.coordinates, duration: 1.5 })
+      if (area?.bbox) {
+        flyToRegion(this.viewer, { bbox: area.bbox, duration: 1.5 })
+        this._showSelectedAreaPolygon(area.bbox)
       }
       return true
     }
@@ -197,8 +194,11 @@ class AreaManager {
     }
   }
 
-  // 私有方法：处理鼠标移动
   _handleMouseMove(movement) {
+    if (!this.viewer) {
+      return
+    }
+
     const now = Date.now()
     if (now - this.lastMouseMoveTime < this.MOUSE_MOVE_THROTTLE_MS) return
     this.lastMouseMoveTime = now
@@ -206,36 +206,48 @@ class AreaManager {
     try {
       const pickedObject = this.viewer.scene.pick(movement.endPosition)
 
-      // 恢复非选中状态的悬停样式
       if (this.hoveredEntity && this.hoveredEntity.id !== this.selectedEntity?.id) {
         const stillHovered = Cesium.defined(pickedObject) && pickedObject.id === this.hoveredEntity
         if (!stillHovered) {
           this._restoreOriginalBillboardStyle(this.hoveredEntity)
           this.hoveredEntity = null
           this.viewer.canvas.style.cursor = 'default'
+          this._clearHoveredAreaPolygon()
         }
       }
 
-      // 处理重点关注区域悬停 
-      // 处理监测点悬停
-      if (Cesium.defined(pickedObject) && this._isAreaEntity(pickedObject.id)) {
-        this.viewer.canvas.style.cursor = 'pointer'
+      if (Cesium.defined(pickedObject) && pickedObject.id) {
+        const entity = pickedObject.id
+        
+        if (Array.isArray(entity)) {
+          return
+        }
+        
+        if (this._isAreaEntity(entity)) {
+          this.viewer.canvas.style.cursor = 'pointer'
 
-        if (pickedObject.id === this.selectedEntity) {
-          if (this.selectedEntity?.billboard) {
-            this.selectedEntity.billboard.image = '/image/ic_select_point.png'
-            this.selectedEntity.billboard.scale = 1.5
+          if (entity === this.selectedEntity) {
+            if (this.selectedEntity?.billboard) {
+              this.selectedEntity.billboard.image = '/image/ic_select_point.png'
+              this.selectedEntity.billboard.scale = 1.5
+            }
+          } else if (entity !== this.hoveredEntity) {
+            this._saveOriginalBillboardStyle(entity)
+            if (entity.billboard) entity.billboard.scale = 1.6
+            this.hoveredEntity = entity
+            
+            const areaData = entity.properties?.areaData
+            const area = areaData && areaData.getValue ? areaData.getValue() : areaData
+            if (area?.bbox) {
+              this._showHoveredAreaPolygon(area.bbox)
+            }
           }
-        } else if (pickedObject.id !== this.hoveredEntity) {
-          this._saveOriginalBillboardStyle(pickedObject.id)
-          if (pickedObject.id.billboard) pickedObject.id.billboard.scale = 1.6
-          this.hoveredEntity = pickedObject.id
         }
       } else if (!this.hoveredEntity) {
         this.viewer.canvas.style.cursor = 'default'
       }
     } catch (e) {
-      // 忽略pick错误
+      console.error('Hover error:', e)
     }
   }
 
@@ -308,9 +320,18 @@ class AreaManager {
     this.areaEntities.clear()
   }
 
-  // 私有方法：设置实体为选中状态
   _setEntityAsSelected(entity) {
     this._restoreAllBillboardStyles()
+
+    if (this.selectedAreaPolygon) {
+      this.viewer.entities.remove(this.selectedAreaPolygon)
+      this.selectedAreaPolygon = null
+    }
+
+    if (this.hoveredAreaPolygon) {
+      this.viewer.entities.remove(this.hoveredAreaPolygon)
+      this.hoveredAreaPolygon = null
+    }
 
     if (entity?.billboard) {
       if (!this.originalBillboardStyle.has(entity.id)) {
@@ -338,7 +359,9 @@ class AreaManager {
 
   // 私有方法：判断是否为重点关注区域实体
   _isAreaEntity(entity) {
-    return entity?.id?.startsWith && entity.id.startsWith('area_')
+    if (!entity || !entity.id) return false
+    const id = typeof entity.id === 'string' ? entity.id : String(entity.id)
+    return id.startsWith('area_')
   }
 
   // 私有方法：恢复实体原始样式
@@ -405,37 +428,32 @@ class AreaManager {
       })
     }
   }
-   // 私有方法：解绑所有事件
   _unbindEvents() {
     if (!this.viewer) return
 
-    // 1. 解绑相机移动事件
     if (this._cameraMoveEndListener) {
       this.viewer.scene.camera.moveEnd.removeEventListener(this._cameraMoveEndListener)
       this._cameraMoveEndListener = null
     }
 
-    // 2. 注销eventManager的点击处理器
     if (this._clickHandler) {
-      eventManager.unregisterClickHandler(this._clickHandler, 3) // 需确保eventManager支持按handler+优先级注销
+      eventManager.unregisterClickHandler(this._clickHandler, 3)
       this._clickHandler = null
     }
 
-    // 3. 移除鼠标移动事件
-    this.viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE)
+    if (this._mouseMoveUnregister) {
+      this._mouseMoveUnregister()
+      this._mouseMoveUnregister = null
+    }
 
-    // 4. 恢复鼠标样式
     if (this.viewer.canvas) {
       this.viewer.canvas.style.cursor = 'default'
     }
   }
 
-  // 私有方法：清理Cesium资源（实体/数据源）
   _clearCesiumResources() {
-    // 1. 移除所有重点关注区域实体
     this.areaEntities.forEach(entity => {
       try {
-        // 先从数据源移除，再从viewer移除（双重保障）
         const dataSource = this.viewer.dataSources.getByName('areaClustering')[0]
         if (dataSource) {
           dataSource.entities.remove(entity)
@@ -446,26 +464,106 @@ class AreaManager {
       }
     })
 
-    // 2. 移除并销毁聚合数据源
+    if (this.selectedAreaPolygon) {
+      this.viewer.entities.remove(this.selectedAreaPolygon)
+      this.selectedAreaPolygon = null
+    }
+
+    if (this.hoveredAreaPolygon) {
+      this.viewer.entities.remove(this.hoveredAreaPolygon)
+      this.hoveredAreaPolygon = null
+    }
+
     const dataSource = this.viewer.dataSources.getByName('areaClustering')[0]
     if (dataSource) {
-      this.viewer.dataSources.remove(dataSource, true) // true：销毁数据源，释放内存
+      this.viewer.dataSources.remove(dataSource, true)
     }
   }
 
   // 私有方法：重置内部状态
   _resetState() {
-    // 清空实体缓存
     this.areaEntities.clear()
-    // 清空样式缓存
     this.originalBillboardStyle.clear()
-    // 重置交互状态
     this.hoveredEntity = null
     this.selectedEntity = null
     this.lastMouseMoveTime = 0
-    // 清空store选中状态
     if (this.areaStore) {
       this.areaStore.setSelectedArea(null)
+    }
+    if (this.selectedAreaPolygon) {
+      this.viewer.entities.remove(this.selectedAreaPolygon)
+      this.selectedAreaPolygon = null
+    }
+    if (this.hoveredAreaPolygon) {
+      this.viewer.entities.remove(this.hoveredAreaPolygon)
+      this.hoveredAreaPolygon = null
+    }
+  }
+
+  _showSelectedAreaPolygon(bbox) {
+    if (this.selectedAreaPolygon) {
+      this.viewer.entities.remove(this.selectedAreaPolygon)
+    }
+
+    const [[west, south], [east, north]] = bbox
+    const positions = Cesium.Cartesian3.fromDegreesArrayHeights([
+      west, south, 100,
+      east, south, 100,
+      east, north, 100,
+      west, north, 100,
+      west, south, 100
+    ])
+
+    this.selectedAreaPolygon = this.viewer.entities.add({
+      name: 'selectedAreaPolygon',
+      polygon: {
+        hierarchy: new Cesium.PolygonHierarchy(positions),
+        material: new Cesium.ColorMaterialProperty(Cesium.Color.CYAN.withAlpha(0.15)),
+        outline: true,
+        outlineColor: Cesium.Color.CYAN,
+        outlineWidth: 4,
+        perPositionHeight: true,
+        extrudedHeight: 200,
+        closeTop: true,
+        closeBottom: true
+      }
+    })
+  }
+
+  _showHoveredAreaPolygon(bbox) {
+    if (this.hoveredAreaPolygon) {
+      this.viewer.entities.remove(this.hoveredAreaPolygon)
+    }
+
+    const [[west, south], [east, north]] = bbox
+    const positions = Cesium.Cartesian3.fromDegreesArrayHeights([
+      west, south, 50,
+      east, south, 50,
+      east, north, 50,
+      west, north, 50,
+      west, south, 50
+    ])
+
+    this.hoveredAreaPolygon = this.viewer.entities.add({
+      name: 'hoveredAreaPolygon',
+      polygon: {
+        hierarchy: new Cesium.PolygonHierarchy(positions),
+        material: new Cesium.ColorMaterialProperty(Cesium.Color.fromCssColorString('#00ffcc').withAlpha(0.1)),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString('#00ffcc'),
+        outlineWidth: 2,
+        perPositionHeight: true,
+        extrudedHeight: 100,
+        closeTop: true,
+        closeBottom: true
+      }
+    })
+  }
+
+  _clearHoveredAreaPolygon() {
+    if (this.hoveredAreaPolygon) {
+      this.viewer.entities.remove(this.hoveredAreaPolygon)
+      this.hoveredAreaPolygon = null
     }
   }
    setareasVisibility(visible) {

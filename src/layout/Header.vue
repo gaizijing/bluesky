@@ -36,7 +36,7 @@
     <div v-if="showAreaSelector" class="dialog-mask" @click="toggleAreaSelector">
       <div class="dialog-container" @click.stop>
         <div class="dialog-header">
-          <h3>选择起降点</h3>
+          <h3>选择区域</h3>
           <button class="dialog-close" @click="toggleAreaSelector">×</button>
         </div>
         <div class="dialog-content">
@@ -444,8 +444,7 @@ onMounted(() => {
 .mode-btn {
   width: 40px;
   height: 40px;
-  background-color: rgba(17, 24, 39, 0.8);
-  border: 1px solid rgba(59, 130, 246, 0.5);
+  background: radial-gradient(circle at center, rgba(66, 153, 225, 0.8) 0%, rgba(66, 153, 225, 0.3) 100%);
   color: #e2e8f0;
   border-radius: 50%;
   cursor: pointer;
@@ -457,17 +456,17 @@ onMounted(() => {
 }
 
 .mode-btn:hover {
-  background-color: rgba(37, 99, 235, 0.2);
-  border-color: rgba(59, 130, 246, 0.8);
+  //background-color: rgba(37, 99, 235, 0.2);
+ //border-color: rgba(59, 130, 246, 0.8);
   color: #fff;
   transform: scale(1.1);
 }
 
 .mode-btn.active {
-  background-color: rgba(59, 130, 246, 0.9);
-  border-color: #3b82f6;
+  //background-color: rgba(59, 130, 246, 0.9);
+  //border-color: #3b82f6;
   color: white;
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  //box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
 }
 
 .mode-btn:active {
