@@ -51,6 +51,7 @@ body {
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
+      backdrop-filter: blur(0.520833vw);
 }
 
 .right_bg {
@@ -58,7 +59,7 @@ body {
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
-
+    backdrop-filter: blur(0.520833vw);
 }
 
 .panel-header {
