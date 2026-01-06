@@ -24,7 +24,8 @@ export const fetchAreaList = async () => {
             "bbox": [[120.3735, 36.0525], [120.3935, 36.0725]],
             "status": "available",
             "warningReason": "",
-            "lastUpdate": 1640995200000
+            "lastUpdate": 1640995200000,
+            "grids": ["BD_120.38_36.06", "BD_120.39_36.06"]
           },
           {
             "id": "point-2",
@@ -35,7 +36,8 @@ export const fetchAreaList = async () => {
             "bbox": [[120.4650, 36.1020], [120.4850, 36.1220]],
             "status": "available",
             "warningReason": "",
-            "lastUpdate": 1640996400000
+            "lastUpdate": 1640996400000,
+            "grids": ["BD_120.47_36.11", "BD_120.48_36.11"]
           },
           {
             "id": "point-3",
@@ -46,7 +48,8 @@ export const fetchAreaList = async () => {
             "bbox": [[120.1580, 35.9850], [120.1780, 36.0050]],
             "status": "warning",
             "warningReason": "信号强度不稳定",
-            "lastUpdate": 1640997300000
+            "lastUpdate": 1640997300000,
+            "grids": ["BD_120.16_35.99", "BD_120.17_35.99"]
           },
           {
             "id": "point-4",
@@ -57,7 +60,8 @@ export const fetchAreaList = async () => {
             "bbox": [[120.4720, 36.3680], [120.4920, 36.3880]],
             "status": "available",
             "warningReason": "",
-            "lastUpdate": 1640988000000
+            "lastUpdate": 1640988000000,
+            "grids": ["BD_120.48_36.37", "BD_120.49_36.37"]
           },
           {
             "id": "point-5",
@@ -68,7 +72,8 @@ export const fetchAreaList = async () => {
             "bbox": [[120.3460, 36.2950], [120.3660, 36.3150]],
             "status": "unavailable",
             "warningReason": "设备维护中",
-            "lastUpdate": 1640916000000
+            "lastUpdate": 1640916000000,
+            "grids": ["BD_120.35_36.30", "BD_120.36_36.30"]
           },
           {
             "id": "point-6",
@@ -79,7 +84,8 @@ export const fetchAreaList = async () => {
             "bbox": [[120.3750, 36.3080], [120.3950, 36.3280]],
             "status": "warning",
             "warningReason": "温度异常",
-            "lastUpdate": 1640998200000
+            "lastUpdate": 1640998200000,
+            "grids": ["BD_120.38_36.31", "BD_120.39_36.31"]
           },
           {
             "id": "point-7",
@@ -90,7 +96,8 @@ export const fetchAreaList = async () => {
             "bbox": [[120.3050, 36.2220], [120.3250, 36.2420]],
             "status": "available",
             "warningReason": "",
-            "lastUpdate": 1640996800000
+            "lastUpdate": 1640996800000,
+            "grids": ["BD_120.31_36.23", "BD_120.32_36.23"]
           },
           {
             "id": "point-8",
@@ -101,7 +108,8 @@ export const fetchAreaList = async () => {
             "bbox": [[120.4380, 36.1750], [120.4580, 36.1950]],
             "status": "available",
             "warningReason": "",
-            "lastUpdate": 1640998500000
+            "lastUpdate": 1640998500000,
+            "grids": ["BD_120.44_36.18", "BD_120.45_36.18"]
           },
           {
             "id": "point-9",
@@ -112,7 +120,8 @@ export const fetchAreaList = async () => {
             "bbox": [[120.0460, 36.2850], [120.0660, 36.3050]],
             "status": "available",
             "warningReason": "",
-            "lastUpdate": 1640994300000
+            "lastUpdate": 1640994300000,
+            "grids": ["BD_120.05_36.29", "BD_120.06_36.29"]
           },
           {
             "id": "point-10",
@@ -123,7 +132,8 @@ export const fetchAreaList = async () => {
             "bbox": [[120.3820, 36.0780], [120.4020, 36.0980]],
             "status": "unavailable",
             "warningReason": "强风天气",
-            "lastUpdate": 1640998440000
+            "lastUpdate": 1640998440000,
+            "grids": ["BD_120.39_36.08", "BD_120.40_36.08"]
           }
         ]
 
@@ -159,7 +169,8 @@ export const fetchCurrentSelectedArea = async () => {
         "bbox": [[120.3735, 36.0525], [120.3935, 36.0725]],
         "status": "available",
         "warningReason": "",
-        "lastUpdate": 1640995200000
+        "lastUpdate": 1640995200000,
+        "grids": ["BD_120.38_36.06", "BD_120.39_36.06"]
       }
     }
 
@@ -565,6 +576,30 @@ export const getRiskWarnings = async () => {
     return { code: 500, message: '获取数据失败' }
   }
 }
+
+// 获取风场数据
+export const getWindData = async () => {
+  try {
+    // 模拟API调用延迟
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    // 在实际项目中，这里会是真实的API调用:
+    // const response = await request.get('/wind-data')
+    // return response
+    
+    // 开发环境使用模拟数据
+    const response = await import('@/mock/windData.js')
+    return response.default
+  } catch (error) {
+    console.error('获取风场数据失败：', error)
+    return { 
+      code: 500, 
+      message: '获取风场数据失败',
+      layers: []
+    }
+  }
+}
+
 const handleQuery = async () => {
   if (!validate()) return;
   setLoading(true);

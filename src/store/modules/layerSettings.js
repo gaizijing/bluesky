@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { WIND_LAYER_DEFAULTS, validateWindOptions } from '@/config/windLayerDefaults'
+import { WIND_LAYER_DEFAULTS } from '@/config/windLayerDefaults'
 
 /**
  * 图层设置Store
@@ -71,7 +71,7 @@ export const useLayerSettingsStore = defineStore('layerSettings', {
       }
 
       // 使用验证函数确保参数有效性
-      this.windOptions = validateWindOptions(mergedOptions)
+      this.windOptions =mergedOptions
     },
 
     // 重置风场配置到默认值

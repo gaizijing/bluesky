@@ -4,7 +4,7 @@ let tiandituLayer = null
 
 export const addTiandituLayer = (viewerInstance) => {
   const tianditu = new Cesium.WebMapTileServiceImageryProvider({
-    url: "http://{s}.tianditu.gov.cn/img_w/wmts?service=wmts&request=GetTile&version=1.0.0&LAYER=img&tileMatrixSet=w&TileMatrix={TileMatrix}&TileRow={TileRow}&TileCol={TileCol}&style=default&format=tiles&tk=6b1c07f3a655588c6b86fa35ebb1c177",
+    url: `http://t0.tianditu.com/cia_w/wmts?service=wmts&request=GetTile&version=1.0.0&LAYER=cia&tileMatrixSet=w&TileMatrix={TileMatrix}&TileRow={TileRow}&TileCol={TileCol}&style=default&format=tiles&tk=`+"6b1c07f3a655588c6b86fa35ebb1c177",
     layer: "tianditu",
     style: "default",
     format: "image/jpeg",
@@ -17,7 +17,8 @@ export const addTiandituLayer = (viewerInstance) => {
     retryDelay: 1000, // 重试延迟1秒
     requestHeaders: {}, // 不要加Accept-Encoding
     // 可选：降低瓦片请求优先级（减少并发）
-    priority:1
+    priority:1,
+    tileMatrixSetID: "GoogleMapsCompatible",
   });
 
   tiandituLayer = viewerInstance.imageryLayers.addImageryProvider(tianditu)

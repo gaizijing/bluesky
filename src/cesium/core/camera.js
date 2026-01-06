@@ -296,4 +296,36 @@ export const handleCameraMove = (viewer) => {
 
   // 返回处理函数，以便可以在需要时移除它
   return handleKeydown;
-}
+};
+
+/**
+ * 监听相机高度变化，当高度达到指定阈值时触发回调
+ * @param {Cesium.Viewer} viewer - Cesium viewer实例
+ * @param {number} threshold - 相机高度阈值
+ * @param {function} callback - 回调函数，参数为相机高度和是否低于阈值
+ * @returns {function} 清理函数，用于移除事件监听器
+ */
+export const watchCameraHeight = (viewer, threshold, callback) => {
+  if (!viewer || !callback) return () => {};
+  
+  // 初始检查
+  const checkCameraHeight = () => {
+    const carto = viewer.camera.positionCartographic;
+    if (!Cesium.defined(carto)) return;
+    
+    const height = carto.height;
+    const isBelowThreshold = height <= threshold;
+    callback(height, isBelowThreshold);
+  };
+  
+  // 添加相机移动结束事件监听器
+  const cameraMoveEndHandler = viewer.camera.moveEnd.addEventListener(checkCameraHeight);
+  
+  // 初始调用一次，设置初始状态
+  checkCameraHeight();
+  
+  // 返回清理函数
+  return () => {
+    viewer.camera.moveEnd.removeEventListener(cameraMoveEndHandler);
+  };
+};

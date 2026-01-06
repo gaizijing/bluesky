@@ -262,7 +262,17 @@ class AreaManager {
       this.originalBillboardStyle.delete(entityId)
     }
 
-    // 创建新实体
+    // 创建新实体，只保留可序列化的area属性
+    const serializableArea = {
+      id: area.id,
+      name: area.name,
+      coordinates: area.coordinates,
+      bbox: area.bbox,
+      type: area.type,
+      status: area.status,
+      location: area.location
+    };
+    
     const entity = new Cesium.Entity({
       id: entityId,
       position: Cesium.Cartesian3.fromDegrees(area.coordinates[0], area.coordinates[1], 50),
@@ -286,7 +296,7 @@ class AreaManager {
       }),
       
       
-      properties: { areaData: area }
+      properties: { areaData: serializableArea }
     })
 
     this._saveOriginalBillboardStyle(entity)

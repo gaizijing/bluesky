@@ -4,7 +4,7 @@ import { useCesiumStore } from '@/store/modules/cesium'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import { useAreaStore } from '@/store/modules/area'
 import { createViewer, destroyViewer } from '@/cesium/core/viewer'
-import { handleCameraMove, getCurrentCameraParams, flyToRegion, flyToRectangle, limitCameraRange, switchToOverviewMode, switchToFocusMode, flyToQingdaoOverview, setupCameraPrintKeydown } from '@/cesium/core/camera'
+import { handleCameraMove, getCurrentCameraParams, flyToRegion, flyToRectangle, limitCameraRange, switchToOverviewMode, switchToFocusMode, flyToQingdaoOverview, setupCameraPrintKeydown, watchCameraHeight } from '@/cesium/core/camera'
 import { addTiandituLayer, addTiandituWithGaodeOverlay } from '@/cesium/layers/tianditu'
 import { loadTerrain } from '@/cesium/layers/terrain'
 import { addWhiteModel } from '@/cesium/layers/model3d'
@@ -17,6 +17,7 @@ import { useRouteStore } from '@/store/modules/routeStore'
 import { addDistrictInfo, addBoundGeo } from '@/cesium/layers/district'
 import eventManager from '@/cesium/core/eventManager' // 引入事件管理器
 import { SkyBoxManager } from '@/cesium/volumeCloud/SkyBoxManager' // 引入天空盒管理器
+import { CAMERA_HEIGHT_THRESHOLD } from '../config/windLayerDefaults'
 
 export function useCesium(containerId) {
   // Store实例
@@ -39,7 +40,7 @@ export function useCesium(containerId) {
     heatMapInstance: null,
     areaManager: null,
     cameraMoveHandler: null,
-    cameraRangeCleanup: null,
+    cameraHeightWatcher: null,
     skyBoxManager: null,
     cameraPrintKeydownHandler: null
   })
@@ -55,18 +56,34 @@ export function useCesium(containerId) {
   const initViewer = () => {
     viewer.value = createViewer(containerId)
     viewer.value.cesiumWidget.creditContainer.style.display = 'none'
-    
     resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
       cameraHeightThreshold: 240000
     })
   }
   
   /**
-   * 配置相机控制
+   * 配置按键盘移动相机控制
    */
   const configCamera = () => {
     resources.value.cameraMoveHandler = handleCameraMove(viewer.value)
-  }
+  };
+  
+  /**
+   * 设置风场相机高度监听
+   */
+  const setupWindCameraHeightWatcher = () => {
+    // Define camera height threshold for wind field visibility
+    
+    // Set up camera height watcher
+    resources.value.cameraHeightWatcher = watchCameraHeight(
+      viewer.value,
+      CAMERA_HEIGHT_THRESHOLD,
+      (height, isBelowThreshold) => {
+        // Update wind visibility considering both camera height and visibility setting
+        updateWindVisibilityBasedOnConditions();
+      }
+    );
+  };
   
   /**
    * 加载基础图层
@@ -77,7 +94,7 @@ export function useCesium(containerId) {
     // 添加行政区划边界
     addBoundGeo(viewer.value)
     // TODO: 如需添加天地图，取消以下注释
-    //  resources.value.tiandituLayer = addTiandituLayer(viewer.value)
+     resources.value.tiandituLayer = addTiandituLayer(viewer.value)
     // TODO: 如需添加完整行政区划信息，取消以下注释
       // addDistrictInfo(viewer.value)
   }
@@ -101,6 +118,9 @@ export function useCesium(containerId) {
     resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
     console.log('风场初始化完成',resources.value.windLayer)
     cesiumStore.setWindLayer(resources.value.windLayer)
+    
+    // 设置相机高度监听，用于控制风场显示
+    setupWindCameraHeightWatcher()
     
     // 初始化热力图
     resources.value.heatMapInstance = await addHeatVolume(viewer.value)
@@ -160,13 +180,11 @@ export function useCesium(containerId) {
       // 执行初始化步骤
       initViewer()
       configCamera()
-      loadBaseLayers() // 同步函数，不需要await
-      await load3DModel() // 异步函数，需要await
-      await initEntitiesAndVisualizations() // 异步函数，需要await
-      setupReactiveWatchers() // 同步函数，不需要await
+      loadBaseLayers() 
+      await load3DModel() 
+      await initEntitiesAndVisualizations() 
+      setupReactiveWatchers() 
       
-      // 在所有资源加载完成后，初始化相机范围限制
-      // resources.value.cameraRangeCleanup = limitCameraRange(viewer.value)
     } finally {
       isLoading.value = false
     }
@@ -185,16 +203,16 @@ export function useCesium(containerId) {
     }
     
     // 移除相机移动事件监听
-    if (resources.value.cameraMoveHandler) {
-      document.removeEventListener('keydown', resources.value.cameraMoveHandler)
-      resources.value.cameraMoveHandler = null
-    }
-    
-    // // 清理相机范围限制
-    // if (resources.value.cameraRangeCleanup) {
-    //   resources.value.cameraRangeCleanup()
-    //   resources.value.cameraRangeCleanup = null
-    // }
+      if (resources.value.cameraMoveHandler) {
+        document.removeEventListener('keydown', resources.value.cameraMoveHandler)
+        resources.value.cameraMoveHandler = null
+      }
+      
+      // 移除相机高度监听（用于风场可见性控制）
+      if (resources.value.cameraHeightWatcher) {
+        resources.value.cameraHeightWatcher()
+        resources.value.cameraHeightWatcher = null
+      }
     
     if (viewer.value) {
       // 清理天空盒管理器
@@ -220,8 +238,21 @@ export function useCesium(containerId) {
       
       // 清理风场
       if (resources.value.windLayer) {
-        resources.value.windLayer.destroy()
-        resources.value.windLayer = null
+        // Support both single wind layer and array of wind layers
+        if (Array.isArray(resources.value.windLayer)) {
+          // Check if the array has a destroy method (custom implementation)
+          if (typeof resources.value.windLayer.destroy === 'function') {
+            resources.value.windLayer.destroy();
+          } else {
+            // Fallback to individual layer cleanup
+            resources.value.windLayer.forEach(layer => {
+              layer.destroy();
+            });
+          }
+        } else {
+          resources.value.windLayer.destroy();
+        }
+        resources.value.windLayer = null;
       }
       
       // 销毁Viewer
@@ -246,7 +277,39 @@ export function useCesium(containerId) {
    */
   const setWindVisibility = (visible) => {
     if (resources.value.windLayer) {
-      resources.value.windLayer.show = visible
+      // Store the wind layer visibility state in layerSettingsStore
+      layerSettingsStore.setLayerVisibility('wind', visible);
+      
+      // Update wind layer visibility considering both camera height and visibility setting
+      updateWindVisibilityBasedOnConditions();
+    }
+  };
+  
+  /**
+   * Update wind visibility based on both camera height and visibility setting
+   */
+  const updateWindVisibilityBasedOnConditions = () => {
+    if (!resources.value.windLayer) return;
+    
+    // Get current camera height
+    const cameraPosition = viewer.value.camera.positionCartographic;
+    const cameraHeight = cameraPosition.height;
+    
+    // Get visibility setting from store
+    const isWindEnabled = layerSettingsStore.layers.wind.visible;
+    
+    // Define camera height threshold for wind field visibility
+    
+    // Determine final visibility based on both conditions
+    const shouldBeVisible = isWindEnabled && cameraHeight <= CAMERA_HEIGHT_THRESHOLD;
+    
+    // Update visibility for all wind layers
+    if (Array.isArray(resources.value.windLayer)) {
+      resources.value.windLayer.forEach(layer => {
+        layer.show = shouldBeVisible;
+      });
+    } else {
+      resources.value.windLayer.show = shouldBeVisible;
     }
   };
 
@@ -293,25 +356,6 @@ export function useCesium(containerId) {
   };
   
   /**
-   * 更新风场配置选项
-   */
-  const updateWindOptions = (options) => {
-    if (resources.value.windLayer && options) {
-      resources.value.windLayer.updateOptions({
-        particleHeight: options.height,
-        particleSize: options.particleSize,
-        lineWidth: { min: options.lineWidth, max: options.lineWidth + 1 },
-        speedFactor: options.speedFactor,
-        colors: options.colorScale === 'rainbow' ? ['#FF0000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF'] :
-          options.colorScale === 'jet' ? ['#000080', '#0000FF', '#00FFFF', '#FFFF00', '#FF0000', '#800000'] :
-            ['#440154', '#3B528B', '#21908C', '#5DC863', '#FDE725'], // viridis
-        opacity: options.opacity,
-        maxParticles: options.maxParticles
-      })
-    }
-  };
-
-  /**
    * 设置当前时间
    * @param {Date} time - JavaScript Date对象
    */
@@ -356,7 +400,6 @@ export function useCesium(containerId) {
     setTemperatureVisibility,
     // 可视化更新
     updateHeatmapTime,
-    updateWindOptions,
     // 时间控制
     setCurrentTime,
     // 矩形绘制

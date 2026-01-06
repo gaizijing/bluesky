@@ -30,14 +30,14 @@
  */
 
 export const WIND_LAYER_DEFAULTS = {
-    particlesTextureSize: 100,  // 粒子数量
-    particleHeight: 150,        // 粒子高度
-    lineWidth: { min: 0.8, max: 1 },  // 线宽
-    lineLength: { min: 10, max: 20 },  // 线长
-    speedFactor: 0.6,           // 速度因子
+    particlesTextureSize: 50,  // 粒子数量
+    //particleHeight: 150,        // 粒子高度
+    lineWidth: { min: 0.05, max: 0.08 },  // 线宽
+    lineLength: { min:1, max: 1 },  // 线长
+    speedFactor: 0.3,           // 速度因子
     dropRate: 0.003,            // 粒子消失率
-    dropRateBump: 0.0005,       // 粒子重置率
-    colors: ['#FF0000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF'],
+    dropRateBump: 0.001,       // 粒子重置率
+    colors: ['#050404ff', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF'],
     flipY: true,
     useViewerBounds: false,
     dynamic: true,
@@ -46,6 +46,7 @@ export const WIND_LAYER_DEFAULTS = {
       max: 10                  
     }
 };
+export const CAMERA_HEIGHT_THRESHOLD = 3000; // Show wind field only when camera is below 500m
 
 // 预定义颜色方案
 export const COLOR_SCHEMES = {
@@ -64,70 +65,3 @@ export const getColorScheme = (scheme) => {
   return COLOR_SCHEMES[scheme] || COLOR_SCHEMES.rainbow;
 };
 
-/**
- * 验证风场配置参数，确保符合WindLayerOptions接口规范
- * @param {Object} options - 风场配置选项
- * @returns {Object} 验证并标准化后的配置
- */
-export const validateWindOptions = (options) => {
-  const validated = { ...WIND_LAYER_DEFAULTS, ...options };
-  
-  // 数值范围验证
-  validated.particlesTextureSize = Math.max(50, Math.min(500, validated.particlesTextureSize));
-  validated.particleHeight = Math.max(0, Math.min(10000, validated.particleHeight));
-  validated.speedFactor = Math.max(0.1, Math.min(10, validated.speedFactor));
-  validated.dropRate = Math.max(0, Math.min(1, validated.dropRate));
-  validated.dropRateBump = Math.max(0, Math.min(1, validated.dropRateBump));
-  
-  // 验证线宽配置
-  if (validated.lineWidth && typeof validated.lineWidth === 'object') {
-    validated.lineWidth.min = Math.max(0.1, Math.min(10, validated.lineWidth.min));
-    validated.lineWidth.max = Math.max(validated.lineWidth.min, Math.min(10, validated.lineWidth.max));
-  } else {
-    validated.lineWidth = WIND_LAYER_DEFAULTS.lineWidth;
-  }
-  
-  // 验证线长配置
-  if (validated.lineLength && typeof validated.lineLength === 'object') {
-    validated.lineLength.min = Math.max(5, Math.min(500, validated.lineLength.min));
-    validated.lineLength.max = Math.max(validated.lineLength.min, Math.min(500, validated.lineLength.max));
-  } else {
-    validated.lineLength = WIND_LAYER_DEFAULTS.lineLength;
-  }
-  
-  // 验证颜色数组
-  if (!Array.isArray(validated.colors) || validated.colors.length === 0) {
-    validated.colors = WIND_LAYER_DEFAULTS.colors;
-  }
-  
-  // 验证domain配置
-  if (validated.domain && typeof validated.domain === 'object') {
-    if (validated.domain.min !== undefined) {
-      validated.domain.min = Math.max(0, validated.domain.min);
-    }
-    if (validated.domain.max !== undefined) {
-      validated.domain.max = Math.max(validated.domain.min || 0, validated.domain.max);
-    }
-  }
-  
-  // 验证displayRange配置
-  if (validated.displayRange && typeof validated.displayRange === 'object') {
-    if (validated.displayRange.min !== undefined) {
-      validated.displayRange.min = Math.max(0, validated.displayRange.min);
-    }
-    if (validated.displayRange.max !== undefined) {
-      validated.displayRange.max = Math.max(validated.displayRange.min || 0, validated.displayRange.max);
-    }
-  }
-  
-  return validated;
-};
-
-/**
- * 获取标准化的风场配置
- * @param {Object} options - 自定义配置选项
- * @returns {Object} 标准化后的风场配置
- */
-export const getWindLayerOptions = (options = {}) => {
-  return validateWindOptions(options);
-};

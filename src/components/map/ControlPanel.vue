@@ -1,17 +1,15 @@
-<!-- ControlPanel.vue -->
 <template>
   <div class="control-panel">
-    <!-- 图层控制部分 -->
-    <div class="layer-control-section" v-if="layerSettingsStore">
+
+    <!-- ================= 图层控制 ================= -->
+    <div class="control-section" v-if="layerSettingsStore">
       <div class="section-header" @click="toggleSection('layers')">
         <h3>图层控制</h3>
-        <span class="toggle-icon">{{
-          expandedSections.layers ? "−" : "+"
-        }}</span>
+        <span class="toggle-icon">{{ expandedSections.layers ? '−' : '+' }}</span>
       </div>
 
       <div v-show="expandedSections.layers" class="section-content">
-        <div v-for="(layer, key) in layerSettingsStore.layers" :key="key" class="layer-item">
+        <div v-for="(layer, key) in (layerSettingsStore?.layers || {})" :key="key" class="layer-item">
           <div class="layer-row">
             <span class="layer-name">{{ layer.name }}</span>
             <label class="switch">
@@ -23,231 +21,209 @@
       </div>
     </div>
 
-    <!-- 风场控制部分 -->
+    <!-- ================= 风场控制 ================= -->
     <div class="control-section">
       <div class="section-header" @click="toggleSection('wind')">
         <h3>风场控制</h3>
-        <span class="toggle-icon">{{ expandedSections.wind ? "−" : "+" }}</span>
+        <span class="toggle-icon">{{ expandedSections.wind ? '−' : '+' }}</span>
       </div>
 
       <div v-show="expandedSections.wind" class="section-content">
-        <div class="control-group">
-          <label>粒子数量: {{ localOptions.particlesTextureSize }}</label>
-          <input type="range" min="100" max="1000" step="10" :value="localOptions.particlesTextureSize"
-            @input="handleParticlesTextureSizeChange" />
-        </div>
 
+        <!-- 粒子密度 -->
         <div class="control-group">
-          <label>速度因子: {{ localOptions.speedFactor.toFixed(2) }}</label>
-          <input type="range" min="0" max="5" step="0.1" :value="localOptions.speedFactor"
-            @input="handleSpeedFactorChange" />
-        </div>
-
-        <div class="control-group">
-          <label>线宽范围: {{ localOptions.lineWidth.min }} -
-            {{ localOptions.lineWidth.max }}</label>
-          <div class="range-group">
-            <input type="range" min="0" max="10" step="0.1" :value="localOptions.lineWidth.min"
-              @input="handleLineWidthMinChange" />
-            <input type="range" min="0" max="10" step="0.1" :value="localOptions.lineWidth.max"
-              @input="handleLineWidthMaxChange" />
+          <label class="control-label">
+            粒子密度
+            <div class="help-tooltip">
+              <span class="help-icon">?</span>
+              <span class="tooltip-text">调整风场粒子的密度，数值越大粒子越多</span>
+            </div>
+          </label>
+          <div class="slider-input-group">
+            <input type="range" min="1" max="100" step="1" v-model.number="localOptions.particlesTextureSize" />
+            <input type="number" min="1" max="100" step="1" v-model.number="localOptions.particlesTextureSize"
+              class="num-input" />
           </div>
         </div>
 
+        <!-- 速度因子 -->
         <div class="control-group">
-          <label>线条长度: {{ localOptions.lineLength.min }} -
-            {{ localOptions.lineLength.max }}</label>
-          <div class="range-group">
-            <input type="range" min="1" max="100" step="1" :value="localOptions.lineLength.min"
-              @input="handleLineLengthMinChange" />
-            <input type="range" min="1" max="100" step="1" :value="localOptions.lineLength.max"
-              @input="handleLineLengthMaxChange" />
+          <label class="control-label">
+            速度因子
+            <div class="help-tooltip">
+              <span class="help-icon">?</span>
+              <span class="tooltip-text">调整风场粒子的移动速度，数值越大速度越快</span>
+            </div>
+          </label>
+          <div class="slider-input-group">
+            <input type="range" min="0" max="1" step="0.01" v-model.number="localOptions.speedFactor" />
+            <input type="number" min="0" max="1" step="0.01" v-model.number="localOptions.speedFactor"
+              class="num-input" />
           </div>
         </div>
 
+        <!-- 线宽范围 -->
         <div class="control-group">
-          <label>显示速度范围: {{ localOptions.displayRange.min }} -
-            {{ localOptions.displayRange.max }}</label>
-          <div class="range-group">
-            <input type="range" min="1" max="100" step="1" :value="localOptions.displayRange.min"
-              @input="handleDisplayRangeMinChange" />
-            <input type="range" min="1" max="100" step="1" :value="localOptions.displayRange.max"
-              @input="handleDisplayRangeMaxChange" />
+          <label class="control-label">
+            线宽范围
+            <div class="help-tooltip">
+              <span class="help-icon">?</span>
+              <span class="tooltip-text">调整风场粒子轨迹线的宽度范围</span>
+            </div>
+          </label>
+          <div class="range-inputs">
+            <input type="number" min="0" max="0.1" step="0.001" v-model.number="localOptions.lineWidth.min"
+              class="num-input" />
+            <input type="number" min="0" max="0.1" step="0.001" v-model.number="localOptions.lineWidth.max"
+              class="num-input" />
           </div>
         </div>
+
+        <!-- 线条长度 -->
         <div class="control-group">
-          <label>粒子高度: {{ localOptions.particleHeight }}</label>
-          <input type="range" min="10" max="5000" step="10" :value="localOptions.particleHeight"
-            @input="handleParticleHeightChange" />
+          <label class="control-label">
+            线条长度
+            <div class="help-tooltip">
+              <span class="help-icon">?</span>
+              <span class="tooltip-text">调整风场粒子轨迹线的长度范围</span>
+            </div>
+          </label>
+          <div class="range-inputs">
+            <input type="number" min="0" max="10" step="0.01" v-model.number="localOptions.lineLength.min"
+              class="num-input" />
+            <input type="number" min="0" max="10" step="0.01" v-model.number="localOptions.lineLength.max"
+              class="num-input" />
+          </div>
         </div>
 
+        <!-- 显示速度范围 -->
         <div class="control-group">
-          <button @click="resetToDefaults" class="reset-button">
-            重置为默认值
-          </button>
+          <label class="control-label">
+            显示速度范围
+            <div class="help-tooltip">
+              <span class="help-icon">?</span>
+              <span class="tooltip-text">调整风场显示的风速范围，超出范围的风速将被过滤</span>
+            </div>
+          </label>
+          <div class="range-inputs">
+            <input type="number" min="0" max="100" step="0.1" v-model.number="localOptions.displayRange.min"
+              class="num-input" />
+            <input type="number" min="0" max="100" step="0.1" v-model.number="localOptions.displayRange.max"
+              class="num-input" />
+          </div>
         </div>
+
+        <button class="reset-button" @click="resetToDefaults">
+          重置为默认值
+        </button>
+
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted, Ref, inject } from "vue";
-import { WindLayer, WindLayerOptions } from "cesium-wind-layer";
-import { WIND_LAYER_DEFAULTS } from "../../config/windLayerDefaults";
-import { useLayerSettingsStore } from "@/store/modules/layerSettings";
+import { reactive, watch  } from 'vue'
+import type { WindLayer, WindLayerOptions } from 'cesium-wind-layer'
+import { WIND_LAYER_DEFAULTS } from '@/config/windLayerDefaults'
+import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 
-// 定义组件属性
+/* ================= props ================= */
+
 const props = defineProps<{
-  windLayer: Ref<WindLayer> | null;
-  initialOptions?: WindLayerOptions;
-  layerControls: any;
-}>();
+  windLayer: WindLayer | null
+}>()
 
-// 定义事件发射器
-const emit = defineEmits<{
-  (e: "optionsChange", options: Partial<WindLayerOptions>): void;
-}>();
+/* ================= store ================= */
 
-// 使用图层设置store
-const layerSettingsStore = useLayerSettingsStore();
+const layerSettingsStore = useLayerSettingsStore()
 
-// 展开的面板部分
+/* ================= panel ================= */
+
 const expandedSections = reactive({
   layers: true,
-  wind: true,
-});
+  wind: true
+})
 
-// 切换面板展开/收起
-const toggleSection = (section: string) => {
-  expandedSections[section as keyof typeof expandedSections] =
-    !expandedSections[section as keyof typeof expandedSections];
-};
+const toggleSection = (key: keyof typeof expandedSections) => {
+  expandedSections[key] = !expandedSections[key]
+}
 
-// 切换图层可见性
-const toggleLayerVisibility = (key: string, event: Event) => {
-  const visible = (event.target as HTMLInputElement).checked;
-  layerSettingsStore.setLayerVisibility(key, visible);
-  // 保存设置到本地存储
-  layerSettingsStore.saveSettingsToLocal();
+/* ================= 图层控制 ================= */
 
-  // 调用传入的Cesium控制方法
-  if (props.layerControls) {
-    switch (key) {
-      case "model":
-        props.layerControls.setModelVisibility?.(visible);
-        break;
-      case "wind":
-        props.layerControls.setWindVisibility?.(visible);
-        break;
-      case "areas":
-        props.layerControls.setAreasVisibility?.(visible);
-        break;
-      case "temperature":
-        props.layerControls.setTemperatureVisibility?.(visible);
-        break;
-    }
-  }
-};
+const toggleLayerVisibility = (key: string, e: Event) => {
+  const visible = (e.target as HTMLInputElement).checked
+  layerSettingsStore.setLayerVisibility(key, visible)
+  layerSettingsStore.saveSettingsToLocal()
+}
 
-// 本地选项状态
+/* ================= 风场参数 ================= */
+
 const localOptions = reactive<WindLayerOptions>({
-  ...props.initialOptions,
-});
-
-// 默认选项
-const defaultOptions = WIND_LAYER_DEFAULTS;
-
-// 监听初始选项变化
-watch(
-  () => props.initialOptions,
-  (newOptions) => {
-    if (newOptions) {
-      Object.assign(localOptions, newOptions);
-    }
-  },
-  { deep: true }
-);
-
-// 更新风场选项
-const updateWindLayerOptions = (changedOptions: Partial<WindLayerOptions>) => {
-  props.windLayer.updateOptions(changedOptions);
+  ...WIND_LAYER_DEFAULTS,
+})
+// 事件发射器 
+const emit = defineEmits<{ (e: "optionsChange", options: Partial<WindLayerOptions>): void; }>();
+const applyOptions = (changedOptions: Partial<WindLayerOptions>) => {
+  if (props.windLayer) {
+    const layers = Array.isArray(props.windLayer)
+      ?
+      props.windLayer
+      :
+      [props.windLayer.value];
+    layers.forEach(layer => layer?.updateOptions?.(changedOptions));
+  }
   emit("optionsChange", changedOptions);
-
-  // 同步更新store中的风场配置
   layerSettingsStore.updateWindOptions(changedOptions);
-
-  // 保存设置到本地存储
   layerSettingsStore.saveSettingsToLocal();
+}
 
-};
+/* 单值参数 */
 
-// 处理各种参数变更
-const handleParticlesTextureSizeChange = (event: Event) => {
-  const value = parseInt((event.target as HTMLInputElement).value);
-  localOptions.particlesTextureSize = value;
-  updateWindLayerOptions({ particlesTextureSize: value });
-};
+watch(() => localOptions.speedFactor, v =>
+  applyOptions({ speedFactor: v })
+)
 
-const handleSpeedFactorChange = (event: Event) => {
-  const value = parseFloat((event.target as HTMLInputElement).value);
-  localOptions.speedFactor = value;
-  updateWindLayerOptions({ speedFactor: value });
-};
+watch(() => localOptions.particlesTextureSize, v =>
+  applyOptions({ particlesTextureSize: v })
+)
 
-const handleLineWidthMinChange = (event: Event) => {
-  const value = parseFloat((event.target as HTMLInputElement).value);
-  localOptions.lineWidth.min = value;
-  updateWindLayerOptions({ lineWidth: { ...localOptions.lineWidth } });
-};
+/* range 参数 */
 
-const handleLineWidthMaxChange = (event: Event) => {
-  const value = parseFloat((event.target as HTMLInputElement).value);
-  localOptions.lineWidth.max = value;
-  updateWindLayerOptions({ lineWidth: { ...localOptions.lineWidth } });
-};
+watch(() => localOptions.lineWidth, v => {
+  v.min = Math.min(v.min, v.max)
+  v.max = Math.max(v.max, v.min)
+  applyOptions({ lineWidth: { ...v } })
+}, { deep: true })
 
-const handleLineLengthMinChange = (event: Event) => {
-  const value = parseInt((event.target as HTMLInputElement).value);
-  localOptions.lineLength.min = value;
-  updateWindLayerOptions({ lineLength: { ...localOptions.lineLength } });
-};
+watch(() => localOptions.lineLength, v => {
+  v.min = Math.min(v.min, v.max)
+  v.max = Math.max(v.max, v.min)
+  applyOptions({ lineLength: { ...v } })
+}, { deep: true })
 
-const handleLineLengthMaxChange = (event: Event) => {
-  const value = parseInt((event.target as HTMLInputElement).value);
-  localOptions.lineLength.max = value;
-  updateWindLayerOptions({ lineLength: { ...localOptions.lineLength } });
-};
-const handleDisplayRangeMinChange = (event: Event) => {
-  const value = parseInt((event.target as HTMLInputElement).value);
-  localOptions.displayRange.min = value;
-  updateWindLayerOptions({ displayRange: { ...localOptions.displayRange } });
-};
+watch(() => localOptions.displayRange, v => {
+  v.min = Math.min(v.min, v.max)
+  v.max = Math.max(v.max, v.min)
+  applyOptions({ displayRange: { ...v } })
+}, { deep: true })
 
-const handleDisplayRangeMaxChange = (event: Event) => {
-  const value = parseInt((event.target as HTMLInputElement).value);
-  localOptions.displayRange.max = value;
-  updateWindLayerOptions({ displayRange: { ...localOptions.displayRange } });
-};
+/* windLayer变化时更新 */
 
-const handleParticleHeightChange = (event: Event) => {
-  const value = parseInt((event.target as HTMLInputElement).value);
-  localOptions.particleHeight = value;
-  updateWindLayerOptions({ particleHeight: value });
-};
+watch(() => props.windLayer, (newLayer) => {
+  if (newLayer) {
+    applyOptions(localOptions)
+  }
+}, { immediate: true })
 
-// 重置为默认值
+/* reset */
+
 const resetToDefaults = () => {
-  Object.assign(localOptions, defaultOptions);
-
-  props.windLayer.updateOptions(defaultOptions);
-  emit("optionsChange", defaultOptions);
-
-  // 重置store中的风场配置
-  layerSettingsStore.resetWindOptions();
-
-};
+  Object.assign(localOptions, WIND_LAYER_DEFAULTS)
+  applyOptions(WIND_LAYER_DEFAULTS)
+}
 </script>
+
 
 <style scoped>
 .control-panel {
@@ -255,14 +231,9 @@ const resetToDefaults = () => {
   position: absolute;
   top: 80px;
   left: 20px;
-  background-color: #0f1733;
+  background: #0f1733 url("@/assets/images/bg_dialog.png") center/cover no-repeat;
   border-radius: 8px;
-  background-image: url("@/assets/images/bg_dialog.png");
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: center;
   padding: 20px;
-  border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   max-width: 320px;
@@ -270,6 +241,12 @@ const resetToDefaults = () => {
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
+/* 控制区域 */
+.control-section {
+  margin-bottom: 10px;
+}
+
+/* 标题栏样式 */
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -290,17 +267,6 @@ const resetToDefaults = () => {
   background-color: rgba(255, 255, 255, 0.2);
 }
 
-.toggle-icon {
-  color: #fff;
-  font-size: 24px;
-  font-weight: bold;
-  transition: transform 0.3s ease;
-}
-
-.section-header:hover .toggle-icon {
-  transform: scale(1.2);
-}
-
 .section-header h3 {
   margin: 0;
   color: #fff;
@@ -313,12 +279,19 @@ const resetToDefaults = () => {
   color: #fff;
   font-size: 24px;
   font-weight: bold;
+  transition: transform 0.3s ease;
 }
 
+.section-header:hover .toggle-icon {
+  transform: scale(1.2);
+}
+
+/* 面板内容区 */
 .section-content {
   margin-bottom: 20px;
 }
 
+/* 图层项样式 */
 .layer-item {
   margin-bottom: 10px;
   padding: 8px 0;
@@ -341,7 +314,7 @@ const resetToDefaults = () => {
   font-size: 14px;
 }
 
-/* Switch样式 */
+/* 开关样式 */
 .switch {
   position: relative;
   display: inline-block;
@@ -358,10 +331,7 @@ const resetToDefaults = () => {
 .slider {
   position: absolute;
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background-color: #ccc;
   transition: 0.4s;
   border-radius: 34px;
@@ -387,29 +357,31 @@ input:checked+.slider:before {
   transform: translateX(20px);
 }
 
-/* 原有的风场控制样式 */
-.control-section h3 {
-  margin-top: 0;
-  color: #fff;
-  font-size: 23px;
-  font-weight: 600;
-  font-family: "AiDeepFont";
-}
-
+/* 控制项通用样式 */
 .control-group {
   margin-bottom: 15px;
 }
 
-.control-group label {
-  display: block;
+.control-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 6px;
   font-weight: 500;
   font-size: 13px;
   color: #fff;
 }
 
-.control-group input[type="range"] {
+/* 滑块+输入框组合 */
+.slider-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
+}
+
+.slider-input-group input[type="range"] {
+  flex: 1;
   height: 6px;
   border-radius: 3px;
   background: #ddd;
@@ -417,7 +389,7 @@ input:checked+.slider:before {
   -webkit-appearance: none;
 }
 
-.control-group input[type="range"]::-webkit-slider-thumb {
+.slider-input-group input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 16px;
@@ -427,15 +399,86 @@ input:checked+.slider:before {
   cursor: pointer;
 }
 
-.range-group {
+/* 范围类参数布局 */
+.range-inputs {
   display: flex;
-  gap: 10px;
+  gap: 15px;
 }
 
-.range-group input {
+/* 数值输入框样式 */
+.num-input {
   flex: 1;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid #022848;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+  outline: none;
+  transition: all 0.3s ease;
 }
 
+.num-input:focus {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* 帮助提示样式 */
+.help-tooltip {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+}
+
+.help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background-color: #1890ff;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 50%;
+  margin-left: 4px;
+  transition: all 0.3s ease;
+}
+
+.help-icon:hover {
+  background-color: #40a9ff;
+  transform: scale(1.1);
+}
+
+.tooltip-text {
+  visibility: hidden;
+  width: 200px;
+  background-color: #0f1733;
+  color: #fff;
+  text-align: left;
+  border-radius: 4px;
+  padding: 8px 10px;
+  position: absolute;
+  z-index: 1001;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  border: 1px solid #1890ff;
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.help-tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* 重置按钮样式 */
 .reset-button {
   width: 100%;
   padding: 10px;
