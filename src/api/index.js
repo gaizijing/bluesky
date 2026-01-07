@@ -378,8 +378,6 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
     const { data } = response;
     // 5. 格式化数据为项目可用格式
     const nowData = data.now;
-    console.log(data);
-
     return nowData;
 
   } catch (error) {

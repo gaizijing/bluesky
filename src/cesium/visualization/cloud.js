@@ -1,4 +1,5 @@
 import * as Cesium from 'cesium'
+import { useWeatherStore } from '@/store/modules/weather'
 
 /**
  * 青岛上空默认云层（无交互）
@@ -24,6 +25,7 @@ export default class Cloud {
     }
 
     const scene = this.viewer.scene;
+    const weatherStore = useWeatherStore();
 
     ///////////////////////////
     // Create clouds for Qingdao with realistic density and layered clouds
@@ -37,6 +39,28 @@ export default class Cloud {
     }
 
     this.clouds = new Cesium.CloudCollection();
+
+    // 根据天气数据计算云量参数
+    let cloudCover = 0.5; // 默认云量
+    if (weatherStore.currentPointWeather && weatherStore.currentPointWeather.cloud !== undefined) {
+      cloudCover = weatherStore.currentPointWeather.cloud / 100; // 转换为0-1范围
+    }
+    
+    // 确保即使云量为0时也有一些云
+    const adjustedCloudCover = Math.max(cloudCover, 0.1); // 最少10%的云量
+    
+    // 根据云量计算云的数量和密度
+    const baseCloudCount = 200;
+    const baseHighCloudCount = 100;
+    const minSlice = 0.1;
+    const maxSlice = 0.6;
+    
+    const cloudCount = Math.round(baseCloudCount * adjustedCloudCover);
+    const highCloudCount = Math.round(baseHighCloudCount * adjustedCloudCover);
+    const sliceRange = {
+      min: minSlice + (1 - adjustedCloudCover) * 0.1, // 云量越少，密度越低
+      max: maxSlice * adjustedCloudCover + 0.1 // 确保有最小密度
+    };
 
     // 后层云（远山背景云，较稀疏）
     function createBackLayerClouds() {
@@ -108,9 +132,9 @@ export default class Cloud {
         height = getRandomNumberInRange(minHeight, maxHeight);
         
         // 调整云的尺寸，使其更自然
-        scaleX = getRandomNumberInRange(500,1000);  // 稍微增大尺寸，减少数量
+        scaleX = getRandomNumberInRange(500, 1000);  // 稍微增大尺寸，减少数量
         scaleY = scaleX / 2.0 - getRandomNumberInRange(0, scaleX / 5.0);  // 更自然的比例
-        slice = getRandomNumberInRange(0.2, 0.6);  // 降低密度值，更真实
+        slice = getRandomNumberInRange(sliceRange.min, sliceRange.max);  // 根据云量调整密度
         depth = getRandomNumberInRange(8, 25);     // 调整深度
         aspectRatio = getRandomNumberInRange(1.5, 2.5);  // 更自然的长宽比
         cloudHeight = getRandomNumberInRange(8, 25);     // 调整高度
@@ -151,11 +175,11 @@ export default class Cloud {
     // 添加后层云
     createBackLayerClouds.bind(this)();
 
-    // 减少云数量，提高真实性（从5000减少到800）
-    createRandomClouds.bind(this)(200, 120.35, 120.45, 36.05, 36.15, 100, 200);
+    // 根据云量添加不同数量的云
+    createRandomClouds.bind(this)(cloudCount, 120.35, 120.45, 36.05, 36.15, 100, 200);
 
     // 添加第二层中等高度的云
-    createRandomClouds.bind(this)(100, 120.36, 120.44, 36.06, 36.14, 200, 300);
+    createRandomClouds.bind(this)(highCloudCount, 120.36, 120.44, 36.06, 36.14, 200, 300);
 
     // 添加高层稀疏云层增加层次感
     //createRandomClouds(300, 120.35, 120.45, 36.05, 36.15, 450, 600);
@@ -165,8 +189,11 @@ export default class Cloud {
 
     this.viewer.scene.primitives.add(this.clouds);
 
-    console.log('青岛云层已生成')
-  }
+ 
+    console.log(`青岛云层已生成，云量: ${(adjustedCloudCover * 100).toFixed(0)}%`)
+  
+
+ }
 
   /**
    * 移除云

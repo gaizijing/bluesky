@@ -19,6 +19,8 @@ import eventManager from '@/cesium/core/eventManager' // 引入事件管理器
 import { SkyBoxManager } from '@/cesium/volumeCloud/SkyBoxManager' // 引入天空盒管理器
 import { CAMERA_HEIGHT_THRESHOLD } from '../config/windLayerDefaults'
 import Cloud from '@/cesium/visualization/cloud'
+import Atmosphere from '@/cesium/visualization/atmosphere'
+
 export function useCesium(containerId) {
   // Store实例
   const cesiumStore = useCesiumStore()
@@ -60,8 +62,12 @@ export function useCesium(containerId) {
     resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
       cameraHeightThreshold: 240000
     })
+    const atmosphere = new Atmosphere(viewer.value)
+atmosphere.show()
     resources.value.cloud = new Cloud(viewer.value)
     resources.value.cloud.show()
+
+    
   }
 
   /**
@@ -177,15 +183,7 @@ export function useCesium(containerId) {
     // 初始化航线管理器
     routeManager.init(viewer.value)
   }
-  const setCloudCollectionVisibility = (visibility) => {
-    if (!resources.value.cloud) {
-      resources.value.cloud = new Cloud(viewer.value)
-      resources.value.cloud.show()
-    }
 
-    resources.value.cloud.show = visibility;
-
-  }
 
   /**
    * 设置响应式监听

@@ -217,35 +217,48 @@ class AreaManager {
       }
 
       if (Cesium.defined(pickedObject) && pickedObject.id) {
-        const entity = pickedObject.id
-        
-        if (Array.isArray(entity)) {
-          return
-        }
-        
-        if (this._isAreaEntity(entity)) {
-          this.viewer.canvas.style.cursor = 'pointer'
+          const entity = pickedObject.id
+          
+          if (Array.isArray(entity)) {
+            return
+          }
+          
+          if (this._isAreaEntity(entity)) {
+            this.viewer.canvas.style.cursor = 'pointer'
 
-          if (entity === this.selectedEntity) {
-            if (this.selectedEntity?.billboard) {
-              this.selectedEntity.billboard.image = '/image/ic_select_point.png'
-              this.selectedEntity.billboard.scale = 1.5
-            }
-          } else if (entity !== this.hoveredEntity) {
-            this._saveOriginalBillboardStyle(entity)
-            if (entity.billboard) entity.billboard.scale = 1.6
-            this.hoveredEntity = entity
-            
-            const areaData = entity.properties?.areaData
-            const area = areaData && areaData.getValue ? areaData.getValue() : areaData
-            if (area?.bbox) {
-              this._showHoveredAreaPolygon(area.bbox)
+            if (entity === this.selectedEntity) {
+              if (this.selectedEntity?.billboard) {
+                this.selectedEntity.billboard.image = '/image/ic_select_point.png'
+                this.selectedEntity.billboard.scale = 1.5
+              }
+            } else if (entity !== this.hoveredEntity) {
+              try {
+                this._saveOriginalBillboardStyle(entity)
+                if (entity.billboard) entity.billboard.scale = 1.6
+                this.hoveredEntity = entity
+                
+                // 安全获取 areaData，确保数据可序列化
+                const areaData = entity.properties?.areaData
+                if (areaData) {
+                  const area = areaData && areaData.getValue ? areaData.getValue() : areaData
+                  // 验证 area 和 bbox 的结构
+                  if (area && typeof area === 'object' && area.bbox) {
+                    // 验证 bbox 是有效的二维数组
+                    if (Array.isArray(area.bbox) && area.bbox.length === 2 && 
+                        Array.isArray(area.bbox[0]) && Array.isArray(area.bbox[1])) {
+                      this._showHoveredAreaPolygon(area.bbox)
+                    }
+                  }
+                }
+              } catch (e) {
+                console.warn('Error processing hover data:', e)
+                // 即使出错也继续执行，不影响其他功能
+              }
             }
           }
+        } else if (!this.hoveredEntity) {
+          this.viewer.canvas.style.cursor = 'default'
         }
-      } else if (!this.hoveredEntity) {
-        this.viewer.canvas.style.cursor = 'default'
-      }
     } catch (e) {
       console.error('Hover error:', e)
     }

@@ -55,7 +55,7 @@ export const getViewerOptions = () => ({
 export const createViewer = (containerId) => {
   Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_TOKEN || ''
 
-  return new Cesium.Viewer(containerId, {})
+  return new Cesium.Viewer(containerId, getViewerOptions())
 }
 
 export const destroyViewer = (viewer) => {
