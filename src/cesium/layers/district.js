@@ -100,7 +100,7 @@ export const addBoundGeo = (viewerInstance) => {
   }).then((dataSource) => {
 
     // 将数据源添加到视图
-    viewerInstance.dataSources.add(dataSource);
+   viewerInstance.dataSources.add(dataSource);
 
     // 获取所有实体
     var entities = dataSource.entities.values;
@@ -114,7 +114,7 @@ export const addBoundGeo = (viewerInstance) => {
           red: 0.1,
           maximumGreen: 0.5,
           minimumBlue: 0.5,
-          alpha: 0
+          alpha: 1
         });
 
         entity.polygon.classificationType = Cesium.ClassificationType.TERRAIN;

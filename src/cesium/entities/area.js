@@ -576,14 +576,13 @@ class AreaManager {
       this.hoveredAreaPolygon = null
     }
   }
-   setareasVisibility(visible) {
-
+   setAreasVisibility(visible) {
     this.areaEntities.forEach((entity) => {
       if (entity) {
-        entity.show = visible;
+        entity.show = visible;        
       }
     });
-  };
+  }
 }
 
 export { AreaManager }

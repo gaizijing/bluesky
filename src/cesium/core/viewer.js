@@ -19,14 +19,10 @@ export const getViewerOptions = () => ({
   maximumRenderTimeChange: 0.1, // 控制请求渲染模式下的帧率，较小的值提高响应速度
   scene3DOnly: true, // 如果只需要3D场景，禁用2D和Columbus View可提高性能
 
-  // // 降低视觉效果换取性能
-  orderIndependentTranslucency: false, // 禁用顺序无关透明度，大幅提高性能
   shadows: false, // 禁用阴影计算
 
   showRenderLoopErrors: false, // 生产环境禁用错误弹窗
-  contextOptions: {
-    requestWebgl1: true,
-  },
+ 
   // WebGL上下文配置
   contextOptions: {
     requestWebgl1: false,
@@ -59,7 +55,7 @@ export const getViewerOptions = () => ({
 export const createViewer = (containerId) => {
   Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_TOKEN || ''
 
-  return new Cesium.Viewer(containerId, getViewerOptions())
+  return new Cesium.Viewer(containerId, {})
 }
 
 export const destroyViewer = (viewer) => {
