@@ -76,50 +76,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, defineAsyncComponent,watch  } from "vue";
-import { getRiskWarnings } from "@/api";
-import { useAreaStore } from "@/store/modules/area";
+import { ref, onMounted, computed, defineAsyncComponent, watch } from "vue";
+import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
 
-const areaStore = useAreaStore();
+const dashboardWeatherStore = useDashboardWeatherStore();
 const WeatherWarnings = defineAsyncComponent(() =>
   import("@/components/business/WeatherWarnings/index.vue")
 );
+const warnings = computed(() => {
+  return dashboardWeatherStore.riskWarningsData || [];
+});
+console.log(warnings);
 // 响应式数据
-const isLoading = ref(true);
-const warnings = ref([]);
 const selectedLevel = ref("all");
 const showHistory = ref(false);
 
-// 初始化加载数据
-onMounted(() => {
-  fetchData();
-});
 
-// 获取预警数据
-const fetchData = async () => {
-  isLoading.value = true;
-  try {
-    const result = await getRiskWarnings();
-
-    // 适配截图数据结构：添加 targetType（目标类型：takeoff/route/airspace）
-    warnings.value = result.warnings.map((w) => ({
-      ...w,
-      targetType:
-        w.targetType ||
-        ["takeoff", "route", "airspace"][Math.floor(Math.random() * 3)],
-      // 确保detail为截图式具体描述（如："【中科大起降点】风速超过8m/s,飞行存在严重风险"）
-      detail:
-        w.detail ||
-        `${w.area ? `【${w.area}】` : ""}${w.riskReason || "飞行存在严重风险"
-        }`,
-    }));
-
-  } catch (err) {
-    console.error("获取风险预警数据失败：", err);
-  } finally {
-    isLoading.value = false;
-  }
-};
 
 // 按预警等级筛选
 const filteredWarnings = computed(() => {
@@ -183,14 +155,6 @@ const closeHistoryDialog = () => {
   showHistory.value = false;
 };
 
-watch(
-  () => areaStore.selectedArea,
-  (newArea) => {
-    if (newArea) {
-      fetchData();
-    }
-  }
-);
 </script>
 
 <style lang="scss">

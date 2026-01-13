@@ -12,9 +12,9 @@
     <div id="cesiumContainer" class="cesium-container" :class="{ 'hidden': loading }"></div>
 
     <!-- 控制面板 -->
-    <ControlPanel v-if="layerSettingsStore.isShow" :wind-layer="cesiumStore.windLayer"
-      :initial-options="layerSettingsStore.windOptions" @options-change="handleOptionsChange"
-      :layer-controls="cesiumHooks" />
+    <ControlPanel v-if="layerSettingsStore.isShow" :wind-layer="windStore.windLayer"
+      @options-change="handleOptionsChange"
+      @layer-visibility-change="applyLayerVisibilitySettings" />
 
     <!-- 时间进度条：只在存在当前航线时显示 -->
     <TimeProgressBar 
@@ -28,7 +28,7 @@
 <script setup>
 import { onMounted, onUnmounted, watch, ref } from 'vue'
 import { useCesium } from '@/hooks/useCesium'
-import { useCesiumStore } from '@/store/modules/cesium'
+import { useWindStore } from '@/store/modules/wind'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import { useAreaStore } from '@/store/modules/area'
 import ControlPanel from "@/components/map/ControlPanel.vue"
@@ -40,7 +40,7 @@ import { ElMessage } from 'element-plus'
 // 地图容器ID
 const CESIUM_CONTAINER_ID = 'cesiumContainer'
 const layerSettingsStore = useLayerSettingsStore()
-const cesiumStore = useCesiumStore()
+const windStore = useWindStore()
 const routeStore = useRouteStore()
 const areaStore = useAreaStore()
 
@@ -55,6 +55,7 @@ let cesiumHooks = null
 // 根据图层配置设置图层显示状态
 const applyLayerVisibilitySettings = () => {
   if (cesiumHooks && layerSettingsStore.layers) {
+    console.log(layerSettingsStore.layers)
     for (const [key, layer] of Object.entries(layerSettingsStore.layers)) {
       switch (key) {
         case "model":
@@ -63,7 +64,7 @@ const applyLayerVisibilitySettings = () => {
         case "wind":
           cesiumHooks.setWindVisibility?.(layer.visible)
           break
-        case "areas":
+        case "areaPoints":
           cesiumHooks.setAreasVisibility?.(layer.visible)
           break
         case "temperature":

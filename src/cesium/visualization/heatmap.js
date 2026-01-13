@@ -1,13 +1,17 @@
 import * as Cesium from 'cesium'
 import h337 from 'heatmap.js';
+import { useHeatmapStore } from '@/store/modules/heatmap';
+
 /**
  * 👉 生成热力图数据
  */
 export const addHeatVolume = async (viewer) => {
   try {
-    const response = await fetch(import.meta.env.VITE_TEM_DATA_URL);
-    const data = await response.json();
-
+    const heatmapStore = useHeatmapStore();
+    const data = heatmapStore.heatmapData;
+    if(!data){
+      return null;
+    }
     // 转换数据格式为新热力图所需格式
     const heatmapPoints = data.points.map(point => ({
       lnglat: [point.lon, point.lat],

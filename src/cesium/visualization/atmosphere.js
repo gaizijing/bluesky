@@ -7,7 +7,7 @@ export default class Atmosphere {
     }
 
     /**
-     * 初始化并显示大气散射效果
+     * 初始化并显示大气散射效果（修复后）
      */
     show() {
         if (!this.viewer || !this.viewer.scene) {
@@ -19,6 +19,7 @@ export default class Atmosphere {
         if (this.atmosphereStage) {
             return
         }
+
         const fs = `
 uniform sampler2D colorTexture;  // 颜色纹理
 uniform sampler2D depthTexture;  // 深度纹理
@@ -28,6 +29,10 @@ uniform float u_cameraHeight;
 uniform float u_fogHeight;
 uniform vec3 u_fogColor;
 uniform float u_globalDensity;
+
+// 显式声明输出颜色（关键修复：Cesium部分版本必须声明）
+out vec4 out_FragColor;
+
 // 通过深度纹理与纹理坐标得到世界坐标
 vec4 getWorldCoordinate(sampler2D depthTexture, vec2 texCoords) {
 	float depthOrLogDepth = czm_unpackDepth(texture(depthTexture, texCoords));
@@ -37,44 +42,60 @@ vec4 getWorldCoordinate(sampler2D depthTexture, vec2 texCoords) {
 	worldCoordinate = worldCoordinate / worldCoordinate.w;
 	return worldCoordinate;
 }
-// 计算粗略的高程，依赖js传递的相机位置处的地球高程u_earthRadiusOnCamera。好处是计算量非常低
+
+// 计算粗略的高程（增加边界判断，避免负数）
 float getRoughHeight(vec4 worldCoordinate) {
 	float disToCenter = length(vec3(worldCoordinate));
-	return disToCenter - u_earthRadiusOnCamera;
+	float height = disToCenter - u_earthRadiusOnCamera;
+	return max(height, 0.0); // 确保高程非负，避免无效计算
 }
-// 得到a向量在b向量的投影长度，如果同向结果为正，异向结果为复
+
+// 得到a向量在b向量的投影长度（增加防除0）
 float projectVector(vec3 a, vec3 b) {
-	float scale = dot(a, b) / dot(b, b);
-	float k = scale / abs(scale);
+	float bDot = dot(b, b);
+	if (bDot < 0.0001) { // 防除0
+		return 0.0;
+	}
+	float scale = dot(a, b) / bDot;
+	float k = scale / abs(scale + 0.0001); // 防scale为0
 	return k * length(scale * b);
 }
-// 线性浓度积分高度雾
+
+// 线性浓度积分高度雾（核心修复：防除0、降低雾强度）
 float linearHeightFog(vec3 positionToCamera, float cameraHeight, float pixelHeight, float fogMaxHeight) {
-	float globalDensity = u_globalDensity / 10.0;
+	float globalDensity = u_globalDensity / 100.0; // 降低密度（从/10改为/100）
 	vec3 up = -1.0 * normalize(czm_viewerPositionWC);
 	float vh = projectVector(normalize(positionToCamera), up);
- 
+
+	// 防vh为0（关键修复：避免除以0导致NaN）
+	if (abs(vh) < 0.01) {
+		vh = 0.01 * sign(vh); // 给极小值，避免除以0
+	}
+
 	// 让相机沿着视线方向移动 雾气产生距离 的距离
 	float s = step(100.0, length(positionToCamera));
 	vec3 sub = mix(positionToCamera, normalize(positionToCamera) * 100.0, s);
 	positionToCamera -= sub;
 	cameraHeight = mix(pixelHeight, cameraHeight - 100.0 * vh, s);
- 
+
 	float b = mix(cameraHeight, fogMaxHeight, step(fogMaxHeight, cameraHeight));
 	float a = mix(pixelHeight, fogMaxHeight, step(fogMaxHeight, pixelHeight));
- 
+
 	float fog = (b - a) - 0.5 * (pow(b, 2.0) - pow(a, 2.0)) / fogMaxHeight;
-	fog = globalDensity * fog / vh;
- 
-	if(abs(vh) <= 0.01 && cameraHeight < fogMaxHeight) {
+	fog = globalDensity * fog / vh; // 现在vh不会为0
+
+	// 简化近距离雾计算，避免重复判断
+	if(cameraHeight < fogMaxHeight) {
 		float disToCamera = length(positionToCamera);
-		fog = globalDensity * (1.0 - cameraHeight / fogMaxHeight) * disToCamera;
+		fog = mix(fog, globalDensity * (1.0 - cameraHeight / fogMaxHeight) * disToCamera, step(0.01, abs(vh)));
 	}
- 
-	fog = mix(0.0, 1.0, fog / (fog + 1.0));
- 
+
+	// 降低雾的增长速度（从fog/(fog+1)改为fog/(fog+10)）
+	fog = mix(0.0, 1.0, fog / (fog + 10.0));
+
 	return fog;
 }
+
 void main(void) {
   vec4 color = texture(colorTexture, v_textureCoordinates);
 
@@ -101,34 +122,45 @@ void main(void) {
     u_fogHeight
   );
 
-  fog = clamp(fog, 0.0, 0.8);
+  // 降低雾混合比例上限（从0.8改为0.3，避免过度雾化）
+  fog = clamp(fog, 0.0, 0.3);
 
+  // 降低雾色亮度（从接近白色改为淡灰色，避免变白）
   out_FragColor = mix(color, vec4(u_fogColor, 1.0), fog);
-}`
-
+}`;
 
         const customPostProcessStage = new Cesium.PostProcessStage({
             fragmentShader: fs,
             uniforms: {
-                u_earthRadiusOnCamera: () => Cesium.Cartesian3.magnitude(this.viewer.camera.positionWC) - this.viewer.camera.positionCartographic.height,
-                u_cameraHeight: () => this.viewer.camera.positionCartographic.height,
-                u_fogColor: () => new Cesium.Color(0.8, 0.82, 0.84),
+                // 增加边界判断，避免极端值（关键修复）
+                u_earthRadiusOnCamera: () => {
+                    const cameraPos = this.viewer.camera.positionWC;
+                    const cartographic = Cesium.Cartographic.fromCartesian(cameraPos);
+                    const earthRadius = Cesium.Ellipsoid.WGS84.getRadius(cartographic);
+                    return earthRadius; // 改用WGS84椭球半径，更准确
+                },
+                u_cameraHeight: () => Math.max(this.viewer.camera.positionCartographic.height, 0),
+                u_fogColor: () => new Cesium.Color(0.5, 0.55, 0.6), // 淡灰色，远离白色
                 u_fogHeight: () => 1000,
-                u_globalDensity: () => 0.6,
+                u_globalDensity: () => 0.3, // 降低密度，减少雾化强度
             }
-        })
-        this.viewer.scene.postProcessStages.add(customPostProcessStage)
-        console.log('大气散射效果已启用')
+        });
+
+        // 关键修复：将创建的后处理阶段赋值给实例变量
+        this.atmosphereStage = customPostProcessStage;
+        this.viewer.scene.postProcessStages.add(this.atmosphereStage);
+        console.log('大气散射效果已启用');
     }
 
     /**
-     * 移除大气散射效果
+     * 移除大气散射效果（现在能正常生效）
      */
     destroy() {
         if (this.atmosphereStage) {
-            this.viewer.scene.postProcessStages.remove(this.atmosphereStage)
-            this.atmosphereStage = null
-            console.log('大气散射效果已禁用')
+            this.viewer.scene.postProcessStages.remove(this.atmosphereStage);
+            this.atmosphereStage.destroy(); // 显式销毁，释放资源
+            this.atmosphereStage = null;
+            console.log('大气散射效果已禁用');
         }
     }
 }

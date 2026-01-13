@@ -113,8 +113,8 @@
 <script setup>
 import * as echarts from "echarts";
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from "vue";
-import { useDashboardStore } from "@/store/modules/dashboard"; 
-const dashboardStore = useDashboardStore();
+import { useModuleStore } from "@/store/modules/module"; 
+const moduleStore = useModuleStore();
 import eventManager from '@/cesium/core/eventManager';
 
 // 定义组件事件
@@ -581,7 +581,7 @@ onUnmounted(() => {
 
 // 监听仪表盘模块变化，调整图表大小或重新初始化
 watch(
-  () => dashboardStore.currentModule,
+  () => moduleStore.currentModule,
   () => {
     nextTick(() => {
       if (riskChart.value) {

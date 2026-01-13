@@ -4,12 +4,8 @@
 
     <!-- 区域切换栏 -->
     <div class="point-tabs">
-      <div
-        v-for="(point, idx) in points"
-        :key="idx"
-        :class="{ button: true, active: activePoint === idx }"
-        @click="activePoint = idx"
-      >
+      <div v-for="(point, idx) in points" :key="idx" :class="{ button: true, active: activePoint === idx }"
+        @click="activePoint = idx">
         {{ point }}
       </div>
     </div>
@@ -44,11 +40,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick, onUnmounted } from "vue";
+import { ref, onMounted, watch, nextTick, onUnmounted, computed } from "vue";
 import * as echarts from "echarts";
-import { useDashboardStore } from "@/store/modules/dashboard";
+import { useModuleStore } from "@/store/modules/module";
+import { useDeviceStore } from "@/store/modules/device";
 
-const dashboardStore = useDashboardStore();
+const moduleStore = useModuleStore();
 // 测点配置
 const points = ref(["测点A", "测点B", "测点C", "测点D"]);
 const activePoint = ref(0);
@@ -65,50 +62,6 @@ let timelineChart = null;
 let radarChart = null;
 let weatherRadar = null;
 
-// 简化数据生成，确保格式正确
-const generateChartData = () => {
-  const timeLabels = Array.from({ length: 12 }, (_, i) => {
-    const time = new Date(Date.now() - (11 - i) * 3600000);
-    return time.toLocaleTimeString("zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  });
-
-  // 折线图数据
-  const trendData = {
-    temperature: [
-      25.1, 25.3, 24.9, 24.7, 25.0, 25.5, 26.1, 26.3, 25.9, 25.6, 25.3, 25.0,
-    ],
-    humidity: [62, 63, 65, 66, 64, 63, 61, 60, 62, 64, 65, 63],
-    windSpeed: [4.2, 4.5, 4.8, 5.1, 4.7, 4.3, 4.0, 3.8, 4.1, 4.4, 4.6, 4.3],
-  };
-
-  // 时序图数据
-  const timelineData = {
-    radialSpeed: [8.2, 8.5, 8.3, 8.7, 8.4, 8.6, 8.8, 8.5, 8.3, 8.1, 8.4, 8.6],
-    speedStd: [1.2, 1.3, 1.1, 1.4, 1.2, 1.3, 1.1, 1.2, 1.3, 1.1, 1.2, 1.3],
-    snr: [35, 36, 37, 36, 35, 34, 33, 34, 35, 36, 37, 36],
-  };
-
-  // 雷达图数据
-  const radarData = [
-    { name: "温度", value: 25.5 },
-    { name: "湿度", value: 64 },
-    { name: "风速", value: 4.5 },
-    { name: "风向", value: 180 },
-    { name: "气压", value: 1012.0 },
-  ];
-
-  // 天气雷达图数据
-  const weatherRadarData = [
-    { value: 30, name: "弱回波" },
-    { value: 60, name: "中回波" },
-    { value: 90, name: "强回波" },
-  ];
-
-  return { timeLabels, trendData, timelineData, radarData, weatherRadarData };
-};
 
 // 初始化折线图
 const initTrendChart = (data) => {
@@ -288,22 +241,26 @@ const initWeatherRadarChart = (data) => {
     ],
   });
 };
-
+const chartData = computed(() => {
+  return useDeviceStore().getHistoryData();
+})
 // 统一初始化所有图表
 const initCharts = () => {
-  nextTick(() => {
-    const data = generateChartData();
-    initTrendChart(data);
-    initTimelineChart(data);
-    initRadarChart(data);
-    initWeatherRadarChart(data);
-  });
+  const data = chartData.value;
+  if (!data || !data.trendData) return;
+  console.log(data.trendData.temperature);
+  initTrendChart(data);
+  initTimelineChart(data);
+  initRadarChart(data);
+  initWeatherRadarChart(data);
+
 };
 
-// 监听测点切换
+// 监听测点切换和数据变化
 watch(activePoint, initCharts);
+watch(chartData, initCharts, { deep: true });
 watch(
-  () => dashboardStore.currentModule,
+  () => moduleStore.currentModule,
   (newVal) => {
     nextTick(() => {
       timelineChart?.resize();
@@ -333,7 +290,7 @@ onUnmounted(() => {
   timelineChart?.dispose();
   radarChart?.dispose();
   weatherRadar?.dispose();
-  window.removeEventListener("resize", () => {});
+  window.removeEventListener("resize", () => { });
 });
 </script>
 
@@ -341,7 +298,8 @@ onUnmounted(() => {
 /* 父容器固定高度，确保整体空间充足 */
 .history-area-container {
   width: 100%;
-  height: 900px; /* 整体高度提升，给底部图表更多空间 */
+  height: 900px;
+  /* 整体高度提升，给底部图表更多空间 */
   min-height: 900px;
 }
 
@@ -375,10 +333,12 @@ onUnmounted(() => {
     background-size: cover;
     background-repeat: no-repeat;
     background-position: center;
+
     &.active {
       color: #fff;
       transform: translateY(-2px);
     }
+
     &:hover {
       transform: translateY(-2px);
     }
@@ -390,14 +350,16 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 15px;
-  height: calc(100% - 100px); /* 减去标题和测点栏高度 */
+  height: calc(100% - 100px);
+  /* 减去标题和测点栏高度 */
 }
 
 /* 顶部两个图表：各占25%高度 */
 .chart-section.top {
   width: 100%;
   height: 25%;
-  min-height: 180px; /* 最小高度限制，避免过小 */
+  min-height: 180px;
+  /* 最小高度限制，避免过小 */
   position: relative;
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 8px;
@@ -409,13 +371,15 @@ onUnmounted(() => {
   display: flex;
   gap: 15px;
   height: 45%;
-  min-height: 350px; /* 底部总最小高度，确保每个图至少170px */
+  min-height: 350px;
+  /* 底部总最小高度，确保每个图至少170px */
 }
 
 .chart-section.bottom {
   width: 50%;
   height: 100%;
-  min-height: 350px; /* 底部单个图表最小高度 */
+  min-height: 350px;
+  /* 底部单个图表最小高度 */
   position: relative;
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 8px;

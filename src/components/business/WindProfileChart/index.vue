@@ -55,8 +55,8 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from "vue";
 import * as echarts from "echarts";
-import { useDashboardStore } from "@/store/modules/dashboard";
-const dashboardStore = useDashboardStore();
+import { useModuleStore } from "@/store/modules/module";
+const moduleStore = useModuleStore();
 
 // 气象要素配置
 const params = ref([
@@ -276,7 +276,7 @@ onUnmounted(() => {
 
 // 监听dashboard模块变化
 watch(
-  () => dashboardStore.currentModule,
+  () => moduleStore.currentModule,
   (newVal) => {
     nextTick(() => {
       if (chartInstance) {

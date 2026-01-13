@@ -1,12 +1,9 @@
 import * as Cesium from 'cesium'
-import { createProgressManager } from '@/utils/progressUtils'
-import { useCesiumStore } from '@/store/modules/cesium'
 
 let modelTileset = null
 
 export const addWhiteModel = async (viewerInstance) => {
   try {
-    const cesiumStore = useCesiumStore()
     modelTileset = await Cesium.Cesium3DTileset.fromUrl("/cesium/model/qingdaoshi/tileset.json", {
       maximumScreenSpaceError: 16,
       skipLevelOfDetail: true,
@@ -29,12 +26,7 @@ export const addWhiteModel = async (viewerInstance) => {
       distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 200000)
     })
 
-    const progressManager = createProgressManager((displayProgress) => {
-      cesiumStore.setModelLoadProgress(displayProgress);
-    }, {
-      totalExpectedUpdates: 20,
-      maxPossibleValue: 35
-    });
+   
 
     modelTileset.loadProgress.addEventListener(progress => {
       progressManager.updateProgress(progress);
@@ -43,14 +35,6 @@ export const addWhiteModel = async (viewerInstance) => {
     viewerInstance.scene.primitives.add(modelTileset);
     //模型调试
     // viewerInstance.extend(Cesium.viewerCesium3DTilesInspectorMixin)
-    modelTileset.allTilesLoaded.addEventListener(() => {
-      progressManager.markAsCompleted();
-      setTimeout(() => {
-        cesiumStore.setModelLoadProgress(0);
-        progressManager.reset();
-      }, 3000);
-    });
-
 
     ///////////cesium自带的模型////////////
     //  const tileset = await Cesium.createOsmBuildingsAsync();

@@ -3,7 +3,6 @@
     <!-- 1. 全屏地图（底层） -->
     <div class="map-container">
       <MapContainer id="cesiumContainer" class="cesium-container" />
-    
     </div>
 
     <!-- 2. 蒙版背景图（新增） -->
@@ -11,13 +10,8 @@
 
     <!-- 3. 控制面板 -->
     <div class="control-panel">
-      <div
-        class="control-item"
-        v-for="module in MODULE_LIST"
-        :key="module.key"
-        @click="switchModule(module.key)"
-        :class="{ selected: currentModule === module.key }"
-      >
+      <div class="control-item" v-for="module in MODULE_LIST" :key="module.key" @click="switchModule(module.key)"
+        :class="{ selected: currentModule === module.key }">
         <span class="module-text">{{ module.name }}</span>
       </div>
     </div>
@@ -59,12 +53,6 @@
           </div>
         </div>
         <div class="right-panel">
-          <!-- <div class="main-panel left_bg">
-            <div class="panel-header">
-              <span class="panel-title">设备列表</span>
-            </div>
-            <div class="panel-content"><DeviceTrace /></div>
-          </div> -->
           <div class="main-panel right_bg">
             <div class="panel-header">
               <span class="panel-title">历史42h实况监测数据</span>
@@ -95,7 +83,6 @@
               <div class="dashboard-content">
                 <div class="analysis-panel">
                   <WeatherForecastPanel />
-                  <!-- <Xinyuce/> -->
                 </div>
               </div>
             </div>
@@ -134,30 +121,13 @@
   </div>
 </template>
 <script setup>
-import { ref, onMounted, watch, computed } from "vue";
+import { watch, computed } from "vue";
 import { DASHBOARD_MODULES, MODULE_LIST } from "@/config/constants.js";
-import { useDashboardStore } from "@/store/modules/dashboard"; // 新增导入
-
-// 原有逻辑保留
-import { useWeatherStore } from "@/store/modules/weather";
-import { useCesiumStore } from "@/store/modules/cesium";
-import {
-  getWeatherStatistics,
-  getWeatherTrend,
-  getWeatherAlerts,
-  getWeatherDetails,
-} from "@/api/weather";
-
-// 在组件导入部分替换为异步导入
+import { useModuleStore } from "@/store/modules/module";
+import { DashboardService } from "../../services/dashboardService";
+// 在组件导入异步导入
 import { defineAsyncComponent } from "vue";
 
-const RegionMoniterList = defineAsyncComponent(() =>
-  import("@/components/business/RegionMoniterList/index.vue")
-);
-
-const RegionDetail = defineAsyncComponent(() =>
-  import("@/components/business/RegionDetail/index.vue")
-);
 const DeviceCount = defineAsyncComponent(() =>
   import("@/components/business/DeviceCount/index.vue")
 );
@@ -169,9 +139,6 @@ const SurveillanceFootage = defineAsyncComponent(() =>
 );
 const HistoryData = defineAsyncComponent(() =>
   import("@/components/business/HistoryData/index.vue")
-);
-const MicroscaleWeather = defineAsyncComponent(() =>
-  import("@/components/business/MicroscaleWeather/index.vue")
 );
 const FlightSuitableAnalysisPanel = defineAsyncComponent(() =>
   import("@/components/business/FlightSuitableAnalysisPanel/index.vue")
@@ -188,183 +155,36 @@ const RealTimeWeatherPanel = defineAsyncComponent(() =>
 const WeatherForecastPanel = defineAsyncComponent(() =>
   import("@/components/business/WeatherForecastPanel/index.vue")
 );
-
-
 const MapContainer = defineAsyncComponent(() =>
   import("@/components/map/MapContainer.vue")
 );
-import { useRegionStore } from "@/store/modules/region";
-import mockRegionWeatherData, {
-  WEATHER_TYPE_LABELS,
-  FLIGHT_CONDITIONS_THRESHOLD,
-} from "@/mock/regionWeatherData.js";
 // Cesium地图由MapContainer组件管理
-// 使用dashboard store
-const dashboardStore = useDashboardStore();
-
-// 原有状态保留
-const weatherStore = useWeatherStore();
-const cesiumStore = useCesiumStore();
-const modelLoadProgress = computed(() => cesiumStore.modelLoadProgress);
-
-const timeRange = ref(weatherStore.timeRange);
-const statisticsData = ref(null);
-const trendData = ref(null);
-const weatherAlerts = ref([]);
-const detailData = ref([]);
-const currentElement = ref(["temperature"]);
-const regionStore = useRegionStore();
-const selectedRegionDetail = ref([]);
-
+const moduleStore = useModuleStore();
+const dashboardService = new DashboardService();
 // 使用store中的currentModule
 const currentModule = computed({
-  get: () => dashboardStore.currentModule,
-  set: (value) => dashboardStore.switchModule(value),
+  get: () => moduleStore.currentModule,
+  set: (value) => moduleStore.switchModule(value),
 });
-
-// 面板收起状态（默认收起）
-const isRegionCollapsed = ref(true);
-const isDeviceCollapsed = ref(true);
-const isWeatherCollapsed = ref(true);
-
-// 左右面板显隐状态
-const isLeftPanelVisible = ref(true);
-const isRightPanelVisible = ref(true);
-
-// 切换左右面板显隐的方法
-const toggleLeftPanel = () => {
-  isLeftPanelVisible.value = !isLeftPanelVisible.value;
-};
-
-const toggleRightPanel = () => {
-  isRightPanelVisible.value = !isRightPanelVisible.value;
-};
-
-// 访问选中的区域数据
-const selectedRegion = computed(() => regionStore.selectedRegion);
 
 // 修改切换模块的方法
 const switchModule = (moduleKey) => {
   if (moduleKey === currentModule.value) {
-    dashboardStore.switchModule("");
+    currentModule.value = ''
   } else {
-    dashboardStore.switchModule(moduleKey);
-  }
-};
-
-// 原有业务方法保留
-const fetchWeatherData = async () => {
-  try {
-    const stats = await getWeatherStatistics({
-      element: currentElement.value,
-      timeRange: timeRange.value,
-      time: weatherStore.currentTime,
-    });
-    statisticsData.value = stats;
-
-    const trend = await getWeatherTrend({
-      element: currentElement.value,
-      timeRange: timeRange.value,
-    });
-    trendData.value = trend;
-
-    const alerts = await getWeatherAlerts({ time: weatherStore.currentTime });
-    weatherAlerts.value = alerts;
-
-    const details = await getWeatherDetails({
-      element: currentElement.value,
-      time: weatherStore.currentTime,
-    });
-    detailData.value = details;
-
-    weatherStore.updateStatistics(stats);
-  } catch (error) {
-    console.error("获取气象数据失败:", error);
-  }
-};
-
-const fetchRegionWeatherDetail = (id) => {
-  return mockRegionWeatherData.find((region) => region.regionId === id);
-};
-
-// 在 watch(currentModule...) 之前添加
-const initializeModuleState = (module) => {
-  switch (module) {
-    case DASHBOARD_MODULES.REGION_MONITOR:
-      isRegionCollapsed.value = false;
-      isWeatherCollapsed.value = true;
-      isDeviceCollapsed.value = true;
-      break;
-    case DASHBOARD_MODULES.FLIGHT_ANALYSIS:
-      isRegionCollapsed.value = true;
-      isWeatherCollapsed.value = false;
-      isDeviceCollapsed.value = true;
-      break;
-    case DASHBOARD_MODULES.DEVICE_MONITOR:
-      isRegionCollapsed.value = true;
-      isWeatherCollapsed.value = true;
-      isDeviceCollapsed.value = false;
-      break;
+    currentModule.value = moduleKey
   }
 };
 
 // 修改模块切换监听器
 watch(
-  () => dashboardStore.currentModule,
-  (newModule) => {
-    initializeModuleState(newModule);
+  () => moduleStore.currentModule,
+  async (newModule) => {
+    dashboardService.loadModuleData(newModule);
   }
 );
 
-// 监听目标区域变化
-watch(
-  () => regionStore.selectedRegion,
-  (newRegion) => {
-    // 1、获取该区域的详细天气数据
-    selectedRegionDetail.value = fetchRegionWeatherDetail(newRegion.id);
-  }
-);
 
-watch(
-  () => weatherStore.currentElement,
-  (newVal) => {
-    currentElement.value = newVal;
-    fetchWeatherData();
-  }
-);
-
-watch(() => weatherStore.currentTime, fetchWeatherData);
-
-// 监听模块切换
-watch(
-  () => dashboardStore.currentModule,
-  (newModule) => {
-    // 切换到区域监测模块时展开面板
-    if (newModule === DASHBOARD_MODULES.REGION_MONITOR) {
-      isRegionCollapsed.value = false;
-    } else {
-      isRegionCollapsed.value = true;
-    }
-
-    // 切换到飞行分析模块时展开面板
-    if (newModule === DASHBOARD_MODULES.FLIGHT_ANALYSIS) {
-      isWeatherCollapsed.value = false;
-    } else {
-      isWeatherCollapsed.value = true;
-    }
-
-    // 切换到设备监控模块时展开面板
-    if (newModule === DASHBOARD_MODULES.DEVICE_MONITOR) {
-      isDeviceCollapsed.value = false;
-    } else {
-      isDeviceCollapsed.value = true;
-    }
-  }
-);
-
-onMounted(() => {
-  fetchWeatherData();
-});
 </script>
 <style scoped lang="scss">
 .dashboard-container {
@@ -405,51 +225,6 @@ onMounted(() => {
   /* 不阻挡鼠标事件 */
 }
 
-/* 地图容器（底层） */
-.map-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-
-  .cesium-container {
-    width: 100%;
-    height: 100%;
-    border-radius: 0;
-  }
-
-  .cesium-loading {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background-color: rgba(15, 23, 51, 0.8);
-    padding: 20px 30px;
-    border-radius: 8px;
-    z-index: 2;
-    min-width: 300px; // 确保进度条有足够宽度
-
-    .progress-container {
-      width: 100%;
-      padding: 10px 0;
-
-      .progress-text {
-        color: #fff;
-        margin-bottom: 8px;
-        text-align: center;
-        font-size: 14px;
-      }
-    }
-  }
-}
-
-/* 顶部面板 */
-
 /* 控制面板 */
 /* 替换原有的控制面板样式 */
 .control-panel {
@@ -480,6 +255,7 @@ onMounted(() => {
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
+
   &:hover {
     // background: linear-gradient(135deg, #2a5298, #3a6bc0);
     transform: translateY(-2px);
@@ -504,11 +280,6 @@ onMounted(() => {
     font-size: 16px;
     font-weight: 500;
   }
-}
-
-.weather-panel {
-  position: absolute;
-  left: -100px;
 }
 
 /* 在样式部分添加动画样式 */
@@ -537,18 +308,5 @@ onMounted(() => {
 .analysis-panel {
   width: 100%;
   height: 100%;
-}
-
-// 添加进度条样式
-.progress-container {
-  width: 300px;
-  padding: 10px 0;
-
-  .progress-text {
-    color: #fff;
-    margin-bottom: 8px;
-    text-align: center;
-    font-size: 14px;
-  }
 }
 </style>

@@ -1,6 +1,6 @@
 <template>
   <div class="landing-point-card">
-    <div v-if="weatherStore.isLoading || weatherStore.currentPointWeather==null" class="loading-overlay">  
+    <div v-if="dashboardWeatherStore.isLoading || dashboardWeatherStore.realTimeWeatherPanelData==null" class="loading-overlay">  
       <div class="loading-content">
         <div class="loading-spinner"></div>
         <div class="loading-text">加载中...</div>
@@ -12,29 +12,29 @@
           <span>实时风速</span>
         </div>
         <div class="panel-value">
-          <span class="value">{{ weatherStore.currentPointWeather.windSpeed }}</span>
+          <span class="value">{{ dashboardWeatherStore.realTimeWeatherPanelData.windSpeed }}</span>
           <span class="unit">
             m/s
           </span>
         </div>
         <div class="panel-desc">
-          {{ WIND_SPEED_DESC[getWindSpeedLevel(weatherStore.currentPointWeather.windSpeed)] }}
+          {{ WIND_SPEED_DESC[getWindSpeedLevel(dashboardWeatherStore.realTimeWeatherPanelData.windSpeed)] }}
         </div>
       </div>
-      <div class="data-panel wind-shear-panel" :class="`level-${weatherStore.currentPointWeather.windShearLevel}`">
+      <div class="data-panel wind-shear-panel" :class="`level-${dashboardWeatherStore.realTimeWeatherPanelData.windShearLevel}`">
         <div class="panel-label">
           <span>风切变等级</span>
         </div>
         <div class="panel-value">
           <span class="value">{{
-            WIND_SHEAR_MAP[weatherStore.currentPointWeather.windShearLevel]
+            WIND_SHEAR_MAP[dashboardWeatherStore.realTimeWeatherPanelData.windShearLevel]
           }}</span>
-          <span class="level-tag" :class="`tag-${weatherStore.currentPointWeather.windShearLevel}`">
-            {{ weatherStore.currentPointWeather.windShearLevel }}
+          <span class="level-tag" :class="`tag-${dashboardWeatherStore.realTimeWeatherPanelData.windShearLevel}`">
+            {{ dashboardWeatherStore.realTimeWeatherPanelData.windShearLevel }}
           </span>
         </div>
-        <div class="panel-desc" :class="`desc-${weatherStore.currentPointWeather.windShearLevel}`">
-          {{ WIND_SHEAR_DESC[weatherStore.currentPointWeather.windShearLevel] }}
+        <div class="panel-desc" :class="`desc-${dashboardWeatherStore.realTimeWeatherPanelData.windShearLevel}`">
+          {{ WIND_SHEAR_DESC[dashboardWeatherStore.realTimeWeatherPanelData.windShearLevel] }}
         </div>
       </div>
       <div class="data-panel stability-panel">
@@ -42,11 +42,11 @@
           <span>稳定度指数</span>
         </div>
         <div class="panel-value">
-          <span class="value">{{ weatherStore.currentPointWeather.stabilityIndex }}</span>
+          <span class="value">{{ dashboardWeatherStore.realTimeWeatherPanelData.stabilityIndex }}</span>
           <span class="unit">类</span>
         </div>
         <div class="panel-desc">
-          {{ STABILITY_DESC[weatherStore.currentPointWeather.stabilityIndex] }}
+          {{ STABILITY_DESC[dashboardWeatherStore.realTimeWeatherPanelData.stabilityIndex] }}
         </div>
       </div>
     </div>
@@ -54,12 +54,9 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from "vue";
-import { useWeatherStore } from "@/store/modules/weather";
-const weatherStore = useWeatherStore();
-import { useAreaStore } from "@/store/modules/area";
-const areaStore = useAreaStore();
-const isRefreshing = ref(false);
+import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
+const dashboardWeatherStore = useDashboardWeatherStore();
+
 
 const WIND_SHEAR_MAP = {
   low: "低",
@@ -95,6 +92,7 @@ const getWindSpeedLevel = (windSpeed) => {
   if (speed < 15) return "high";
   return "extreme";
 };
+
 </script>
 
 <style scoped lang="scss">

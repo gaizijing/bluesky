@@ -33,13 +33,12 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import * as echarts from "echarts";
 import { useAreaStore } from "@/store/modules/area";
-import { getWeatherForecastTrend, getWeatherForecastHeatmap } from "@/api";
-import { useDashboardStore } from "@/store/modules/dashboard";
+import { useModuleStore } from "@/store/modules/module";
+import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
 
-const dashboardStore = useDashboardStore();
+const moduleStore = useModuleStore();
+const dashboardWeatherStore = useDashboardWeatherStore();
 
-// Store引用
-const areaStore = useAreaStore();
 
 // 图表实例
 let trendChartInstance = null;
@@ -48,25 +47,7 @@ let profileChartInstance = null;
 // 图表引用
 const trendChartRef = ref(null);
 const profileChartRef = ref(null);
-const panelRef = ref(null);
 
-// 状态
-const isLoading = ref(false);
-const selectedElement = ref(0); // 默认选中第一个气象要素
-
-// 自动计算时间范围（当前时间后两个小时，间隔10分钟）
-const getTimeRange = () => {
-  const now = new Date();
-  const startTime = new Date(now);
-  const endTime = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 当前时间后2小时
-  const interval = 10; // 10分钟间隔
-
-  return {
-    startTime: startTime.toISOString().slice(0, 19).replace('T', ' '),
-    endTime: endTime.toISOString().slice(0, 19).replace('T', ' '),
-    timeInterval: interval
-  };
-};
 
 // 气象要素配置 - 固定选择能见度、风速、降水
 const weatherElements = ref([
@@ -89,63 +70,13 @@ const weatherElements = ref([
     type: 'precipitation'
   }
 ]);
-
-// 移除时间范围配置，改为自动计算
-
-// 动态生成面板标题
-const dynamicPanelTitle = computed(() => {
-  return '未来两小时气象要素预测'; // 固定标题，因为现在显示三个要素
+const weatherForecastPanelData = computed(() => {
+  return dashboardWeatherStore.weatherForecastPanelData;
 });
-
-// 获取风向文本（8方向）
-const getDirectionText = (degree) => {
-  const dirs = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
-  const index = Math.round(degree / 45) % 8;
-  return dirs[index];
-};
-
-
-// 将原来的loadData函数替换为：
-const loadData = async () => {
-  isLoading.value = true;
-  try {
-    // 获取时间范围
-    const timeRange = getTimeRange();
-    // 获取选中的重点关注区域信息
-    const selectedArea = areaStore.selectedArea;
-    const pointId = selectedArea?.id || 'BJ-001';
-    const coordinates = selectedArea?.coordinates || [116.403874, 39.914885];
-
-    // 调用模拟API获取数据
-    const trendData = await getWeatherForecastTrend({
-      areaId: pointId,
-      longitude: coordinates[0],
-      latitude: coordinates[1],
-      altitude: 50.0, // 固定高度
-      elements: ['precipitation', 'visibility', 'windSpeed'], // 固定选择三个要素
-      startTime: timeRange.startTime,
-      endTime: timeRange.endTime,
-      timeInterval: timeRange.timeInterval
-    });
-    const profileData = await getWeatherForecastHeatmap({
-      areaId: pointId,
-      // timeRange: selectedTimeRange.value
-    });
-
-    // 更新图表
-    updateTrendChart(trendData);
-    updateProfileChart(profileData);
-  } catch (error) {
-    console.error('加载数据失败:', error);
-  } finally {
-    isLoading.value = false;
-  }
-};
-
 
 // 更新趋势图表
 const updateTrendChart = (data) => {
-  if (!trendChartInstance) {
+  if (!trendChartInstance || !data) {
     return;
   }
 
@@ -154,13 +85,10 @@ const updateTrendChart = (data) => {
     const date = new Date(item);
     return `${date.getHours().toString().padStart(2, '0')}`;
   });
-  // 当前时间索引（近似中间位置）
-    // 当前时间索引（根据当前小时数定位）
+  // 当前时间索引（根据当前小时数定位）
   const currentHour = new Date().getHours();
   const currentHourStr = currentHour.toString().padStart(2, '0');
   const currentIndex = timeLabels.indexOf(currentHourStr);
-  
-
 
   // 自定义tooltip格式化器
   const tooltipFormatter = (params) => {
@@ -225,11 +153,6 @@ const updateTrendChart = (data) => {
       },
       axisLabel: {
         color: 'rgba(255, 255, 255, 0.7)',
-        // 只显示整点小时标签
-        // formatter: function(value, index) {
-        //   const date = new Date(data.time[index]);
-        //   return date.getMinutes() === 0 ? value : '';
-        // },
         rotate: 0,
         fontSize: 10
       },
@@ -395,11 +318,7 @@ const updateTrendChart = (data) => {
 
 // 更新适飞指数图表
 const updateProfileChart = (data) => {
-  if (!profileChartInstance) {
-    return;
-  }
-
-  if (!data) {
+  if (!profileChartInstance || !data) {
     return;
   }
 
@@ -476,7 +395,7 @@ const updateProfileChart = (data) => {
       left: '1%',
       right: '5%',
       top: '1%',
-      bottom: '1%', // 增加底部空间以显示横坐标标签
+      bottom: '1%',
       containLabel: true
     },
     xAxis: {
@@ -486,7 +405,7 @@ const updateProfileChart = (data) => {
       axisLabel: {
         color: 'rgba(255, 255, 255, 0.7)',
         fontSize: 11,
-        interval: 0 // 显示所有标签
+        interval: 0
       },
       splitLine: { show: false }
     },
@@ -510,7 +429,7 @@ const updateProfileChart = (data) => {
       calculable: true,
       dimension: 2,
       inRange: {
-        color: ['#10b981 ', '#a3e635 ', '#fbbf24', '#f97316 ','#ef4444'] // 增加中间色阶
+        color: ['#10b981 ', '#a3e635 ', '#fbbf24', '#f97316 ','#ef4444']
       }
     },
     series: [
@@ -519,8 +438,8 @@ const updateProfileChart = (data) => {
         data: heatmapData,
         label: {
           show: true,
-          color: '#fff', // 白色文字
-          fontSize: 12 // 可根据需要调整字体大小，增强可读性
+          color: '#fff',
+          fontSize: 12
         },
         emphasis: {
           itemStyle: {
@@ -563,7 +482,6 @@ const initCharts = () => {
     return;
   }
 
-
   // 销毁现有图表实例
   if (trendChartInstance) {
     trendChartInstance.dispose();
@@ -578,21 +496,20 @@ const initCharts = () => {
     // 创建新的图表实例
     trendChartInstance = echarts.init(trendChartRef.value);
     profileChartInstance = echarts.init(profileChartRef.value);
-    loadData();
+   
   } catch (error) {
     console.error('创建图表实例失败:', error);
   }
 };
 
-// 监听选中重点关注区域变化
-watch(
-  () => areaStore.selectedArea,
-  (newArea) => {
-    if (newArea) {
-      loadData();
-    }
+// 监听模块数据变化
+watch(weatherForecastPanelData, (newData) => {
+  if (newData) {
+    updateTrendChart(newData.trendData);
+    updateProfileChart(newData.heatmapData);
   }
-);
+}, { deep: true });
+
 
 // 组件挂载
 onMounted(() => {
@@ -619,7 +536,7 @@ onUnmounted(() => {
 
 });
 watch(
-  () => dashboardStore.currentModule,
+  () => moduleStore.currentModule,
   (newVal) => {
     nextTick(() => {
       handleResize();

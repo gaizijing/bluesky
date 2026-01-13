@@ -17,6 +17,8 @@ class EventManager {
     this.rectanglePrimitive = null;
     this.viewer = null;
     this.drawCompleteCallback = null;
+    // 相机控制模式
+    this.originalCameraMode = true;
   }
 
   /**
@@ -152,8 +154,16 @@ class EventManager {
 
     this.rectangleDrawing = true;
     this.drawCompleteCallback = callback;
-    // 改变鼠标样式
-    this.viewer.container.style.cursor = 'crosshair';
+    // 改变鼠标样式 - 确保应用到正确的DOM元素
+    if (this.viewer.container) {
+      this.viewer.container.style.cursor = 'crosshair';
+    }
+    
+    // 同时设置document.body的鼠标样式作为备选
+    document.body.style.cursor = 'crosshair';
+    
+    // 添加CSS类确保样式优先级
+    this.viewer.container.classList.add('rectangle-drawing-mode');
     
     // 保存原始的相机控制模式
     this.originalCameraMode = this.viewer.scene.screenSpaceCameraController.enableInputs;
@@ -169,11 +179,24 @@ class EventManager {
     this.startPosition = null;
     this.currentPosition = null;
     this.removeRectanglePrimitive();
+    
     if (this.viewer) {
-      this.viewer.container.style.cursor = '';
+      // 恢复鼠标样式
+      if (this.viewer.container) {
+        this.viewer.container.style.cursor = '';
+        
+        // 移除CSS类
+        this.viewer.container.classList.remove('rectangle-drawing-mode');
+      }
+      
+      // 恢复document.body的鼠标样式
+      document.body.style.cursor = '';
+      
       // 恢复原始的相机控制模式
       this.viewer.scene.screenSpaceCameraController.enableInputs = this.originalCameraMode;
+      console.log('恢复相机控制模式');
     }
+    
     this.drawCompleteCallback = null;
   }
 

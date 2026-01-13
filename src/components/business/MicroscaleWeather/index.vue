@@ -377,10 +377,10 @@ onBeforeUnmount(() => {
 const onResize = () => {
   chart?.resize();
 };
-import { useDashboardStore } from "@/store/modules/dashboard";
-const dashboardStore = useDashboardStore();
+import { useModuleStore } from "@/store/modules/module";
+const moduleStore = useModuleStore();
 watch(
-  () => dashboardStore.currentModule,
+  () => moduleStore.currentModule,
   (newVal) => {
     // 等待 DOM 更新
     nextTick(() => {

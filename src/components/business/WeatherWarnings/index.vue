@@ -37,8 +37,8 @@
 
 <script setup>
 import * as echarts from "echarts";import { ref, onMounted, onBeforeUnmount, watch,nextTick  } from "vue";
-import { useDashboardStore } from "@/store/modules/dashboard";
-const dashboardStore = useDashboardStore();
+import { useModuleStore } from "@/store/modules/module";
+const moduleStore = useModuleStore();
 
 
 const chart = ref(null);
@@ -372,7 +372,7 @@ onMounted(() => {
   });
 });
 watch(
-  () => dashboardStore.currentModule,
+  () => moduleStore.currentModule,
   (newVal) => {
     // 等待 DOM 更新
     nextTick(() => {

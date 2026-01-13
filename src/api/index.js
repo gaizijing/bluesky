@@ -1,6 +1,4 @@
-import request from '../utils/request';
 import axios from 'axios';
-import cacheUtils, { cacheAsync } from '../utils/cacheUtils';
 import { fetchWeatherApi } from "openmeteo";
 
 // 获取重点关注区域列表
@@ -208,11 +206,41 @@ export const updateSelectedArea = async (area) => {
   }
 }
 
-// 适飞分析
-export const getWeatherSuitability = async (currentPoint) => {
-  if (!currentPoint) {
-    throw new Error('未选择重点关注区域')
+// 添加新的重点关注区域
+export const addNewArea = async (areaData) => {
+  try {
+    // 在实际项目中，这里会是真实的API调用:
+    // const response = await axios.post('/api/monitoring-points', areaData)
+    // return response.data
+
+    // 模拟API调用延迟
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    // 模拟成功响应
+    const newArea = {
+      ...areaData,
+      id: `area-${Date.now()}`,
+      status: "available",
+      warningReason: "",
+      lastUpdate: Date.now()
+    }
+
+    const response = {
+      "code": 200,
+      "message": "success",
+      "data": newArea
+    }
+
+    return response.data
+  } catch (error) {
+    console.error('添加重点关注区域失败:', error)
+    throw error
   }
+}
+
+// 适飞分析
+export const getWeatherSuitability = async () => {
+ 
 
   // 在实际项目中，这里会是真实的API调用:
   // const response = await axios.get(`/api/weather/point/${currentPoint.id}`)
@@ -386,13 +414,6 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
   }
 };
 
-
-// // 导出带缓存的函数，避免频繁调用和风天气API导致配额耗尽
-// export const fetchBasicWeatherData = cacheAsync(fetchBasicWeatherDataFromAPI, {
-//   prefix: 'weather_data', // 缓存键前缀
-//   duration: 5 * 60 * 1000, // 缓存5分钟
-//   useLocalStorage: true // 同时使用localStorage，保证页面刷新后仍能使用缓存
-// });
 
 
 // 原始的获取专业气象数据函数
@@ -597,43 +618,3 @@ export const getWindData = async () => {
     }
   }
 }
-
-const handleQuery = async () => {
-  if (!validate()) return;
-  setLoading(true);
-  try {
-    const params = new URLSearchParams({
-      latitude: form.latitude,
-      longitude: form.longitude,
-      elevation: form.elevation,
-      start_date: form.startDate,
-      end_date: form.endDate,
-      hourly: form.elements.join(','),
-      timezone: 'Asia/Shanghai'
-    });
-    const response = await fetch(`https://api.open-meteo.com/v1/archive?${params}`, {
-      method: 'GET'
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP错误：${response.status}`);
-    }
-    const rawData = await response.json();
-    if (rawData.error) {
-      throw new Error(rawData.reason || 'API请求失败');
-    }
-    const transformed = transformData(rawData);
-    setResult(JSON.stringify({
-      code: 200,
-      message: '查询成功',
-      data: transformed
-    }, null, 2));
-  } catch (error) {
-    setResult(JSON.stringify({
-      code: 400,
-      message: error.message,
-      data: null
-    }, null, 2));
-  } finally {
-    setLoading(false);
-  }
-};

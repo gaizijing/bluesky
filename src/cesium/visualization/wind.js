@@ -1,7 +1,7 @@
 import { WindLayer } from 'cesium-wind-layer';
 import { watch } from 'vue';
 import { getWindData } from '@/api';
-
+import { useWindStore } from '@/store/modules/wind';
 /**
  * 初始化风场图层
  * @param {Cesium.Viewer} viewer - Cesium Viewer实例
@@ -13,13 +13,13 @@ export const initWind = async (viewer, layerSettingsStore) => {
 
   //getDataAtLonLat(lon: number, lat: number): WindDataAtLonLat | null这个方法是官方给的获取当前风场的信息，请你根据这个方法获取当前位置的风场信息
   // 获取风场数据
-  const data = await getWindData();
+  const data = useWindStore().windData;
 
   // 创建风场图层数组
   const windLayerRefs = [];
 
   // 为每个高度层创建风场图层
-  data.layers.forEach((layer, index) => {
+  data?.layers.forEach((layer, index) => {
     const { height, windData } = layer;
 
     // 配置风场图层选项

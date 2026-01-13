@@ -1,6 +1,5 @@
 // src/cesium/entities/RouteManager.js
 import * as Cesium from 'cesium'
-import { useCesiumStore } from '@/store/modules/cesium'
 import eventManager from '@/cesium/core/eventManager'
 class RouteManager {
   // 单例实例

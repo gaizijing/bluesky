@@ -1,18 +1,11 @@
 import * as Cesium from 'cesium'
 import { flyToRegion } from '@/cesium/core/camera'
 import eventManager from '@/cesium/core/eventManager'
-
+import { AreaService } from '@/services/areaService'
 class AreaManager {
-   // 静态属性存储唯一实例
   static instance = null
 
-  /**
-   * 私有构造函数，防止外部直接实例化
-   * @param {Cesium.Viewer} viewer - Cesium viewer实例
-   * @param {Object} areaStore - 重点关注区域状态管理对象
-   */
   constructor(viewer, areaStore) {
-    // 防止通过new关键字重复创建
     if (AreaManager.instance) {
       return AreaManager.instance
     }
@@ -27,23 +20,14 @@ class AreaManager {
     this.hoveredAreaPolygon = null
     this.MOUSE_MOVE_THROTTLE_MS = 50
     this.lastMouseMoveTime = 0
+    this.areaService = new AreaService()
 
-    // 初始化时绑定事件（仅首次实例化时执行）
     this._bindEvents()
-
-    // 存储实例
     AreaManager.instance = this
   }
 
-  /**
-   * 静态方法：获取单例实例（推荐使用此方法获取实例）
-   * @param {Cesium.Viewer} viewer - Cesium viewer实例（首次调用时必传）
-   * @param {Object} areaStore - 重点关注区域状态管理对象（首次调用时必传）
-   * @returns {AreaManager} 单例实例
-   */
   static getInstance(viewer, areaStore) {
     if (!AreaManager.instance) {
-      // 首次调用时创建实例
       new AreaManager(viewer, areaStore)
     }
     return AreaManager.instance
@@ -369,13 +353,13 @@ class AreaManager {
         const area = entity.properties?.areaData?.getValue
           ? entity.properties.areaData.getValue()
           : entity.properties?.areaData
-        this.areaStore.setSelectedArea(area)
+        areaService.updateSelectedArea(area)
       } catch (e) {
         this.areaStore.setSelectedArea(null)
       }
     } else {
-      this.areaStore.setSelectedArea(null)
-      this.viewer.canvas.style.cursor = 'default'
+      // this.areaStore.setSelectedArea(null)
+      // this.viewer.canvas.style.cursor = 'default'
     }
     return entity
   }

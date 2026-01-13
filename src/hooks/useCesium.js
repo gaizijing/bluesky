@@ -1,6 +1,6 @@
 import { ref, watch, toRefs } from 'vue'
 import * as Cesium from 'cesium'
-import { useCesiumStore } from '@/store/modules/cesium'
+import { useWindStore } from '@/store/modules/wind'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import { useAreaStore } from '@/store/modules/area'
 import { createViewer, destroyViewer } from '@/cesium/core/viewer'
@@ -20,10 +20,11 @@ import { SkyBoxManager } from '@/cesium/volumeCloud/SkyBoxManager' // 引入天�
 import { CAMERA_HEIGHT_THRESHOLD } from '../config/windLayerDefaults'
 import Cloud from '@/cesium/visualization/cloud'
 import Atmosphere from '@/cesium/visualization/atmosphere'
-
+import { useHeatmapStore } from '@/store/modules/heatmap'
 export function useCesium(containerId) {
   // Store实例
-  const cesiumStore = useCesiumStore()
+  const windStore = useWindStore()
+  const heatmapStore = useHeatmapStore()
   const areaStore = useAreaStore()
   const layerSettingsStore = useLayerSettingsStore()
   const routeStore = useRouteStore()
@@ -62,10 +63,10 @@ export function useCesium(containerId) {
     resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
       cameraHeightThreshold: 240000
     })
-    const atmosphere = new Atmosphere(viewer.value)
-atmosphere.show()
-    resources.value.cloud = new Cloud(viewer.value)
-    resources.value.cloud.show()
+  //  const atmosphere = new Atmosphere(viewer.value)
+// atmosphere.show()
+    // resources.value.cloud = new Cloud(viewer.value)
+    // resources.value.cloud.show()
 
     
   }
@@ -172,13 +173,14 @@ atmosphere.show()
     // 初始化风场
     resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
     console.log('风场初始化完成', resources.value.windLayer)
-    cesiumStore.setWindLayer(resources.value.windLayer)
+    windStore.setWindLayer(resources.value.windLayer)
 
     // 设置相机高度监听，控制风场、云朵和监测点的显示/隐藏
     setupCameraHeightWatcher()
 
     // 初始化热力图
     resources.value.heatMapInstance = await addHeatVolume(viewer.value)
+    heatmapStore.setHeatmapLayer(resources.value.heatMapInstance)
 
     // 初始化航线管理器
     routeManager.init(viewer.value)

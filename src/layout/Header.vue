@@ -4,120 +4,44 @@
       <div class="header-logo">
         <img src="@/assets/icons/logo.png" class="logo-img" alt="系统logo" />
       </div>
-      <!-- 模式切换按钮 -->
-      <div class="mode-switcher">
-        <div 
-          class="mode-btn" 
-          :class="{ active: true }"
-          @click="toggleMode"
-          :title="currentMode === 'overview' ? '概览模式（显示所有监测点）- 点击切换到重点关注模式' : '重点关注模式（切换到当前选中的关注区域）- 点击切换到概览模式'"
-        >
-          <div class="mode-icon">
+      <!-- 视角切换按钮 -->
+      <div class="camera-switcher">
+        <div class="camera-btn" :class="{ active: true }" @click="toggleMode"
+          :title="currentMode === 'overview' ? '当前区域' : '区域概览'">
+          <div class="camera-icon">
             <!-- 根据当前模式显示不同图标 -->
-            <svg v-if="currentMode === 'overview'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-              <line x1="8" y1="21" x2="16" y2="21"/>
-              <line x1="12" y1="17" x2="12" y2="21"/>
-            </svg>
-            <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <circle cx="12" cy="12" r="6"/>
-              <circle cx="12" cy="12" r="2"/>
-            </svg>
+            <el-icon v-if="currentMode === 'overview'">
+              <Aim />
+            </el-icon>
+            <el-icon v-else>
+              <House />
+            </el-icon>
           </div>
         </div>
       </div>
-      <div class="location-info">
-        <span class="location-name" @click="toggleAreaSelector">当前位置：{{ areaStore.selectedAreaName
+      <!-- 当前位置 -->
+      <div class="area-info">
+        <span class="area-name" @click="toggleAreaSelector">当前位置：{{ areaStore.selectedAreaName
         }}</span>
       </div>
     </div>
-    <!-- 切换起降点弹窗 -->
-    <div v-if="showAreaSelector" class="dialog-mask" @click="toggleAreaSelector">
-      <div class="dialog-container" @click.stop>
-        <div class="dialog-header">
-          <h3>选择区域</h3>
-          <button class="dialog-close" @click="toggleAreaSelector">×</button>
-        </div>
-        <div class="dialog-content">
-          <AreaList ref="areaListRef" @add-area="handleAddArea" />
-        </div>
-      </div>
-    </div>
+    <!-- 切换区域弹窗 -->
+    <DialogContainer title="选择区域" :visible="showAreaSelector" @close="toggleAreaSelector">
+      <AreaList ref="areaListRef" @add-area="handleAddArea" />
+    </DialogContainer>
 
-    <!-- 新建重点关注区域表单 -->
-    <CreateAreaForm
-      ref="createAreaFormRef"
-      v-show="showCreateForm"
-      @form-closed="handleCreateFormClose"
-      @area-created="handleAreaCreated"
-    />
+    <!-- 新建区域表单 -->
+    <DialogContainer title="新建区域" :visible="showCreateForm" @close="showCreateForm = false">
+      <CreateAreaForm ref="createAreaFormRef" @area-created="handleAreaCreated" @close="handleCreateFromClose"
+        :reselect-area-callback="handleReselectArea" />
+    </DialogContainer>
 
     <!-- 阈值管理弹窗 -->
-    <div v-if="showThresholdDialog" class="dialog-mask" @click="handleThresholdClose">
-      <div class="dialog-container" @click.stop>
-        <div class="dialog-header">
-          <h3 class="dialog-header-h3">阈值设置</h3>
-          <button class="dialog-close" @click="handleThresholdClose">×</button>
-        </div>
-        <div class="dialog-content">
-          <ThresholdManagement />
-        </div>
-      </div>
-    </div>
+    <DialogContainer title="风险阈值设置" :visible="showThresholdDialog" @close="handleAddArea">
+      <ThresholdManagement />
+    </DialogContainer>
 
-    <!-- 详细天气弹窗 -->
-    <div v-if="showWeatherDetail" class="dialog-mask" @click="toggleWeatherDetail">
-      <div class="weather-detail-container" @click.stop>
-        <div class="weather-detail-header">
-          <div class="weather-main-info">
-            <div class="temperature">{{ weatherStore.currentAreaWeather.temp }}℃</div>
-            <div class="weather-status">{{ weatherStore.currentAreaWeather.text }}</div>
-          </div>
-          <div class="weather-date-info">
-            <div class="date">{{ currentDate }}</div>
-            <div class="location">{{ areaStore.selectedAreaName }}</div>
-          </div>
-        </div>
-        <div class="weather-detail-content">
-          <div class="weather-item">
-            <div class="weather-item-label">风速</div>
-            <div class="weather-item-value">{{ weatherStore.currentAreaWeather.windSpeed }}</div>
-            <div class="weather-item-unit">m/s</div>
-          </div>
-          <div class="weather-item">
-            <div class="weather-item-label">能见度</div>
-            <div class="weather-item-value">{{ weatherStore.currentAreaWeather.vis }}</div>
-            <div class="weather-item-unit">km</div>
-          </div>
-          <div class="weather-item">
-            <div class="weather-item-label">降水量</div>
-            <div class="weather-item-value">{{ weatherStore.currentAreaWeather.precip }}</div>
-            <div class="weather-item-unit">mm</div>
-          </div>
-          <div class="weather-item">
-            <div class="weather-item-label">湿度</div>
-            <div class="weather-item-value">{{ weatherStore.currentAreaWeather.humidity }}</div>
-            <div class="weather-item-unit">%</div>
-          </div>
-          <div class="weather-item">
-            <div class="weather-item-label">气压</div>
-            <div class="weather-item-value">{{ weatherStore.currentAreaWeather.pressure }}</div>
-            <div class="weather-item-unit">hPa</div>
-          </div>
-          <div class="weather-item">
-            <div class="weather-item-label">风向</div>
-            <div class="weather-item-value">{{ weatherStore.currentAreaWeather.windDir }}</div>
-          </div>
-        </div>
-        <div class="weather-detail-footer">
-          <div class="weather-suggestion">
-            <div class="suggestion-title">今日天气状况良好，适宜飞行</div>
-          </div>
-        </div>
-        <button class="weather-detail-close" @click="toggleWeatherDetail">×</button>
-      </div>
-    </div>
+
 
     <div class="logo-text">{{ appTitle }}</div>
 
@@ -129,46 +53,11 @@
           <div class="loading-text">加载中...</div>
         </div>
       </div>
-      <div v-else class="weather-info" @click="toggleWeatherDetail">
-        <div class="weather-item">
-          <div class="weather-icon-circle">
-            <img src="@/assets/icons/ic_temperature.png" class="weather-icon" />
-          </div>
-
-          <span class="weather-value">{{
-            weatherStore.headerWeatherInfo.temperature
-          }}</span>
-        </div>
-        <div class="weather-item">
-          <div class="weather-icon-circle">
-            <img src="@/assets/icons/ic_windspeed.png" class="weather-icon" />
-          </div>
-          <span class="weather-value">{{
-            weatherStore.headerWeatherInfo.windSpeed
-          }}</span>
-        </div>
-        <div class="weather-item">
-          <div class="weather-icon-circle">
-            <img src="@/assets/icons/ic_visibility.png" class="weather-icon" />
-          </div>
-          <span class="weather-value">{{
-            weatherStore.headerWeatherInfo.visibility
-          }}</span>
-        </div>
-        <div class="weather-item">
-          <div class="weather-icon-circle">
-            <img src="@/assets/icons/ic_humidity.png" class="weather-icon" />
-          </div>
-          <span class="weather-value">{{
-            weatherStore.headerWeatherInfo.humidity
-          }}</span>
-        </div>
-      </div>
+      <WeatherComponent v-else />
       <div class="current-time">{{ currentTime }}</div>
       <el-dropdown trigger="click">
         <div class="user-info">
-          <!-- 将原来的 el-avatar 替换为使用 ic_user.png 图片 -->
-          <img src="@/assets/icons/ic_user.png" class="user-avatar" />
+          \ <img src="@/assets/icons/ic_user.png" class="user-avatar" />
         </div>
         <template #dropdown>
           <el-dropdown-menu>
@@ -197,12 +86,9 @@
 <script setup>
 import {
   ref,
-  onMounted,
-  onBeforeMount,
-  onUnmounted,
-  computed,
   defineAsyncComponent,
   watch,
+  nextTick
 } from "vue";
 import { useRouter } from "vue-router";
 import { useCurrentTime } from "@/hooks/useTime";
@@ -222,10 +108,13 @@ const ThresholdManagement = defineAsyncComponent(() =>
 );
 import { useWeatherStore } from "@/store/modules/weather";
 import { useLayerSettingsStore } from "@/store/modules/layerSettings";
-import { fetchCurrentPointWeather } from "@/api";
-import { fetchAreaList, fetchCurrentSelectedArea } from '@/api'
 import { useAreaStore } from '@/store/modules/area'
 import { ElMessage } from 'element-plus'
+import DialogContainer from '@/components/common/DialogContainer.vue'
+import { InitializationService } from '@/services/initialization'
+
+// 创建初始化服务实例
+const initializationService = new InitializationService();
 
 const layerSettingsStore = useLayerSettingsStore();
 const { currentTime } = useCurrentTime();
@@ -233,12 +122,26 @@ const { currentTime } = useCurrentTime();
 const appTitle = import.meta.env.VITE_APP_TITLE;
 
 const showAreaSelector = ref(false);
-const areaListRef = ref(null);
 const createAreaFormRef = ref(null);
 const showThresholdDialog = ref(false);
 const showLayerDialog = ref(false);
-const showWeatherDetail = ref(false);
 const showCreateForm = ref(false);
+
+// 存储待传递的bbox数据
+const pendingBbox = ref(null);
+
+// 监听组件挂载状态
+watch(
+  createAreaFormRef,
+  (newVal) => {
+    if (newVal && pendingBbox.value) {
+      // 组件已经挂载且有等待处理的bbox数据
+      newVal.showCreateForm(pendingBbox.value);
+      pendingBbox.value = null; // 清空待处理数据
+    }
+  },
+  { deep: true }
+);
 const router = useRouter();
 const weatherStore = useWeatherStore();
 const areaStore = useAreaStore();
@@ -249,58 +152,76 @@ const currentMode = ref('overview'); // 默认概览模式
 // 切换模式函数
 const toggleMode = () => {
   const newMode = currentMode.value === 'overview' ? 'focus' : 'overview';
-  currentMode.value = newMode;
-  
-  // 触发模式切换事件，让地图组件响应
-  eventManager.emit('modeChange', newMode);
-  
+
+  // 如果是切换到重点关注模式，先检查是否有选中的区域
   if (newMode === 'focus') {
-    // 重点关注模式：切换到当前选中的关注区域
     const selectedArea = areaStore.selectedArea;
     if (!selectedArea) {
-      // 如果没有选中的重点关注区域，显示提示信息
       console.warn('没有选中的重点关注区域，无法切换到重点关注模式');
-      // 使用Element Plus的Message提示框
       ElMessage.warning('请先选择一个重点关注区域，然后再切换到重点关注模式');
-      // 切换回概览模式
-      currentMode.value = 'overview';
+      // 不执行切换
+      return;
     }
   }
+  // 执行模式切换
+  currentMode.value = newMode;
+  // 触发模式切换事件，让地图组件响应
+  eventManager.emit('modeChange', newMode);
 }
-// 切换重点关注区域选择器显示
+// 切换区域列表弹窗显示
 const toggleAreaSelector = () => {
   showAreaSelector.value = !showAreaSelector.value;
 };
 
-// 处理新增关注区域事件
-const handleAddArea = () => {
-  // 隐藏重点关注区域选择器
-  showAreaSelector.value = false;
+// 通用的开始绘制区域方法
+const startAreaDrawing = () => {
+  try {
+    // 先停止可能正在进行的绘制操作，确保状态重置
+    if (eventManager.stopRectangleDrawing) {
+      eventManager.stopRectangleDrawing();
+    }
+
+    // 根据不同情况处理上下文
   
+      // 重新选择情况：隐藏创建表单
+      showCreateForm.value = false;
+   
+      showAreaSelector.value = false;
+    
+      performDrawing();
+  } catch (error) {
+    // 恢复鼠标样式
+    if (eventManager.stopRectangleDrawing) {
+      eventManager.stopRectangleDrawing();
+    }
+  }
+};
+
+// 执行实际的绘制操作
+const performDrawing = () => {
   // 开始矩形绘制
   eventManager.startRectangleDrawing((rectangle) => {
     // 将Cesium.Rectangle转换为bbox对象
     const bbox = {
-      west: rectangle.west,
-      south: rectangle.south,
-      east: rectangle.east,
-      north: rectangle.north
+      ...rectangle
     };
-    
+
+    // 停止绘制并恢复鼠标样式
+    eventManager.stopRectangleDrawing();
+
     // 显示创建表单
     showCreateForm.value = true;
-    // 调用创建表单组件的方法，传递bbox数据
-    setTimeout(() => {
-      if (createAreaFormRef.value) {
-        createAreaFormRef.value.showCreateForm(bbox);
-      }
-    }, 0);
+
+
+    // 新增情况：使用pendingBbox
+    pendingBbox.value = bbox;
+
   });
 };
 
-// 处理创建表单关闭事件
-const handleCreateFormClose = () => {
-  showCreateForm.value = false;
+// 处理新增关注区域事件
+const handleAddArea = () => {
+  startAreaDrawing();
 };
 
 // 处理新区域创建完成事件
@@ -316,9 +237,12 @@ const handleSetting = () => {
   showThresholdDialog.value = true;
 };
 
-// 处理阈值管理弹窗关闭
-const handleThresholdClose = () => {
-  showThresholdDialog.value = false;
+// 处理创建表单关闭事件（保留接口兼容性）
+const handleCreateFromClose = () => {
+  // 停止绘制操作
+  eventManager.stopRectangleDrawing();
+  // 关闭表单（DialogContainer会自动处理显示/隐藏）
+  showCreateForm.value = false;
 };
 
 // 显示图层设置弹窗
@@ -327,88 +251,21 @@ const mapSetting = () => {
   layerSettingsStore.setShow(showLayerDialog.value);
 };
 
-// 切换详细天气弹窗显示
-const toggleWeatherDetail = () => {
-  showWeatherDetail.value = !showWeatherDetail.value;
-};
-
 // 退出登录
 const handleLogout = () => {
   // 实际项目中添加退出登录逻辑（清除token、状态等）
   router.push("/login");
 };
 
-// 当前日期
-const currentDate = computed(() => {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
-  return `${year}-${month}-${day} ${week}`;
-});
 
-// 点击外部关闭弹窗
-const handleClickOutside = (event) => {
-  if (showWeatherDetail.value) {
-    const weatherInfo = document.querySelector('.weather-info');
-    const weatherPopup = document.querySelector('.weather-detail-container');
-    if (weatherInfo && !weatherInfo.contains(event.target) && weatherPopup && !weatherPopup.contains(event.target)) {
-      showWeatherDetail.value = false;
-    }
-  }
-};
-
-// 添加全局点击事件监听
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside);
-});
-
-// 移除全局点击事件监听
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside);
-});
-
-// 获取当前重点关注区域的天气数据并保存到store
-const fetchAndSaveWeatherData = async () => {
-  if (!areaStore.hasSelectedArea) {
-    return;
-  }
-  weatherStore.setIsLoading(true);
-  const weatherData = await fetchCurrentPointWeather(
-    areaStore.selectedArea
-  );
-  weatherStore.setCurrentAreaWeather(weatherData);
-  weatherStore.setIsLoading(false);
-};
-// 监听selectedArea变化，触发监测列表的初始化和天气数据更新
+// 监听selectedArea变化，触发天气数据更新
 watch(
   () => areaStore.selectedArea,
   (newArea) => {
     showAreaSelector.value = false;
-    if (newArea) {
-      fetchAndSaveWeatherData();
-    }
+    initializationService.initializeAreaWeatherData();
   }
 );
-// 在组件挂载前检查是否需要初始化
-onBeforeMount(async () => {
-
-  // 从API获取重点关注区域数据
-  const areasData = await fetchAreaList();
-  const currentArea = await fetchCurrentSelectedArea();
-  // 保存到store
-  areaStore.setAreaList(areasData);
-  areaStore.setSelectedArea(currentArea);
-
-});
-
-// 组件挂载后，获取当前重点关注区域的天气数据
-onMounted(() => {
-  if (areaStore.hasSelectedArea) {
-    fetchAndSaveWeatherData();
-  }
-});
 </script>
 
 <style scoped lang="scss">
@@ -436,12 +293,12 @@ onMounted(() => {
 }
 
 /* 模式切换按钮样式 */
-.mode-switcher {
+.camera-switcher {
   display: flex;
   align-items: center;
 }
 
-.mode-btn {
+.camera-btn {
   width: 40px;
   height: 40px;
   background: radial-gradient(circle at center, rgba(66, 153, 225, 0.8) 0%, rgba(66, 153, 225, 0.3) 100%);
@@ -455,39 +312,39 @@ onMounted(() => {
   backdrop-filter: blur(10px);
 }
 
-.mode-btn:hover {
+.camera-btn:hover {
   //background-color: rgba(37, 99, 235, 0.2);
- //border-color: rgba(59, 130, 246, 0.8);
+  //border-color: rgba(59, 130, 246, 0.8);
   color: #fff;
   transform: scale(1.1);
 }
 
-.mode-btn.active {
+.camera-btn.active {
   //background-color: rgba(59, 130, 246, 0.9);
   //border-color: #3b82f6;
   color: white;
   //box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
 }
 
-.mode-btn:active {
+.camera-btn:active {
   transform: scale(0.95);
 }
 
 /* 图标样式 */
-.mode-icon {
+.camera-icon {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.mode-icon svg {
+.camera-icon svg {
   width: 20px;
   height: 20px;
   stroke-width: 2.5;
 }
 
-.location-info {
-  .location-name {
+.area-info {
+  .area-name {
     font-size: 20px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -497,7 +354,7 @@ onMounted(() => {
   }
 }
 
-.location-info:hover {
+.area-info:hover {
   transform: scale(1.05);
 }
 
@@ -612,7 +469,7 @@ onMounted(() => {
   top: 100px;
   right: 20px;
   width: 350px;
-  background-image: url('@/assets/images/bg_weather.jpg') ;
+  background-image: url('@/assets/images/bg_weather.jpg');
   background-size: cover;
   background-position: center;
   border-radius: 10px;
@@ -716,13 +573,13 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .location-info {
-    .location-name {
+  .area-info {
+    .area-name {
       max-width: 100px;
       font-size: $font-size-small;
     }
 
-    .switch-location-btn {
+    .switch-area-btn {
       padding: 3px 8px;
       font-size: 13px;
     }

@@ -15,13 +15,8 @@ export const useAreaStore = defineStore('areaList', {
       this.areaList = areas;
       // 如果还没有选中区域，且列表不为空，则默认选中第一个起降点
       if (!this.selectedArea && areas && areas.length > 0) { 
-        const firstTakeoffArea = areas.find(point => point.type === 'takeoff');
-        if (firstTakeoffArea) {
-          this.setSelectedArea(firstTakeoffArea); 
-        } else {
           // 如果没有起降点，则选中第一个点
           this.setSelectedArea(areas[0]);
-        }
       }
     },
     

@@ -21,4 +21,28 @@ app.use(store)  // 挂载Pinia
 app.use(router) // 挂载路由
 app.use(ElementPlus)
 
+// 挂载应用
 app.mount('#app')
+
+// 应用挂载后初始化数据
+import { InitializationService } from './services/initialization'
+import { PollingService } from './services/polling'
+
+// 初始化应用数据
+async function initializeApp() {
+  const initializationService = new InitializationService();
+  const pollingService = new PollingService();
+
+  try {
+    // 开始初始化
+    await initializationService.initialize();
+    
+    // 启动轮询
+    pollingService.start();
+  } catch (error) {
+    console.error('应用初始化失败:', error);
+  }
+}
+
+// 调用初始化函数
+initializeApp()

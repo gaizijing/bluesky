@@ -23,35 +23,18 @@
       <!-- 添加搜索框和类型筛选 -->
       <div class="controls-bar">
         <div class="search-box">
-          <input
-            ref="searchInputRef"
-            v-model="searchKeyword"
-            type="text"
-            placeholder="搜索区域名称..."
-            class="search-input"
-          />
+          <input ref="searchInputRef" v-model="searchKeyword" type="text" placeholder="搜索区域名称..."
+            class="search-input" />
         </div>
 
         <div class="filter-tabs">
-          <button
-            class="filter-tab"
-            :class="{ active: typeFilter === 'all' }"
-            @click="typeFilter = 'all'"
-          >
+          <button class="filter-tab" :class="{ active: typeFilter === 'all' }" @click="typeFilter = 'all'">
             全部类型
           </button>
-          <button
-            class="filter-tab"
-            :class="{ active: typeFilter === 'takeoff' }"
-            @click="typeFilter = 'takeoff'"
-          >
+          <button class="filter-tab" :class="{ active: typeFilter === 'takeoff' }" @click="typeFilter = 'takeoff'">
             起降点
           </button>
-          <button
-            class="filter-tab"
-            :class="{ active: typeFilter === 'operation' }"
-            @click="typeFilter = 'operation'"
-          >
+          <button class="filter-tab" :class="{ active: typeFilter === 'operation' }" @click="typeFilter = 'operation'">
             作业点
           </button>
         </div>
@@ -88,12 +71,7 @@
 
       <!-- 重点关注区域列表项 -->
       <div class="table-body">
-        <div
-          v-for="area in filteredAreas"
-          :key="area.id"
-          class="table-row"
-          :class="area.status"
-        >
+        <div v-for="area in filteredAreas" :key="area.id" class="table-row" :class="area.status">
           <div class="table-cell name">
             <div class="area-name">{{ area.name }}</div>
           </div>
@@ -110,11 +88,7 @@
             <span class="status-text">
               {{ getStatusText(area.status) }}
             </span>
-            <span
-              v-if="area.warningReason"
-              class="warning-tooltip"
-              :title="area.warningReason"
-            >
+            <span v-if="area.warningReason" class="warning-tooltip" :title="area.warningReason">
               ⓘ
             </span>
           </div>
@@ -131,17 +105,15 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeMount } from "vue";
 import { useAreaStore } from "@/store/modules/area";
-import { updateSelectedArea } from "@/api";
-
-// 使用组合函数
-const areaStore= useAreaStore();
+import { AreaService } from "@/services/areaService";
+const areaStore = useAreaStore();
 
 // 状态管理
 const searchKeyword = ref("");
 const typeFilter = ref("all");
 const currentArea = ref(null);
 const statusFilter = ref("all");
-
+const areaService = new AreaService();
 // 添加 emit
 const emit = defineEmits(["area-selected", "add-area"]);
 
@@ -191,18 +163,11 @@ const resetFilters = () => {
 };
 const switchArea = async (area) => {
   currentArea.value = { ...area };
-
-  // 保存到全局状态
-  areaStore.setSelectedArea(area);
-
   try {
-    // 调用API保存到后台
-    await updateSelectedArea(area);
+    areaService.updateSelectedArea(area);
   } catch (error) {
     console.error('保存重点关注区域信息失败:', error);
-    // 即使保存失败，也继续执行后续操作
   }
-
   // 触发事件通知父组件
   emit("area-selected", area);
 };
@@ -244,6 +209,7 @@ const setFilter = (status) => {
     flex-wrap: wrap;
     cursor: pointer;
     justify-content: space-between;
+
     .stat-item {
       min-width: 110px;
       text-align: center;
@@ -254,6 +220,7 @@ const setFilter = (status) => {
       transition: transform 0.2s;
       font-family: "aideepFont";
       font-style: normal;
+
       &:hover {
         transform: translateY(-2px);
       }
@@ -368,6 +335,7 @@ const setFilter = (status) => {
     }
   }
 }
+
 .controls-bar {
   display: flex;
   justify-content: space-between;
@@ -465,6 +433,7 @@ const setFilter = (status) => {
     }
   }
 }
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

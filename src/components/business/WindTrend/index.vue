@@ -9,12 +9,12 @@
 <script setup>
 import * as echarts from "echarts";
 import { ref, onMounted, onUnmounted, watch, nextTick } from "vue";
-import { useDashboardStore } from "@/store/modules/dashboard";
+import { useModuleStore } from "@/store/modules/module";
 import { useAreaStore } from "@/store/modules/area";
 import { fetchCurrentPointWindTrend } from "@/api/weather";
 import { intersection } from "lodash";
 
-const dashboardStore = useDashboardStore();
+const moduleStore = useModuleStore();
 const areaStore = useAreaStore();
 
 // 图表实例与状态
@@ -248,7 +248,7 @@ watch(
 
 // 监听dashboard模块变化
 watch(
-  () => dashboardStore.currentModule,
+  () => moduleStore.currentModule,
   (newVal) => {
     nextTick(() => {
       handleResize();

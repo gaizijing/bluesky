@@ -134,6 +134,14 @@ const props = defineProps<{
   windLayer: WindLayer | null
 }>()
 
+/* ================= emit ================= */
+
+// 定义emit事件
+const emit = defineEmits<{
+  (e: "options-change", options: Partial<WindLayerOptions>): void;
+  (e: "layer-visibility-change"): void; // 新增图层可见性变化事件
+}>();
+
 /* ================= store ================= */
 
 const layerSettingsStore = useLayerSettingsStore()
@@ -155,6 +163,8 @@ const toggleLayerVisibility = (key: string, e: Event) => {
   const visible = (e.target as HTMLInputElement).checked
   layerSettingsStore.setLayerVisibility(key, visible)
   layerSettingsStore.saveSettingsToLocal()
+  // 通知父组件更新地图显示
+  emit("layer-visibility-change")
 }
 
 /* ================= 风场参数 ================= */
@@ -162,8 +172,6 @@ const toggleLayerVisibility = (key: string, e: Event) => {
 const localOptions = reactive<WindLayerOptions>({
   ...WIND_LAYER_DEFAULTS,
 })
-// 事件发射器 
-const emit = defineEmits<{ (e: "optionsChange", options: Partial<WindLayerOptions>): void; }>();
 const applyOptions = (changedOptions: Partial<WindLayerOptions>) => {
   if (props.windLayer) {
     const layers = Array.isArray(props.windLayer)
