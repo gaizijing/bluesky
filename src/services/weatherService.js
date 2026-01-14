@@ -38,19 +38,19 @@ class WeatherService {
       weatherStore.setIsLoading(false);
     }
   }
-  async loadWindData(area) {
+  async loadWindData() {
     try {
       const windData = await getWindData();
+      
       this.getWindStore().setWindData(windData);
     } catch (error) {
       console.error('加载区域天气数据失败:', error);
       throw error;
     }
   }
-  async loadHeatMapData(area) {
+  async loadHeatMapData() {
     try {
-      console.log('area', area);
-       const response = await fetch(import.meta.env.VITE_TEM_DATA_URL);
+      const response = await fetch(import.meta.env.VITE_TEM_DATA_URL);
     const data = await response.json();
     this.getHeatmapStore().setHeatmapData(data);
     } catch (error) {

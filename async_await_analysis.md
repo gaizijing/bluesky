@@ -12,7 +12,7 @@
 - **是否异步**：是
 - **原因**：使用了 `await fetch()` 加载风场数据，这是一个网络请求，必须使用异步等待
 
-### 1.3 `addHeatVolume` 函数
+### 1.3 `initHeatVolume` 函数
 - **文件**：`src/cesium/visualization/heatmap.js`
 - **是否异步**：是
 - **原因**：使用了 `await fetch()` 加载热力图数据，这是一个网络请求，必须使用异步等待
@@ -25,9 +25,9 @@
 - **原因**：内部调用了异步函数 `addWhiteModel()`，必须使用 `await` 等待3D模型加载完成，否则会导致后续操作使用未加载完成的模型资源
 
 ### 2.2 `initEntitiesAndVisualizations` 函数
-- **调用关系**：`initEntitiesAndVisualizations` → `initWind()` + `addHeatVolume()`
+- **调用关系**：`initEntitiesAndVisualizations` → `initWind()` + `initHeatVolume()`
 - **是否需要异步**：是
-- **原因**：内部调用了两个异步函数 `initWind()` 和 `addHeatVolume()`，必须使用 `await` 等待风场和热力图数据加载完成，否则会导致后续操作使用未加载完成的可视化资源
+- **原因**：内部调用了两个异步函数 `initWind()` 和 `initHeatVolume()`，必须使用 `await` 等待风场和热力图数据加载完成，否则会导致后续操作使用未加载完成的可视化资源
 
 ## 3. 结论
 

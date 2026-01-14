@@ -1,25 +1,34 @@
 import * as Cesium from 'cesium'
 import h337 from 'heatmap.js';
 import { useHeatmapStore } from '@/store/modules/heatmap';
-
+import { watch } from 'vue';
 /**
  * 👉 生成热力图数据
  */
-export const addHeatVolume = async (viewer) => {
+export const initHeatVolume = async (viewer) => {
   try {
     const heatmapStore = useHeatmapStore();
     const data = heatmapStore.heatmapData;
-    if(!data){
-      return null;
+    console.log('热力图数据:', data);
+    
+    // 创建3D热力图
+    let heatMapInstance;
+    let heatmapPoints = [];
+    
+    // 如果有数据，转换数据格式
+    if(data) {
+      heatmapPoints = data.points.map(point => ({
+        lnglat: [point.lon, point.lat],
+        value: point.value
+      }));
+    } else {
+      // 如果没有数据，使用默认的空数据
+      heatmapPoints = [];
+      console.log('热力图数据未加载，使用空数据初始化');
     }
-    // 转换数据格式为新热力图所需格式
-    const heatmapPoints = data.points.map(point => ({
-      lnglat: [point.lon, point.lat],
-      value: point.value
-    }));
 
     // 创建3D热力图
-    const heatMapInstance = create3DHeatmap(viewer, {
+    heatMapInstance = create3DHeatmap(viewer, {
       dataPoints: heatmapPoints,
       radius: 15,
       baseElevation: 100,
@@ -31,6 +40,32 @@ export const addHeatVolume = async (viewer) => {
         ".95": "red",
       },
     });
+    
+    // 监听热力图数据变化，使用updateData方法更新热力图
+    if (heatMapInstance) {
+      watch(
+        () => heatmapStore.heatmapData,
+        (newData) => {
+          if (newData && newData.points && newData.points.length > 0) {
+            console.log('热力图数据更新，开始更新热力图...', newData);
+            // 转换数据格式
+            const newHeatmapPoints = newData.points.map(point => ({
+              lnglat: [point.lon, point.lat],
+              value: point.value
+            }));
+            // 使用updateData方法更新热力图
+            try {
+              heatMapInstance.updateData(newHeatmapPoints);
+              console.log('热力图更新成功');
+            } catch (error) {
+              console.error('热力图更新失败：', error);
+            }
+          }
+        },
+        { deep: true }
+      );
+    }
+    
     return heatMapInstance;
   } catch (error) {
     console.error('热力图加载失败:', error);
@@ -61,9 +96,57 @@ export const create3DHeatmap = (viewer, options = {}) => {
     heightMultiplier: options.heightMultiplier || 1000
   };
 
+  // 如果没有数据点，创建一个空的热力图实例
   if (!heatmapState.dataPoints || heatmapState.dataPoints.length < 2) {
-    console.log("热力图点位不得少于3个！");
-    return;
+    console.log("热力图点位不足，创建空实例");
+    
+    // 创建容器
+    createHeatmapContainer(heatmapState);
+    
+    // 创建热力图配置
+    const heatmapConfig = {
+      container: document.getElementById(`heatmap-${heatmapState.instanceId}`),
+      radius: options.radius || 20,
+      maxOpacity: 0.7,
+      minOpacity: 0,
+      blur: 0.75,
+      gradient: options.colorGradient || {
+        ".1": "blue",
+        ".5": "yellow",
+        ".7": "red",
+        ".99": "white",
+      },
+    };
+    
+    // 创建热力图实例
+    heatmapState.heatmapInstance = h337.create(heatmapConfig);
+    
+    // 返回一个空的实例对象，包含必要的方法
+    return {
+      destroy: () => {
+        if (heatmapState.containerElement) {
+          heatmapState.containerElement.remove();
+        }
+      },
+      updateData: (newDataPoints) => {
+        // 当数据更新时，重新创建完整的热力图
+        if (newDataPoints && newDataPoints.length >= 2) {
+          // 先销毁当前实例
+          if (heatmapState.heatmapPrimitive) {
+            heatmapState.viewer.scene.primitives.remove(heatmapState.heatmapPrimitive);
+          }
+          if (heatmapState.containerElement) {
+            heatmapState.containerElement.remove();
+          }
+          
+          // 重新创建热力图
+          return create3DHeatmap(viewer, {
+            ...options,
+            dataPoints: newDataPoints
+          });
+        }
+      }
+    };
   }
 
   createHeatmapContainer(heatmapState);

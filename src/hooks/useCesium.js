@@ -10,7 +10,7 @@ import { loadTerrain } from '@/cesium/layers/terrain'
 import { addWhiteModel } from '@/cesium/layers/model3d'
 import { AreaManager } from '@/cesium/entities/area.js'
 import { initWind } from '@/cesium/visualization/wind'
-import { addHeatVolume } from '@/cesium/visualization/heatmap'
+import { initHeatVolume } from '@/cesium/visualization/heatmap'
 import generateHeatmapData from '@/mock/heatmapData'
 import { routeManager } from '@/cesium/entities/routes' // 引入航线管理器
 import { useRouteStore } from '@/store/modules/routeStore'
@@ -63,12 +63,12 @@ export function useCesium(containerId) {
     resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
       cameraHeightThreshold: 240000
     })
-  //  const atmosphere = new Atmosphere(viewer.value)
-// atmosphere.show()
+    //  const atmosphere = new Atmosphere(viewer.value)
+    // atmosphere.show()
     // resources.value.cloud = new Cloud(viewer.value)
     // resources.value.cloud.show()
 
-    
+
   }
 
   /**
@@ -107,11 +107,11 @@ export function useCesium(containerId) {
           if (resources.value.areaManager) {
             resources.value.areaManager.setAreasVisibility(false); // 监测点隐藏
           }
-        
-            if (resources.value.cloud) {
-              resources.value.cloud.show(); // 云朵显示
-            }
-         
+
+          if (resources.value.cloud) {
+            resources.value.cloud.show(); // 云朵显示
+          }
+
 
 
         } else {
@@ -164,22 +164,21 @@ export function useCesium(containerId) {
    */
   const initEntitiesAndVisualizations = async () => {
     // 初始化监测点管理器
-    setTimeout(() => {
-      resources.value.areaManager = AreaManager.getInstance(viewer.value, areaStore)
-      resources.value.areaManager.render(areaList.value)
-    }, 2000)
+
+    resources.value.areaManager = AreaManager.getInstance(viewer.value, areaStore)
+    resources.value.areaManager.render(areaList.value)
+
 
 
     // 初始化风场
     resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
-    console.log('风场初始化完成', resources.value.windLayer)
-    windStore.setWindLayer(resources.value.windLayer)
+
 
     // 设置相机高度监听，控制风场、云朵和监测点的显示/隐藏
-    setupCameraHeightWatcher()
+    // setupCameraHeightWatcher()
 
     // 初始化热力图
-    resources.value.heatMapInstance = await addHeatVolume(viewer.value)
+    resources.value.heatMapInstance = await initHeatVolume(viewer.value)
     heatmapStore.setHeatmapLayer(resources.value.heatMapInstance)
 
     // 初始化航线管理器
@@ -366,7 +365,7 @@ export function useCesium(containerId) {
    * 设置温度图层可见性
    */
   const setTemperatureVisibility = (visible) => {
-    if (resources.value.heatMapInstance && resources.value.heatMapInstance.heatmapState.heatmapPrimitive) {
+    if (resources.value.heatMapInstance && resources.value.heatMapInstance.heatmapState) {
       resources.value.heatMapInstance.heatmapState.heatmapPrimitive.show = visible
     }
   };

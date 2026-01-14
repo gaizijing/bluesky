@@ -1,24 +1,13 @@
 import { fetchAreaList, fetchCurrentSelectedArea, addNewArea } from '@/api';
 import { useAreaStore } from '@/store/modules/area';
-import { updateSelectedArea } from "@/api";
-
+import { updateSelectedArea } from '@/api';
 // 使用延迟初始化模式解决循环依赖问题
 class AreaService {
   constructor() {
     this.areaStore = useAreaStore();
     // 延迟初始化，不在构造函数中创建依赖实例
-    this.initializationService = null;
   }
-  
-  // 获取InitializationService实例（懒加载）
-  getInitializationService() {
-    if (!this.initializationService) {
-      // 动态导入解决循环依赖
-      const { InitializationService } = require('./initialization');
-      this.initializationService = new InitializationService();
-    }
-    return this.initializationService;
-  }
+ 
 
   async loadAreaList() {
     try {
@@ -70,11 +59,7 @@ class AreaService {
     try {
       await updateSelectedArea(areaData);
       this.areaStore.setSelectedArea(areaData);
-      await Promise.all([
-        this.getInitializationService().initializeAreaWeatherData(),
-        this.getInitializationService().initializeMapWeatherLayer(),
-        this.getInitializationService().initializeModuleData(),
-      ]); 
+     
     } catch (error) {
       console.error('更新当前选中区域失败:', error);
       throw error;

@@ -2,6 +2,8 @@ import * as Cesium from 'cesium'
 import { flyToRegion } from '@/cesium/core/camera'
 import eventManager from '@/cesium/core/eventManager'
 import { AreaService } from '@/services/areaService'
+import { InitializationService } from '@/services/initialization'
+
 class AreaManager {
   static instance = null
 
@@ -21,7 +23,7 @@ class AreaManager {
     this.MOUSE_MOVE_THROTTLE_MS = 50
     this.lastMouseMoveTime = 0
     this.areaService = new AreaService()
-
+    this.initializeService = new InitializationService()
     this._bindEvents()
     AreaManager.instance = this
   }
@@ -75,7 +77,7 @@ class AreaManager {
     const entity = this.areaEntities.get(entityId)
 
     this.selectedEntity = this._setEntityAsSelected(entity)
-    
+
     const areaData = entity.properties.areaData
     const area = areaData && areaData.getValue ? areaData.getValue() : areaData
     if (area?.bbox) {
@@ -201,48 +203,48 @@ class AreaManager {
       }
 
       if (Cesium.defined(pickedObject) && pickedObject.id) {
-          const entity = pickedObject.id
-          
-          if (Array.isArray(entity)) {
-            return
-          }
-          
-          if (this._isAreaEntity(entity)) {
-            this.viewer.canvas.style.cursor = 'pointer'
+        const entity = pickedObject.id
 
-            if (entity === this.selectedEntity) {
-              if (this.selectedEntity?.billboard) {
-                this.selectedEntity.billboard.image = '/image/ic_select_point.png'
-                this.selectedEntity.billboard.scale = 1.5
-              }
-            } else if (entity !== this.hoveredEntity) {
-              try {
-                this._saveOriginalBillboardStyle(entity)
-                if (entity.billboard) entity.billboard.scale = 1.6
-                this.hoveredEntity = entity
-                
-                // 安全获取 areaData，确保数据可序列化
-                const areaData = entity.properties?.areaData
-                if (areaData) {
-                  const area = areaData && areaData.getValue ? areaData.getValue() : areaData
-                  // 验证 area 和 bbox 的结构
-                  if (area && typeof area === 'object' && area.bbox) {
-                    // 验证 bbox 是有效的二维数组
-                    if (Array.isArray(area.bbox) && area.bbox.length === 2 && 
-                        Array.isArray(area.bbox[0]) && Array.isArray(area.bbox[1])) {
-                      this._showHoveredAreaPolygon(area.bbox)
-                    }
+        if (Array.isArray(entity)) {
+          return
+        }
+
+        if (this._isAreaEntity(entity)) {
+          this.viewer.canvas.style.cursor = 'pointer'
+
+          if (entity === this.selectedEntity) {
+            if (this.selectedEntity?.billboard) {
+              this.selectedEntity.billboard.image = '/image/ic_select_point.png'
+              this.selectedEntity.billboard.scale = 1.5
+            }
+          } else if (entity !== this.hoveredEntity) {
+            try {
+              this._saveOriginalBillboardStyle(entity)
+              if (entity.billboard) entity.billboard.scale = 1.6
+              this.hoveredEntity = entity
+
+              // 安全获取 areaData，确保数据可序列化
+              const areaData = entity.properties?.areaData
+              if (areaData) {
+                const area = areaData && areaData.getValue ? areaData.getValue() : areaData
+                // 验证 area 和 bbox 的结构
+                if (area && typeof area === 'object' && area.bbox) {
+                  // 验证 bbox 是有效的二维数组
+                  if (Array.isArray(area.bbox) && area.bbox.length === 2 &&
+                    Array.isArray(area.bbox[0]) && Array.isArray(area.bbox[1])) {
+                    this._showHoveredAreaPolygon(area.bbox)
                   }
                 }
-              } catch (e) {
-                console.warn('Error processing hover data:', e)
-                // 即使出错也继续执行，不影响其他功能
               }
+            } catch (e) {
+              console.warn('Error processing hover data:', e)
+              // 即使出错也继续执行，不影响其他功能
             }
           }
-        } else if (!this.hoveredEntity) {
-          this.viewer.canvas.style.cursor = 'default'
         }
+      } else if (!this.hoveredEntity) {
+        this.viewer.canvas.style.cursor = 'default'
+      }
     } catch (e) {
       console.error('Hover error:', e)
     }
@@ -250,7 +252,7 @@ class AreaManager {
 
   // 私有方法：创建重点关注区域实体
   _createAreaEntity(dataSource, area) {
-    if (!dataSource || !area?.coordinates) return    
+    if (!dataSource || !area?.coordinates) return
     const entityId = `area_${area.id}`
     // 移除旧实体
     if (this.areaEntities.has(entityId)) {
@@ -269,7 +271,7 @@ class AreaManager {
       status: area.status,
       location: area.location
     };
-    
+
     const entity = new Cesium.Entity({
       id: entityId,
       position: Cesium.Cartesian3.fromDegrees(area.coordinates[0], area.coordinates[1], 50),
@@ -291,8 +293,8 @@ class AreaManager {
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       }),
-      
-      
+
+
       properties: { areaData: serializableArea }
     })
 
@@ -353,7 +355,10 @@ class AreaManager {
         const area = entity.properties?.areaData?.getValue
           ? entity.properties.areaData.getValue()
           : entity.properties?.areaData
-        areaService.updateSelectedArea(area)
+        this.areaService.updateSelectedArea(area)
+        this.initializeService.initializeAreaWeatherData();
+        this.initializeService.initializeMapWeatherLayer();
+        this.initializeService.initializeModuleData();
       } catch (e) {
         this.areaStore.setSelectedArea(null)
       }
@@ -573,10 +578,10 @@ class AreaManager {
       this.hoveredAreaPolygon = null
     }
   }
-   setAreasVisibility(visible) {
+  setAreasVisibility(visible) {
     this.areaEntities.forEach((entity) => {
       if (entity) {
-        entity.show = visible;        
+        entity.show = visible;
       }
     });
   }
