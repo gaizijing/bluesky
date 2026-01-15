@@ -26,11 +26,6 @@ export const addWhiteModel = async (viewerInstance) => {
       distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 200000)
     })
 
-   
-
-    modelTileset.loadProgress.addEventListener(progress => {
-      progressManager.updateProgress(progress);
-    });
 
     viewerInstance.scene.primitives.add(modelTileset);
     //模型调试

@@ -65,8 +65,8 @@ export function useCesium(containerId) {
     })
     //  const atmosphere = new Atmosphere(viewer.value)
     // atmosphere.show()
-    // resources.value.cloud = new Cloud(viewer.value)
-    // resources.value.cloud.show()
+    resources.value.cloud = new Cloud(viewer.value)
+    resources.value.cloud.show()
 
 
   }
@@ -175,7 +175,7 @@ export function useCesium(containerId) {
 
 
     // 设置相机高度监听，控制风场、云朵和监测点的显示/隐藏
-    // setupCameraHeightWatcher()
+    setupCameraHeightWatcher()
 
     // 初始化热力图
     resources.value.heatMapInstance = await initHeatVolume(viewer.value)
@@ -346,10 +346,38 @@ export function useCesium(containerId) {
       layerSettingsStore.setLayerVisibility('wind', visible);
 
       // Update wind layer visibility considering both camera height and visibility setting
-      // updateWindVisibilityBasedOnConditions();
+      updateWindVisibilityBasedOnConditions();
     }
   };
 
+
+  /**
+   * Update wind visibility based on both camera height and visibility setting
+   */
+  const updateWindVisibilityBasedOnConditions = () => {
+    if (!resources.value.windLayer) return;
+    
+    // Get current camera height
+    const cameraPosition = viewer.value.camera.positionCartographic;
+    const cameraHeight = cameraPosition.height;
+    
+    // Get visibility setting from store
+    const isWindEnabled = layerSettingsStore.layers.wind.visible;
+    
+    // Define camera height threshold for wind field visibility
+    
+    // Determine final visibility based on both conditions
+    const shouldBeVisible = isWindEnabled && cameraHeight <= CAMERA_HEIGHT_THRESHOLD;
+    
+    // Update visibility for all wind layers
+    if (Array.isArray(resources.value.windLayer)) {
+      resources.value.windLayer.forEach(layer => {
+        layer.show = shouldBeVisible;
+      });
+    } else {
+      resources.value.windLayer.show = shouldBeVisible;
+    }
+  };
 
 
   /**
@@ -365,6 +393,8 @@ export function useCesium(containerId) {
    * 设置温度图层可见性
    */
   const setTemperatureVisibility = (visible) => {
+    console.log(resources.value.heatMapInstance);
+    
     if (resources.value.heatMapInstance && resources.value.heatMapInstance.heatmapState) {
       resources.value.heatMapInstance.heatmapState.heatmapPrimitive.show = visible
     }
