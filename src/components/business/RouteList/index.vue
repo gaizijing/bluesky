@@ -219,7 +219,7 @@ import RouterRisk from "@/components/business/RouterRisk/index.vue";
 import { useCesium } from "@/hooks/useCesium";
 import { useRouteStore } from "@/store/modules/routeStore"; // 引入store
 import routeManager from "@/cesium/entities/routes"; // 导入航线管理器
-
+import {useWindStore} from '@/store/modules/wind'
 const routeStore = useRouteStore();
 
 // 状态管理
@@ -316,6 +316,7 @@ const generateRoutes = () => {
       segmentData,
       waypoints,
       dangers, // 存储航段危险等级，用于地图上的颜色显示
+      height:300
     });
   }
   return result;
@@ -326,19 +327,44 @@ const generateRouteData = (segments, totalLength) => {
   const segmentData = [];
   let accumulatedDistance = 0;
 
-  // 生成起点坐标（基于青岛区域）
-  const startLon = 120.2 + Math.random() * 0.3;
-  const startLat = 36.0 + Math.random() * 0.3;
-
-  // 生成终点坐标，距离起点有一定距离
-  const endLon = startLon + (Math.random() * 0.2 - 0.1); // -0.1到0.1度的变化
-  const endLat = startLat + (Math.random() * 0.2 - 0.1);
+  // 获取风场数据，确保航线穿过风场区
+  const windStore = useWindStore();
+  const windData = windStore.windData;
+  
+  // 默认风场边界（从mock数据中提取的实际边界）
+  let windBounds = {
+    west: 120.30,
+    south: 36.05,
+    east: 120.45,
+    north: 36.20
+  };
+  
+  // 如果有风场数据，使用实际的风场边界
+  if (windData && windData.layers && windData.layers.length > 0) {
+    windBounds = windData.layers[0].windData.bounds;
+  }
+  
+  // 在风场边界内生成起点坐标
+  const startLon = windBounds.west + Math.random() * (windBounds.east - windBounds.west);
+  const startLat = windBounds.south + Math.random() * (windBounds.north - windBounds.south);
+  
+  // 生成终点坐标，在风场边界内，距离起点有一定距离
+  const distanceFactor = 0.3; // 控制终点与起点的距离，0.3表示30%的风场宽度
+  const maxDistanceLon = (windBounds.east - windBounds.west) * distanceFactor;
+  const maxDistanceLat = (windBounds.north - windBounds.south) * distanceFactor;
+  
+  let endLon = startLon + (Math.random() * maxDistanceLon * 2 - maxDistanceLon);
+  let endLat = startLat + (Math.random() * maxDistanceLat * 2 - maxDistanceLat);
+  
+  // 确保终点也在风场范围内
+  endLon = Math.max(windBounds.west, Math.min(windBounds.east, endLon));
+  endLat = Math.max(windBounds.south, Math.min(windBounds.north, endLat));
 
   for (let i = 0; i < segments; i++) {
     // 随机生成单个航段长度（总和=总长度）
-    const segmentLength =
-      i === segments - 1
-        ? totalLength - accumulatedDistance
+    const segmentLength = 
+      i === segments - 1 
+        ? totalLength - accumulatedDistance 
         : (totalLength - accumulatedDistance) * (0.1 + Math.random() * 0.2);
 
     accumulatedDistance += segmentLength;
@@ -355,18 +381,33 @@ const generateRouteData = (segments, totalLength) => {
     const endSegmentLon = startLon + (endLon - startLon) * nextProgress;
     const endSegmentLat = startLat + (endLat - startLat) * nextProgress;
 
-    // 添加一些随机偏移，使航线更自然
-    const midLon = (startSegmentLon + endSegmentLon) / 2;
-    const midLat = (startSegmentLat + endSegmentLat) / 2;
-    const offsetLon = (Math.random() - 0.5) * 0.02; // -0.01到0.01度的偏移
-    const offsetLat = (Math.random() - 0.5) * 0.02;
+    // 增加随机偏移，使航线更加曲折
+    // 生成多个控制点，增加路径的曲折度
+    const offsetScale = 0.04; // 增加偏移范围，使航线更曲折
+    
+    // 生成两个控制点，增加路径的曲折度
+    const t1 = 1/3;
+    const t2 = 2/3;
+    
+    // 第一个控制点
+    const mid1Lon = startSegmentLon + (endSegmentLon - startSegmentLon) * t1;
+    const mid1Lat = startSegmentLat + (endSegmentLat - startSegmentLat) * t1;
+    const offset1Lon = (Math.random() - 0.5) * offsetScale;
+    const offset1Lat = (Math.random() - 0.5) * offsetScale;
+    
+    // 第二个控制点
+    const mid2Lon = startSegmentLon + (endSegmentLon - startSegmentLon) * t2;
+    const mid2Lat = startSegmentLat + (endSegmentLat - startSegmentLat) * t2;
+    const offset2Lon = (Math.random() - 0.5) * offsetScale;
+    const offset2Lat = (Math.random() - 0.5) * offsetScale;
 
-    // 生成该航段的路径点（贝塞尔曲线的控制点）
-    const pathCoordinates = generateBezierPath(
+    // 使用三次贝塞尔曲线生成更曲折的路径
+    const pathCoordinates = generateCubicBezierPath(
       [startSegmentLon, startSegmentLat],
-      [midLon + offsetLon, midLat + offsetLat],
+      [mid1Lon + offset1Lon, mid1Lat + offset1Lat],
+      [mid2Lon + offset2Lon, mid2Lat + offset2Lat],
       [endSegmentLon, endSegmentLat],
-      10 // 每个航段10个点
+      15 // 每个航段15个点，使路径更平滑
     );
 
     segmentData.push({
@@ -387,19 +428,41 @@ const generateRouteData = (segments, totalLength) => {
   return segmentData;
 };
 
-// 使用贝塞尔曲线生成平滑路径
+// 使用二次贝塞尔曲线生成平滑路径
 const generateBezierPath = (start, control, end, numPoints) => {
   const path = [];
   for (let i = 0; i <= numPoints; i++) {
     const t = i / numPoints;
-    const x =
-      (1 - t) * (1 - t) * start[0] +
-      2 * (1 - t) * t * control[0] +
+    const x = 
+      (1 - t) * (1 - t) * start[0] + 
+      2 * (1 - t) * t * control[0] + 
       t * t * end[0];
-    const y =
-      (1 - t) * (1 - t) * start[1] +
-      2 * (1 - t) * t * control[1] +
+    const y = 
+      (1 - t) * (1 - t) * start[1] + 
+      2 * (1 - t) * t * control[1] + 
       t * t * end[1];
+    path.push([x, y]);
+  }
+  return path;
+};
+
+// 使用三次贝塞尔曲线生成更曲折的路径
+const generateCubicBezierPath = (start, control1, control2, end, numPoints) => {
+  const path = [];
+  for (let i = 0; i <= numPoints; i++) {
+    const t = i / numPoints;
+    
+    // 三次贝塞尔曲线公式
+    const x = Math.pow(1 - t, 3) * start[0] + 
+              3 * Math.pow(1 - t, 2) * t * control1[0] + 
+              3 * (1 - t) * Math.pow(t, 2) * control2[0] + 
+              Math.pow(t, 3) * end[0];
+    
+    const y = Math.pow(1 - t, 3) * start[1] + 
+              3 * Math.pow(1 - t, 2) * t * control1[1] + 
+              3 * (1 - t) * Math.pow(t, 2) * control2[1] + 
+              Math.pow(t, 3) * end[1];
+    
     path.push([x, y]);
   }
   return path;

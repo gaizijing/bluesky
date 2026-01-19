@@ -40,8 +40,6 @@ export const initWind = async (viewer, layerSettingsStore) => {
   watch(
     () => windStore.windData,
     (newData) => {
-      console.log(2222222222);
-      
       if (newData && windLayerRefs.length > 0) {
         console.log('风场数据更新，使用updateWindData方法更新风场图层...', newData);
         // 使用updateWindData方法更新每个风场图层的数据

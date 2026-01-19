@@ -27,7 +27,9 @@ export const useRouteStore = defineStore('route', {
           averageRisk: route.averageRisk,
           highestRisk: route.highestRisk,
           highestRiskSegment: route.highestRiskSegment
-        }
+        },
+        // 保留原始segmentData，用于绘制曲线路径
+        segmentData: route.segmentData
       }
       this.currentRoute = {...route}
       this.renderedRouteId = route.id
