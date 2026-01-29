@@ -1,18 +1,21 @@
 <template>
-  <div v-if="visible" class="dialog-mask" @click="handleMaskClick">
-    <div class="dialog-container" @click.stop>
-      <div class="dialog-header">
-        <h3>{{ title }}</h3>
-        <button class="dialog-close" @click="handleClose">×</button>
-      </div>
-      <div class="dialog-content">
-        <slot></slot>
-      </div>
-      <div v-if="$slots.footer" class="dialog-footer">
-        <slot name="footer"></slot>
+  <!-- 使用Teleport将弹窗直接挂载到body上，完全脱离父组件控制 -->
+  <Teleport to="body">
+    <div v-if="visible" class="dialog-mask fade-in" @click="handleMaskClick">
+      <div class="dialog-container" @click.stop>
+        <div class="dialog-header">
+          <h3>{{ title }}</h3>
+          <button class="dialog-close" @click="handleClose">×</button>
+        </div>
+        <div class="dialog-content">
+          <slot></slot>
+        </div>
+        <div v-if="$slots.footer" class="dialog-footer">
+          <slot name="footer"></slot>
+        </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script setup>

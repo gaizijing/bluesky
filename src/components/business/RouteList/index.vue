@@ -153,70 +153,111 @@
       </div>
     </div>
 
-    <div v-if="showAddRouteModalFlag" class="dialog-overlay" @click="closeAddRouteModal">
-      <div class="dialog-container" @click.stop>
-        <div class="dialog-header">
-          <h3>添加新航线</h3>
-          <button class="dialog-close" @click="closeAddRouteModal">×</button>
+    <!-- 使用封装好的DialogContainer组件 -->
+
+  </div>
+      <DialogContainer
+      :visible="showAddRouteModalFlag"
+      title="添加新航线"
+      @close="closeAddRouteModal"
+    >
+      <form @submit.prevent="addNewRoute" class="add-route-form">
+        <div class="form-group">
+          <label>起始地点:</label>
+          <input v-model="newRouteForm.startName" type="text" placeholder="起始地名" required />
+          <div class="coordinate-inputs">
+            <input v-model.number="newRouteForm.startLon" type="number" step="0.000001" placeholder="经度" required />
+            <input v-model.number="newRouteForm.startLat" type="number" step="0.000001" placeholder="纬度" required />
+            <button type="button" class="map-select-btn" @click="startMapSelection('start')">
+              地图选点
+            </button>
+          </div>
         </div>
-        <div class="dialog-body">
-          <form @submit.prevent="addNewRoute" class="add-route-form">
-            <div class="form-group">
-              <label>起始地点:</label>
-              <input v-model="newRouteForm.startName" type="text" placeholder="起始地名" required />
-              <div class="coordinate-inputs">
-                <input v-model.number="newRouteForm.startLon" type="number" step="0.000001" placeholder="经度" required />
-                <input v-model.number="newRouteForm.startLat" type="number" step="0.000001" placeholder="纬度" required />
-              </div>
-            </div>
 
-            <div class="form-group">
-              <label>终点:</label>
-              <input v-model="newRouteForm.endName" type="text" placeholder="终点地名" required />
-              <div class="coordinate-inputs">
-                <input v-model.number="newRouteForm.endLon" type="number" step="0.000001" placeholder="经度" required />
-                <input v-model.number="newRouteForm.endLat" type="number" step="0.000001" placeholder="纬度" required />
-              </div>
-            </div>
+        <div class="form-group">
+          <label>终点:</label>
+          <input v-model="newRouteForm.endName" type="text" placeholder="终点地名" required />
+          <div class="coordinate-inputs">
+            <input v-model.number="newRouteForm.endLon" type="number" step="0.000001" placeholder="经度" required />
+            <input v-model.number="newRouteForm.endLat" type="number" step="0.000001" placeholder="纬度" required />
+            <button type="button" class="map-select-btn" @click="startMapSelection('end')">
+              地图选点
+            </button>
+          </div>
+        </div>
 
-            <div class="form-group">
-              <label>途经点:</label>
-              <div class="waypoints-list">
-                <div v-for="(waypoint, index) in newRouteForm.waypoints" :key="index" class="waypoint-item">
-                  <input v-model="waypoint.name" type="text" placeholder="途经点名称" />
-                  <div class="coordinate-inputs">
-                    <input v-model.number="waypoint.lon" type="number" step="0.000001" placeholder="经度" required />
-                    <input v-model.number="waypoint.lat" type="number" step="0.000001" placeholder="纬度" required />
-                  </div>
-                  <button type="button" class="remove-waypoint-btn" @click="removeWaypoint(index)">
-                    删除
-                  </button>
-                </div>
+        <div class="form-group">
+          <label>途经点:</label>
+          <div class="waypoints-list">
+            <div v-for="(waypoint, index) in newRouteForm.waypoints" :key="index" class="waypoint-item">
+              <input v-model="waypoint.name" type="text" placeholder="途经点名称" />
+              <div class="coordinate-inputs">
+                <input v-model.number="waypoint.lon" type="number" step="0.000001" placeholder="经度" required />
+                <input v-model.number="waypoint.lat" type="number" step="0.000001" placeholder="纬度" required />
+                <button type="button" class="map-select-btn" @click="startMapSelection(`waypoint_${index}`)">
+                  地图选点
+                </button>
               </div>
-              <button type="button" class="add-waypoint-btn" @click="addWaypoint">
-                + 添加途经点
+              <button type="button" class="remove-waypoint-btn" @click="removeWaypoint(index)">
+                删除
               </button>
             </div>
+          </div>
+          <button type="button" class="add-waypoint-btn" @click="addWaypoint">
+            + 添加途经点
+          </button>
+        </div>
 
-            <div class="form-group">
+        <div class="form-group">
               <label>飞行器型号:</label>
               <input v-model="newRouteForm.aircraftModel" type="text" placeholder="例如: DJI Mavic 3" required />
             </div>
-          </form>
-        </div>
+            
+            <div class="form-group">
+              <label>总飞行高度:</label>
+              <input v-model.number="newRouteForm.flightHeight" type="number" step="10" placeholder="飞行高度(m)" required />
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group half-width">
+                <label>起始时间:</label>
+                <input 
+                  v-model="newRouteForm.startTime" 
+                  type="datetime-local" 
+                  :min="todayMin" 
+                  :max="todayMax"
+                  required 
+                />
+              </div>
+              
+              <div class="form-group half-width">
+                <label>终止时间:</label>
+                <input 
+                  v-model="newRouteForm.endTime" 
+                  type="datetime-local" 
+                  :min="newRouteForm.startTime || todayMin" 
+                  :max="todayMax"
+                  required 
+                />
+              </div>
+            </div>
+      </form>
+      <template #footer>
         <div class="dialog-footer">
           <button class="cancel-btn" @click="closeAddRouteModal">取消</button>
           <button class="confirm-btn" @click="addNewRoute">确定添加</button>
         </div>
-      </div>
-    </div>
-  </div>
+      </template>
+    </DialogContainer>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted,watch } from "vue";
+import * as Cesium from 'cesium';
 import RouterRisk from "@/components/business/RouterRisk/index.vue";
 import { useCesium } from "@/hooks/useCesium";
+import eventManager from "@/cesium/core/eventManager";
+import DialogContainer from "@/components/common/DialogContainer.vue";
 import { useRouteStore } from "@/store/modules/routeStore"; // 引入store
 import routeManager from "@/cesium/entities/routes"; // 导入航线管理器
 import {useWindStore} from '@/store/modules/wind'
@@ -240,6 +281,72 @@ const tooltipTop = ref(0);
 
 // 使用Cesium hook
 const { showRouteOnMap, clearCurrentRoute, getCesiumRiskColor } = useCesium();
+
+// 当前正在选点的目标（start, end, waypoint_${index}）
+const selectingPointTarget = ref(null);
+
+// 开始地图选点
+const startMapSelection = (target) => {
+  selectingPointTarget.value = target;
+  // 关闭弹窗
+  showAddRouteModalFlag.value = false;
+  
+  // // 修改鼠标样式
+  // document.body.style.cursor = 'crosshair';
+  
+  // 添加地图点击事件监听
+  const handleMapClick = (viewer, movement) => {
+    // 使用Cesium API将屏幕坐标转换为经纬度
+    const cartesian = viewer.scene.pickPosition(movement.position);
+    if (cartesian) {
+      const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+      if (cartographic) {
+        const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+        const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+        // 将坐标填充到对应的表单字段中
+        fillSelectedCoordinates([longitude, latitude]);
+        // 停止选点
+        stopMapSelection();
+        // 重新打开弹窗
+        console.log('dakai');
+        
+        showAddRouteModalFlag.value = true;
+      }
+    }
+    return true; // 表示事件已处理
+  };
+  
+  // 使用eventManager注册点击事件
+  eventManager.registerClickHandler(handleMapClick);
+};
+
+// 填充选中的坐标
+const fillSelectedCoordinates = (position) => {
+  const [longitude, latitude] = position;
+  
+  if (selectingPointTarget.value === 'start') {
+    newRouteForm.value.startLon = longitude;
+    newRouteForm.value.startLat = latitude;
+  } else if (selectingPointTarget.value === 'end') {
+    newRouteForm.value.endLon = longitude;
+    newRouteForm.value.endLat = latitude;
+  } else if (selectingPointTarget.value.startsWith('waypoint_')) {
+    const index = parseInt(selectingPointTarget.value.split('_')[1]);
+    if (newRouteForm.value.waypoints[index]) {
+      newRouteForm.value.waypoints[index].lon = longitude;
+      newRouteForm.value.waypoints[index].lat = latitude;
+    }
+  }
+};
+
+// 停止地图选点
+const stopMapSelection = () => {
+  // 恢复鼠标样式
+  document.body.style.cursor = '';
+  // 移除地图点击事件
+  eventManager.unregisterClickHandlers();
+  selectingPointTarget.value = null;
+};
 
 // 过滤后的航线列表
 const filteredRoutes = computed(() => {
@@ -303,6 +410,11 @@ const generateRoutes = () => {
       });
     }
 
+    // 为历史航线添加默认的时间信息
+    const now = new Date();
+    const startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0, 0); // 默认开始时间：今天10:00
+    const endTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 30, 0); // 默认结束时间：今天10:30
+    
     result.push({
       id: `route-${i + 1}`,
       name: randomName,
@@ -316,7 +428,9 @@ const generateRoutes = () => {
       segmentData,
       waypoints,
       dangers, // 存储航段危险等级，用于地图上的颜色显示
-      height:300
+      height:300,
+      startTime: startTime,
+      endTime: endTime
     });
   }
   return result;
@@ -612,7 +726,24 @@ onMounted(() => {
   loadRoutes();
 });
 
+// 监听当前航线变化，更新图表数据
+watch(
+  () => routeStore.currentRoute,
+  (newRoute) => {
+    if (newRoute && newRoute.segmentData) {
+      currentRouteData.value = newRoute.segmentData;
+    }
+  },
+  { deep: true }
+);
+
 const showAddRouteModalFlag = ref(false);
+
+// 获取今天的最小和最大时间（用于限制 datetime-local 输入）
+const now = new Date();
+const todayMin = ref(now.toISOString().slice(0, 16)); // 今天 00:00
+const todayMax = ref(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59).toISOString().slice(0, 16)); // 今天 23:59
+
 const newRouteForm = ref({
   startName: "",
   startLon: null,
@@ -622,6 +753,9 @@ const newRouteForm = ref({
   endLat: null,
   waypoints: [],
   aircraftModel: "",
+  flightHeight: 300, // 总飞行高度，默认300m
+  startTime: todayMin.value, // 起始时间，默认今天 00:00
+  endTime: todayMax.value, // 终止时间，默认今天 23:59
 });
 // 显示添加航线模态框
 const showAddRouteModal = () => {
@@ -643,7 +777,12 @@ const closeAddRouteModal = () => {
     endLat: null,
     waypoints: [],
     aircraftModel: "",
+    flightHeight: 300,
+    startTime: todayMin.value,
+    endTime: todayMax.value,
   };
+  console.log('guanbi ');
+  
 };
 
 // 添加途经点
@@ -670,9 +809,20 @@ const addNewRoute = () => {
     !newRouteForm.value.endName ||
     !newRouteForm.value.endLon ||
     !newRouteForm.value.endLat ||
-    !newRouteForm.value.aircraftModel
+    !newRouteForm.value.aircraftModel ||
+    !newRouteForm.value.startTime ||
+    !newRouteForm.value.endTime
   ) {
     alert("请填写所有必填字段");
+    return;
+  }
+
+  // 验证时间范围
+  const startTime = new Date(newRouteForm.value.startTime);
+  const endTime = new Date(newRouteForm.value.endTime);
+  
+  if (endTime <= startTime) {
+    alert("终止时间必须晚于起始时间");
     return;
   }
 
@@ -690,22 +840,26 @@ const addNewRoute = () => {
     }
   }
 
-  // 构造航线数据
+  // 构造航线数据，使用总飞行高度
+  const flightHeight = newRouteForm.value.flightHeight;
   const waypoints = [
     {
       name: newRouteForm.value.startName,
       longitude: newRouteForm.value.startLon,
       latitude: newRouteForm.value.startLat,
+      height: flightHeight, // 使用总飞行高度
     },
     ...newRouteForm.value.waypoints.map((wp) => ({
       name: wp.name || "途经点",
       longitude: wp.lon,
       latitude: wp.lat,
+      height: flightHeight, // 使用总飞行高度
     })),
     {
       name: newRouteForm.value.endName,
       longitude: newRouteForm.value.endLon,
       latitude: newRouteForm.value.endLat,
+      height: flightHeight, // 使用总飞行高度
     },
   ];
 
@@ -739,10 +893,15 @@ const addNewRoute = () => {
     })),
     dangers: risks.map((risk) => Math.round(risk * 10)),
     aircraftModel: newRouteForm.value.aircraftModel,
+    startTime: startTime, // 添加起始时间（Date对象）
+    endTime: endTime,     // 添加终止时间（Date对象）
   };
 
   // 添加到航线列表开头
   routes.value.unshift(newRoute);
+
+  // 设置当前航线，触发地图更新
+  routeStore.setCurrentRoute(newRoute);
 
   // 关闭模态框并重置表单
   closeAddRouteModal();
@@ -1721,6 +1880,36 @@ const generateRouteDataForCustomRoute = (waypoints, totalLength) => {
   gap: 20px;
 }
 
+.form-row {
+  display: flex;
+  gap: 20px;
+}
+
+.half-width {
+  flex: 1;
+}
+
+input[type="datetime-local"] {
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+  }
+  
+  &::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+  }
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
@@ -1806,6 +1995,29 @@ const generateRouteDataForCustomRoute = (waypoints, totalLength) => {
 
   &:hover {
     background: rgba(59, 130, 246, 0.2);
+  }
+}
+
+/* 地图选点按钮样式 */
+.map-select-btn {
+  padding: 6px 12px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid #10b981;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(16, 185, 129, 0.2);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.15);
+  }
+
+  &:active {
+    transform: translateY(0);
   }
 }
 

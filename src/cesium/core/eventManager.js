@@ -51,6 +51,13 @@ class EventManager {
   }
 
   /**
+   * 注销所有点击事件处理器
+   */
+  unregisterClickHandlers() {
+    this.clickHandlers = [];
+  }
+
+  /**
    * 注册默认处理器（总是在其他处理器之后执行，无论事件是否被处理）
    * @param {Function} handler - 默认处理函数，接收viewer, movement, handled参数
    * @returns {Function} 注销该处理器的函数

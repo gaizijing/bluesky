@@ -39,6 +39,7 @@ Events：
 - time-change: 当时间变化时触发，参数为选中的Date对象
 -->
 <template>
+  
   <div class="time-progress-bar-container">
     <!-- 时间进度条 -->
     <div class="time-progress-bar">
@@ -87,10 +88,10 @@ Events：
     </div>
   </div>
 </template>
-
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { formatDate } from '@/utils/dateUtils'
+import VueProgressBar from "vue-progress-bar-player";
 
 // 定义props
 const props = defineProps({
@@ -119,20 +120,36 @@ const props = defineProps({
   autoPlay: {
     type: Boolean,
     default: false
+  },
+  isPlaying: {
+    type: Boolean,
+    default: false
   }
 })
 
 // 定义emits
-const emit = defineEmits(['time-change'])
+const emit = defineEmits(['time-change', 'play-pause-change'])
 
 // 响应式状态
-const isPlaying = ref(props.autoPlay)
+const isPlaying = ref(props.isPlaying || props.autoPlay)
 const currentTime = ref(new Date()) // 初始化为当前时间
 const showTooltip = ref(true)
 const progressBarRef = ref(null)
 let animationTimer = null
 let isDragging = ref(false)
 const dragUpdateTimer = ref(null)
+
+// 监听外部isPlaying prop的变化
+watch(() => props.isPlaying, (newValue) => {
+  if (newValue !== isPlaying.value) {
+    isPlaying.value = newValue
+    if (isPlaying.value) {
+      startAnimation()
+    } else {
+      stopAnimation()
+    }
+  }
+})
 
 // 计算属性
 const timeRange = computed(() => props.endTime - props.startTime)
@@ -175,10 +192,13 @@ const handlePlayPause = () => {
   } else {
     stopAnimation()
   }
+  // 向外发出播放/暂停状态变化事件
+  emit('play-pause-change', isPlaying.value)
 }
 
 // 进度条点击事件
 const handleProgressClick = (event) => {
+  console.log("handleProgressClick");
   if (!progressBarRef.value) return
   
   const rect = progressBarRef.value.getBoundingClientRect()
@@ -208,9 +228,13 @@ const handleProgressClick = (event) => {
 }
 
 // 指示器拖拽事件
-const handleIndicatorMouseDown = () => {
+const handleIndicatorMouseDown = (event) => {
   isDragging.value = true
   stopAnimation()
+  
+  // 只有在开始拖动时才注册事件监听
+  document.addEventListener('mousemove', handleMouseMove)
+  document.addEventListener('mouseup', handleMouseUp)
 }
 
 const handleMouseMove = (event) => {
@@ -253,6 +277,8 @@ const handleMouseMove = (event) => {
 }
 
 const handleMouseUp = () => {
+  console.log("handleMouseUp");
+  
   isDragging.value = false
   
   // 清除拖拽更新定时器
@@ -261,28 +287,36 @@ const handleMouseUp = () => {
     dragUpdateTimer.value = null
   }
   
+  // 移除事件监听
+  document.removeEventListener('mousemove', handleMouseMove)
+  document.removeEventListener('mouseup', handleMouseUp)
+  
   // 鼠标松开时确保最后一次更新被触发
   emitTimeChange()
 }
 
 // 动画控制
 const startAnimation = () => {
+  console.log("startAnimation");
+
   if (animationTimer) return
   
   animationTimer = setInterval(() => {
-    const newTime = new Date(currentTime.value.getTime() + 1000*60*10) // 每次前进10分钟
+    const newTime = new Date(currentTime.value.getTime() + 1000) // 每次前进1秒
     
     if (newTime >= props.endTime) {
       // 到达结束时间，停止播放
       currentTime.value = props.endTime
       isPlaying.value = false
       stopAnimation()
+      // 向外发出播放/暂停状态变化事件
+      emit('play-pause-change', false)
     } else {
       currentTime.value = newTime
     }
     
     emitTimeChange()
-  }, 1000)
+  }, 1000) // 每秒更新一次
 }
 
 const stopAnimation = () => {
@@ -294,6 +328,8 @@ const stopAnimation = () => {
 
 // 发射时间变化事件
 const emitTimeChange = () => {
+  console.log("emitTimeChange");
+  
   emit('time-change', currentTime.value)
 }
 
@@ -304,8 +340,8 @@ onMounted(() => {
   }
   
   // 添加鼠标事件监听
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', handleMouseUp)
+  // document.addEventListener('mousemove', handleMouseMove)
+  // document.addEventListener('mouseup', handleMouseUp)
 })
 
 onUnmounted(() => {
@@ -318,8 +354,8 @@ onUnmounted(() => {
   }
   
   // 移除鼠标事件监听
-  document.removeEventListener('mousemove', handleMouseMove)
-  document.removeEventListener('mouseup', handleMouseUp)
+  // document.removeEventListener('mousemove', handleMouseMove)
+  // document.removeEventListener('mouseup', handleMouseUp)
 })
 </script>
 

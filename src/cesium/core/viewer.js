@@ -10,7 +10,7 @@ export const getViewerOptions = () => ({
   infoBoxSandbox: 'allow-same-origin allow-scripts allow-popups allow-forms',
   fullscreenButton: false,
   animation: false,
-  timeline: false,
+  timeline: true,
   selectionIndicator: true,
   // // 渲染精度设置
   maximumScreenSpaceError: 1, // 较低的值提高精度但可能降低性能，可根据需求调整为2-4

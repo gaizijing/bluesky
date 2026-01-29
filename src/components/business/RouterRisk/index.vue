@@ -478,15 +478,27 @@ const getRiskLevel = (value) => {
 // 监听props变化，更新数据
 watch(() => props.routeData, (newData) => {
   routeData.value = newData.length > 0 ? newData : generateRouteData();
-  initChart();
+  if (riskChart.value) {
+    updateChartData(); // 图表已存在，仅更新数据
+  } else {
+    initChart(); // 图表不存在，初始化
+  }
 }, { immediate: true });
 
 // 监听航线基本信息变化
 watch(currentRoute, () => {
+  // 无论props.routeData是否有数据，切换航线时都需要重新生成或更新数据
   if (props.routeData.length === 0) {
     routeData.value = generateRouteData();
-    initChart();
+  } else {
+    // 当有路由数据时，直接使用props.routeData
+    routeData.value = props.routeData;
   }
+  
+  // 切换航线时重新渲染图表
+  nextTick(() => {
+    initChart(); // 重新初始化图表
+  });
 }, { deep: true });
 
 // 航段点击事件（高亮地图对应区域）
@@ -545,8 +557,35 @@ const getLevelText = (value) => {
 };
 
 // 初始化与清理
-// 时间变化处理函数
-const handleTimeChange = (eventData) => {
+// 更新图表数据（不重新创建图表实例）
+const updateChartData = () => {
+  if (!riskChart.value) {
+    console.warn("图表实例不存在，无法更新数据");
+    return;
+  }
+  
+  // 仅更新系列数据，不重新初始化整个图表
+  riskChart.value.setOption({
+    series: getSeriesData()
+  });
+};
+
+// 节流函数 - 限制函数调用频率
+const throttle = (func, limit) => {
+  let inThrottle;
+  return function() {
+    const args = arguments;
+    const context = this;
+    if (!inThrottle) {
+      func.apply(context, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  }
+};
+
+// 时间变化处理函数（带节流）
+const handleTimeChange = throttle((eventData) => {
   console.log('RouterRisk收到时间变化事件:', eventData);
   // 时间变化时，更新航线分析数据
   isRefreshing.value = true;
@@ -554,10 +593,11 @@ const handleTimeChange = (eventData) => {
   // 模拟根据时间偏移量更新航线数据
   setTimeout(() => {
     // 重新生成航线数据（根据时间偏移量调整）
-    initChart();
+    routeData.value = generateRouteData();
+    updateChartData(); // 直接更新数据，不重新创建图表
     isRefreshing.value = false;
-  }, 300);
-};
+  }, 100); // 减少延迟，提高响应速度
+}, 10000); // 10秒钟更新一次
 
 onMounted(() => {
   nextTick(() => {

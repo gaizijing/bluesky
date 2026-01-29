@@ -29,22 +29,47 @@ export const useRouteStore = defineStore('route', {
           highestRiskSegment: route.highestRiskSegment
         },
         // 保留原始segmentData，用于绘制曲线路径
-        segmentData: route.segmentData
+        segmentData: route.segmentData,
+        // 添加时间信息
+        startTime: route.startTime,
+        endTime: route.endTime
       }
       this.currentRoute = {...route}
+      // 确保currentRoute包含正确的waypoints（带有数字类型的经纬度）
+      this.currentRoute.waypoints = cesiumRoute.waypoints
+      // 确保currentRoute包含时间信息
+      this.currentRoute.startTime = route.startTime
+      this.currentRoute.endTime = route.endTime
       this.renderedRouteId = route.id
     },
     // 把列表的segmentData转成Cesium的waypoints（关键转换）
     convertSegmentsToWaypoints(segmentData) {
-      // 示例：生成模拟经纬度（替换成你的真实经纬度！）
-      // 真实场景中，segmentData应该包含每段的起点/终点经纬度
-      const baseLng = 120.0 + Math.random() * 1.0 // 基础经度
-      const baseLat = 36.0 + Math.random() * 1.0  // 基础纬度
-      return segmentData.map((seg, index) => ({
-        longitude: baseLng + index * 0.1,
-        latitude: baseLat + index * 0.05,
-        height: 1000 + index * 50 // 高度
-      }))
+      // 从segmentData中提取真实的经纬度信息
+      if (!segmentData || segmentData.length === 0) {
+        return [];
+      }
+      
+      // 使用segmentData中的真实坐标
+      const waypoints = [];
+      
+      // 添加第一个航段的起点
+      const firstSegment = segmentData[0];
+      waypoints.push({
+        longitude: firstSegment.startCoordinates[0],
+        latitude: firstSegment.startCoordinates[1],
+        height: 300 // 默认高度
+      });
+      
+      // 添加所有航段的终点
+      segmentData.forEach((seg, index) => {
+        waypoints.push({
+          longitude: seg.endCoordinates[0],
+          latitude: seg.endCoordinates[1],
+          height: 300 // 默认高度
+        });
+      });
+      
+      return waypoints;
     },
     // 清空当前航线
     clearCurrentRoute() {

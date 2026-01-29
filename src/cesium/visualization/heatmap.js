@@ -1,6 +1,7 @@
 import * as Cesium from 'cesium'
 import h337 from 'heatmap.js';
 import { useHeatmapStore } from '@/store/modules/heatmap';
+import { useLayerSettingsStore } from '@/store/modules/layerSettings';
 import { watch } from 'vue';
 /**
  * 👉 生成热力图数据
@@ -8,6 +9,7 @@ import { watch } from 'vue';
 export const initHeatVolume = async (viewer) => {
   try {
     const heatmapStore = useHeatmapStore();
+    const layerSettingsStore = useLayerSettingsStore();
     const data = heatmapStore.heatmapData;
     console.log('热力图数据:', data);
     
@@ -44,9 +46,9 @@ export const initHeatVolume = async (viewer) => {
     // 监听热力图数据变化，使用updateData方法更新热力图
     if (heatMapInstance) {
       watch(
-        () => heatmapStore.heatmapData,
-        (newData) => {
-          if (newData && newData.points && newData.points.length > 0) {
+        [() => heatmapStore.heatmapData, () => layerSettingsStore.layers.temperature?.visible],
+        ([newData, isHeatmapVisible]) => {
+          if (isHeatmapVisible && newData && newData.points && newData.points.length > 0) {
             console.log('热力图数据更新，开始更新热力图...', newData);
             // 转换数据格式
             const newHeatmapPoints = newData.points.map(point => ({
@@ -60,6 +62,8 @@ export const initHeatVolume = async (viewer) => {
             } catch (error) {
               console.error('热力图更新失败：', error);
             }
+          } else if (!isHeatmapVisible) {
+            console.log('热力图未显示，跳过更新');
           }
         },
         { deep: true }

@@ -16,12 +16,6 @@
       @options-change="handleOptionsChange"
       @layer-visibility-change="applyLayerVisibilitySettings" />
 
-    <!-- 时间进度条：只在存在当前航线时显示 -->
-    <TimeProgressBar 
-      v-if="routeStore.currentRoute"
-      @time-change="handleTimeChange" 
-    />
-
   </div>
 </template>
 
@@ -32,7 +26,6 @@ import { useWindStore } from '@/store/modules/wind'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import { useAreaStore } from '@/store/modules/area'
 import ControlPanel from "@/components/map/ControlPanel.vue"
-import TimeProgressBar from "@/components/map/TimeProgressBar.vue"
 import { useRouteStore } from '@/store/modules/routeStore'
 import eventManager from '@/cesium/core/eventManager' // 导入独立的事件管理器
 import { ElMessage } from 'element-plus'
@@ -163,6 +156,7 @@ const toggleMode = () => {
   const newMode = currentMode.value === 'overview' ? 'focus' : 'overview'
   switchMode(newMode)
 }
+
 // 组件挂载时初始化地图和设置事件监听
 onMounted(() => {
   initializeMap()

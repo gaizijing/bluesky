@@ -67,9 +67,45 @@ export function useCesium(containerId) {
     // atmosphere.show()
     resources.value.cloud = new Cloud(viewer.value)
     resources.value.cloud.show()
-
-
+    viewer.value.shadows = true;
+    viewer.value.terrainShadows = Cesium.ShadowMode.ENABLED;
   }
+  
+  /**
+   * 设置时钟参数
+   * @param {Date} startTime - 起始时间（必须是今天）
+   * @param {Date} endTime - 终止时间（必须是今天）
+   */
+  const setClockParams = (startTime, endTime) => {
+    if (!viewer.value) return;
+    
+    // 设置时钟参数
+    viewer.value.clock.startTime = startTime;
+    viewer.value.clock.stopTime = endTime;
+    viewer.value.clock.currentTime = startTime; // 默认从起始时间开始
+    viewer.value.clock.multiplier = 10;
+    viewer.value.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK_MULTIPLIER;
+    viewer.value.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
+    viewer.value.clock.shouldAnimate = true; // 有飞机飞的时候自动开始动画
+  };
+  
+  /**
+   * 控制时间线和动画面板显示/隐藏
+   * @param {boolean} visible - 是否显示时间线和动画面板
+   */
+  const setTimelineVisible = (visible) => {
+    if (viewer.value) {
+      // 检查timeline是否存在，避免访问undefined属性
+      if (viewer.value.timeline) {
+        viewer.value.timeline.container.style.display = visible ? 'block' : 'none';
+      }
+      
+      // 同时控制animation面板的显示和隐藏
+      if (viewer.value.animation) {
+        viewer.value.animation.container.style.display = visible ? 'block' : 'none';
+      }
+    }
+  };
 
   /**
    * 配置按键盘移动相机控制
@@ -183,6 +219,73 @@ export function useCesium(containerId) {
 
     // 初始化航线管理器
     routeManager.init(viewer.value)
+    
+    // 配置时间轴显示中国时间
+    if (viewer.value.timeline) {
+      // 调整时间轴容器宽度，确保文字能完全显示
+      const timelineContainer = viewer.value.timeline.container;
+      if (timelineContainer) {
+        // timelineContainer.style.width = '100%';
+        // timelineContainer.style.minWidth = '600px';
+      }
+      
+      // 自定义时间轴标签格式器，显示中国标准时间（使用更紧凑的格式）
+      viewer.value.timeline.makeLabel = function(date) {
+        // 创建一个新的Date对象，避免修改原日期
+        const chinaDate = new Date(date);
+        
+        // 添加8小时时区偏移，转换为中国标准时间
+        // chinaDate.setHours(chinaDate.getHours() + 8);
+        
+        // 使用更紧凑的时间格式，避免文字被截断
+        const month = String(chinaDate.getMonth() + 1).padStart(2, '0');
+        const day = String(chinaDate.getDate()).padStart(2, '0');
+        const hours = String(chinaDate.getHours()).padStart(2, '0');
+        const minutes = String(chinaDate.getMinutes()).padStart(2, '0');
+        
+        return `${month}-${day} ${hours}:${minutes}`;
+      };
+    }
+    
+    // 添加时钟变化事件监听
+    viewer.value.clock.onTick.addEventListener(() => {
+      // 获取当前时间
+      const currentTime = Cesium.JulianDate.toDate(viewer.value.clock.currentTime);
+      
+      // 更新热力图数据
+      if (resources.value.heatMapInstance && resources.value.heatMapInstance.heatmapState) {
+        if (typeof resources.value.heatMapInstance.heatmapState.heatmapPrimitive.updateHeatmapTime === 'function') {
+          resources.value.heatMapInstance.heatmapState.heatmapPrimitive.updateHeatmapTime(currentTime);
+        }
+      }
+      
+      // 更新航线分析数据（根据时间偏移量）
+      if (routeStore.currentRoute) {
+        // 计算时间偏移量（秒）
+        const timeOffset = Math.floor((currentTime - new Date()) / 1000);
+        // 触发航线分析面板更新
+        eventManager.emit('timeChange', { time: currentTime, timeOffset });
+      }
+    });
+    
+    // 添加时间轴拖动事件监听（用于手动拖动时间轴时）
+    if (viewer.value.timeline) {
+      viewer.value.timeline.addEventListener('settime', (event) => {
+        // 获取当前时间
+        const currentTime = Cesium.JulianDate.toDate(event.time);
+        
+        // 确保时钟继续动画
+        viewer.value.clock.shouldAnimate = true;
+        
+        // 更新航线分析数据（根据时间偏移量）
+        if (routeStore.currentRoute) {
+          // 计算时间偏移量（秒）
+          const timeOffset = Math.floor((currentTime - new Date()) / 1000);
+          // 触发航线分析面板更新
+          eventManager.emit('timeChange', { time: currentTime, timeOffset, manual: true });
+        }
+      });
+    }
   }
 
 
@@ -207,7 +310,23 @@ export function useCesium(containerId) {
       () => routeStore.currentRoute,
       (newRoute) => {
         if (newRoute && viewer.value) {
-          routeManager.render(newRoute)
+          // 检查新航线是否包含起始时间和终止时间
+          if (newRoute.startTime && newRoute.endTime) {
+            // 先设置时钟参数
+            setClockParams(newRoute.startTime, newRoute.endTime)
+            // 再渲染航线
+            routeManager.render(newRoute)
+            // 显示时间线
+            setTimelineVisible(true)
+          } else {
+            // 没有时间信息时也渲染航线
+            routeManager.render(newRoute)
+            // 隐藏时间线
+            setTimelineVisible(false)
+          }
+        } else {
+          // 没有航线时，隐藏时间线
+          setTimelineVisible(false)
         }
       }
     )
@@ -356,19 +475,19 @@ export function useCesium(containerId) {
    */
   const updateWindVisibilityBasedOnConditions = () => {
     if (!resources.value.windLayer) return;
-    
+
     // Get current camera height
     const cameraPosition = viewer.value.camera.positionCartographic;
     const cameraHeight = cameraPosition.height;
-    
+
     // Get visibility setting from store
     const isWindEnabled = layerSettingsStore.layers.wind.visible;
-    
+
     // Define camera height threshold for wind field visibility
-    
+
     // Determine final visibility based on both conditions
     const shouldBeVisible = isWindEnabled && cameraHeight <= CAMERA_HEIGHT_THRESHOLD;
-    
+
     // Update visibility for all wind layers
     if (Array.isArray(resources.value.windLayer)) {
       resources.value.windLayer.forEach(layer => {
@@ -394,7 +513,7 @@ export function useCesium(containerId) {
    */
   const setTemperatureVisibility = (visible) => {
     console.log(resources.value.heatMapInstance);
-    
+
     if (resources.value.heatMapInstance && resources.value.heatMapInstance.heatmapState) {
       resources.value.heatMapInstance.heatmapState.heatmapPrimitive.show = visible
     }
@@ -471,6 +590,8 @@ export function useCesium(containerId) {
     updateHeatmapTime,
     // 时间控制
     setCurrentTime,
+    setClockParams,
+    setTimelineVisible,
     // 矩形绘制
     startRectangleDrawing,
     stopRectangleDrawing,

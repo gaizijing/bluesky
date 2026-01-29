@@ -27,7 +27,9 @@
     "vue-cesium": "^3.2.12",
     "vue-count-to": "^1.0.13",
     "vue-echarts": "^6.6.1",
-    "vue-router": "^4.6.3"
+    "vue-progress-bar-player": "^0.0.29",
+    "vue-router": "^4.6.3",
+    "vue3-progress-bar": "^0.0.1-dev7"
   },
   "devDependencies": {
     "@element-plus/icons-vue": "^2.3.1",
