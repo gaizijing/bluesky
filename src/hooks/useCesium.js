@@ -83,7 +83,7 @@ export function useCesium(containerId) {
     viewer.value.clock.startTime = startTime;
     viewer.value.clock.stopTime = endTime;
     viewer.value.clock.currentTime = startTime; // 默认从起始时间开始
-    viewer.value.clock.multiplier = 10;
+    viewer.value.clock.multiplier = 30;
     viewer.value.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK_MULTIPLIER;
     viewer.value.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
     viewer.value.clock.shouldAnimate = true; // 有飞机飞的时候自动开始动画
@@ -98,6 +98,23 @@ export function useCesium(containerId) {
       // 检查timeline是否存在，避免访问undefined属性
       if (viewer.value.timeline) {
         viewer.value.timeline.container.style.display = visible ? 'block' : 'none';
+        
+        // 当时间轴从隐藏变为显示时，重新设置时间范围并触发更新
+        if (visible) {
+          setTimeout(() => {
+            // 获取当前时钟的时间范围
+            const startTime = viewer.value.clock.startTime;
+            const stopTime = viewer.value.clock.stopTime;
+            
+            // 重新设置时间轴的时间范围
+            if (startTime && stopTime) {
+              viewer.value.timeline.zoomTo(startTime, stopTime);
+            }
+            
+            // 触发场景重新渲染
+            viewer.value.scene.requestRender();
+          }, 100);
+        }
       }
       
       // 同时控制animation面板的显示和隐藏
@@ -119,56 +136,56 @@ export function useCesium(containerId) {
    * 近地的时候显示风场和云朵，远地的时候显示area
    */
   const setupCameraHeightWatcher = () => {
-    // Set up camera height watcher
+    if (!viewer.value) return;
+
+    const cameraPosition = viewer.value.camera.positionCartographic;
+    const initialHeight = cameraPosition ? cameraPosition.height : Infinity;
+    const initialIsBelowThreshold = initialHeight <= CAMERA_HEIGHT_THRESHOLD;
+
+    const updateVisibility = (isBelowThreshold) => {
+      if (isBelowThreshold) {
+        const isWindEnabled = layerSettingsStore.layers.wind.visible;
+        if (resources.value.windLayer && resources.value.windLayer.length > 0 && isWindEnabled) {
+          if (Array.isArray(resources.value.windLayer)) {
+            resources.value.windLayer.forEach(layer => {
+              layer.show = true;
+            });
+          } else {
+            resources.value.windLayer.show = true;
+          }
+        }
+        if (resources.value.areaManager) {
+          resources.value.areaManager.setAreasVisibility(false);
+        }
+        if (resources.value.cloud) {
+          resources.value.cloud.show();
+        }
+      } else {
+        if (resources.value.windLayer && resources.value.windLayer.length > 0) {
+          if (Array.isArray(resources.value.windLayer)) {
+            resources.value.windLayer.forEach(layer => {
+              layer.show = false;
+            });
+          } else {
+            resources.value.windLayer.show = false;
+          }
+        }
+        if (resources.value.cloud) {
+          resources.value.cloud.destroy();
+        }
+        if (resources.value.areaManager) {
+          resources.value.areaManager.setAreasVisibility(true);
+        }
+      }
+    };
+
+    updateVisibility(initialIsBelowThreshold);
+
     resources.value.cameraHeightWatcher = watchCameraHeight(
       viewer.value,
       CAMERA_HEIGHT_THRESHOLD,
       (height, isBelowThreshold) => {
-        // 拉近看场时：风场显示，云朵显示，area隐藏
-        // 拉远时：风场隐藏，云朵隐藏，area显示
-        if (isBelowThreshold) {
-          // 拉近场景
-
-          const isWindEnabled = layerSettingsStore.layers.wind.visible;
-          if (resources.value.windLayer && isWindEnabled) {
-            // 风场隐藏
-            if (Array.isArray(resources.value.windLayer)) {
-              resources.value.windLayer.forEach(layer => {
-                layer.show = true;
-              });
-            } else {
-              resources.value.windLayer.show = true;
-            }
-          }
-          if (resources.value.areaManager) {
-            resources.value.areaManager.setAreasVisibility(false); // 监测点隐藏
-          }
-
-          if (resources.value.cloud) {
-            resources.value.cloud.show(); // 云朵显示
-          }
-
-
-
-        } else {
-          // 拉远场景
-          if (resources.value.windLayer) {
-            // 风场隐藏
-            if (Array.isArray(resources.value.windLayer)) {
-              resources.value.windLayer.forEach(layer => {
-                layer.show = false;
-              });
-            } else {
-              resources.value.windLayer.show = false;
-            }
-          }
-          if (resources.value.cloud) {
-            resources.value.cloud.destroy(); // 云朵隐藏
-          }
-          if (resources.value.areaManager) {
-            resources.value.areaManager.setAreasVisibility(true); // 监测点显示
-          }
-        }
+        updateVisibility(isBelowThreshold);
       }
     );
   };
@@ -180,9 +197,9 @@ export function useCesium(containerId) {
     // 加载地形
     loadTerrain(viewer.value)
     // 添加行政区划边界 区名称的小牌子，和区的的整块面的颜色
-    //addBoundGeo(viewer.value)
+    // addBoundGeo(viewer.value)
     // TODO: 如需添加天地图，取消以下注释
-    // resources.value.tiandituLayer = addTiandituLayer(viewer.value)
+    resources.value.tiandituLayer = addTiandituLayer(viewer.value)
     // TODO: 如需添加完整行政区划信息，取消以下注释
     // addDistrictInfo(viewer.value)
 
@@ -209,6 +226,20 @@ export function useCesium(containerId) {
     // 初始化风场
     resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
 
+    // 等待风场数据加载完成后再执行可见性检查
+    if (!windStore.windData) {
+      const unwatch = watch(
+        () => windStore.windData,
+        (newData) => {
+          if (newData) {
+            unwatch();
+            setupCameraHeightWatcher();
+          }
+        }
+      );
+    } else {
+      setupCameraHeightWatcher();
+    }
 
     // 设置相机高度监听，控制风场、云朵和监测点的显示/隐藏
     setupCameraHeightWatcher()
@@ -249,8 +280,10 @@ export function useCesium(containerId) {
     
     // 添加时钟变化事件监听
     viewer.value.clock.onTick.addEventListener(() => {
-      // 获取当前时间
+      if (!viewer.value.clock.currentTime) return;
       const currentTime = Cesium.JulianDate.toDate(viewer.value.clock.currentTime);
+      
+      if (!currentTime) return;
       
       // 更新热力图数据
       if (resources.value.heatMapInstance && resources.value.heatMapInstance.heatmapState) {
@@ -261,9 +294,7 @@ export function useCesium(containerId) {
       
       // 更新航线分析数据（根据时间偏移量）
       if (routeStore.currentRoute) {
-        // 计算时间偏移量（秒）
         const timeOffset = Math.floor((currentTime - new Date()) / 1000);
-        // 触发航线分析面板更新
         eventManager.emit('timeChange', { time: currentTime, timeOffset });
       }
     });
@@ -271,17 +302,15 @@ export function useCesium(containerId) {
     // 添加时间轴拖动事件监听（用于手动拖动时间轴时）
     if (viewer.value.timeline) {
       viewer.value.timeline.addEventListener('settime', (event) => {
-        // 获取当前时间
+        if (!event || !event.time) return;
         const currentTime = Cesium.JulianDate.toDate(event.time);
         
-        // 确保时钟继续动画
+        if (!currentTime) return;
+        
         viewer.value.clock.shouldAnimate = true;
         
-        // 更新航线分析数据（根据时间偏移量）
         if (routeStore.currentRoute) {
-          // 计算时间偏移量（秒）
           const timeOffset = Math.floor((currentTime - new Date()) / 1000);
-          // 触发航线分析面板更新
           eventManager.emit('timeChange', { time: currentTime, timeOffset, manual: true });
         }
       });
@@ -360,8 +389,9 @@ export function useCesium(containerId) {
       await load3DModel()
       await initEntitiesAndVisualizations()
       setupReactiveWatchers()
-
-
+      
+      // 系统初始化时默认隐藏时间轴
+      setTimelineVisible(false)
 
     } finally {
       isLoading.value = false

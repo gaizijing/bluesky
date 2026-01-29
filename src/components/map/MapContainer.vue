@@ -1,5 +1,5 @@
 <template>
-  <div class="map-container">
+  <div class="map-container" style="height: 100%;">
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-overlay">
       <div class="loading-content">
