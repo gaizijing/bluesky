@@ -418,7 +418,7 @@ class RouteManager {
       label: {
         text: `起点：${route.startName || '出发地'}`,
         font: '16px sans-serif',
-        fillColor: Cesium.Color.WHITE,
+        fillColor: Cesium.Color.TOMATO,
         outlineColor: Cesium.Color.TRANSPARENT,
         outlineWidth: 0,
         style: Cesium.LabelStyle.FILL,
@@ -439,7 +439,7 @@ class RouteManager {
       label: {
         text: `终点：${route.endName || '目的地'}`,
         font: '16px sans-serif',
-        fillColor: Cesium.Color.WHITE,
+        fillColor: Cesium.Color.TOMATO,
         outlineColor: Cesium.Color.TRANSPARENT,
         outlineWidth: 0,
         style: Cesium.LabelStyle.FILL,

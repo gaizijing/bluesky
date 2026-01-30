@@ -3,6 +3,7 @@ import { flyToRegion } from '@/cesium/core/camera'
 import eventManager from '@/cesium/core/eventManager'
 import { AreaService } from '@/services/areaService'
 import { InitializationService } from '@/services/initialization'
+import { WallDiffuseMaterialProperty } from '@/cesium/WallDiffuseMaterialProperty'
 
 class AreaManager {
   static instance = null
@@ -223,19 +224,19 @@ class AreaManager {
               if (entity.billboard) entity.billboard.scale = 1.6
               this.hoveredEntity = entity
 
-              // 安全获取 areaData，确保数据可序列化
-              const areaData = entity.properties?.areaData
-              if (areaData) {
-                const area = areaData && areaData.getValue ? areaData.getValue() : areaData
-                // 验证 area 和 bbox 的结构
-                if (area && typeof area === 'object' && area.bbox) {
-                  // 验证 bbox 是有效的二维数组
-                  if (Array.isArray(area.bbox) && area.bbox.length === 2 &&
-                    Array.isArray(area.bbox[0]) && Array.isArray(area.bbox[1])) {
-                    this._showHoveredAreaPolygon(area.bbox)
-                  }
-                }
-              }
+              // // 安全获取 areaData，确保数据可序列化 鼠标放上有方框的选中效果
+              // const areaData = entity.properties?.areaData
+              // if (areaData) {
+              //   const area = areaData && areaData.getValue ? areaData.getValue() : areaData
+              //   // 验证 area 和 bbox 的结构
+              //   if (area && typeof area === 'object' && area.bbox) {
+              //     // 验证 bbox 是有效的二维数组
+              //     if (Array.isArray(area.bbox) && area.bbox.length === 2 &&
+              //       Array.isArray(area.bbox[0]) && Array.isArray(area.bbox[1])) {
+              //       this._showHoveredAreaPolygon(area.bbox)
+              //     }
+              //   }
+              // }
             } catch (e) {
               console.warn('Error processing hover data:', e)
               // 即使出错也继续执行，不影响其他功能
@@ -518,26 +519,23 @@ class AreaManager {
     }
 
     const [[west, south], [east, north]] = bbox
-    const positions = Cesium.Cartesian3.fromDegreesArrayHeights([
-      west, south, 100,
-      east, south, 100,
-      east, north, 100,
-      west, north, 100,
-      west, south, 100
+    const positions = Cesium.Cartesian3.fromDegreesArray([
+      west, south,
+      east, south,
+      east, north,
+      west, north,
+      west, south
     ])
 
     this.selectedAreaPolygon = this.viewer.entities.add({
       name: 'selectedAreaPolygon',
-      polygon: {
-        hierarchy: new Cesium.PolygonHierarchy(positions),
-        material: new Cesium.ColorMaterialProperty(Cesium.Color.CYAN.withAlpha(0.15)),
-        outline: true,
-        outlineColor: Cesium.Color.CYAN,
-        outlineWidth: 4,
-        perPositionHeight: true,
-        extrudedHeight: 200,
-        closeTop: true,
-        closeBottom: true
+      wall: {
+        positions: positions,
+        maximumHeights: new Array(positions.length).fill(200),
+        minimumHeights: new Array(positions.length).fill(0),
+        material: new WallDiffuseMaterialProperty({
+          color: new Cesium.Color(0.392, 0.584, 0.929, 1.0)
+        }),
       }
     })
   }

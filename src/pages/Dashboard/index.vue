@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard-container">
     <!-- 1. 全屏地图（底层） -->
-    <div class="map-container">
+    <div class="map-container" style="height: 100%;">
       <MapContainer id="cesiumContainer" class="cesium-container" />
     </div>
 
