@@ -11,6 +11,7 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
+    "@stomp/stompjs": "^7.2.1",
     "axios": "^1.12.2",
     "cesium": "^1.122.0",
     "cesium-wind-layer": "^0.10.0",
@@ -21,6 +22,7 @@
     "lodash": "^4.17.21",
     "openmeteo": "^1.2.3",
     "pinia": "^3.0.3",
+    "sockjs-client": "^1.6.1",
     "unplugin-auto-import": "^20.2.0",
     "unplugin-vue-components": "^30.0.0",
     "vue": "^3.5.22",

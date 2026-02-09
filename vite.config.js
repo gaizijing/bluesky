@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: './',
+    define: {
+      global: 'window'
+    },
     plugins: [
       vue(),
       cesium(),
@@ -69,6 +72,12 @@ export default defineConfig(({ mode }) => {
           headers: {
             'Access-Control-Allow-Origin': '*'
           }
+        },
+        '/ws/mqtt': {
+          target: 'http://localhost:8088',
+          changeOrigin: true,
+          ws: true,
+          secure: false
         }
       }
     },
