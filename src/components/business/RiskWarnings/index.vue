@@ -61,23 +61,16 @@
     </div>
   </div>
 
-  <!-- 历史弹窗（保留原功能） -->
-  <div v-if="showHistory" class="dialog-mask" @click="closeHistoryDialog">
-    <div class="dialog-container" @click.stop>
-      <div class="dialog-header">
-        <h3>近七日风险预警情况</h3>
-        <button class="dialog-close" @click="closeHistoryDialog">×</button>
-      </div>
-      <div class="dialog-content">
-        <WeatherWarnings />
-      </div>
-    </div>
-  </div>
+  <!-- 历史弹窗（使用DialogContainer组件） -->
+  <DialogContainer title="近七日风险预警情况" :visible="showHistory" @close="closeHistoryDialog">
+    <WeatherWarnings />
+  </DialogContainer>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, defineAsyncComponent, watch } from "vue";
 import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
+import DialogContainer from "@/components/common/DialogContainer.vue";
 
 const dashboardWeatherStore = useDashboardWeatherStore();
 const WeatherWarnings = defineAsyncComponent(() =>
@@ -478,4 +471,6 @@ const closeHistoryDialog = () => {
     padding: 1px 4px;
   }
 }
+
+
 </style>
