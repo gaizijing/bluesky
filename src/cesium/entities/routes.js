@@ -112,8 +112,8 @@ class RouteManager {
       )
     });
 
-    // 初始化键盘事件监听
-    aircraftController.initKeyboardControls();
+    // 初始化websocket连接
+    aircraftController.initWebSocket();
 
     return route.id;
   }

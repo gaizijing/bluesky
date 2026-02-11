@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium'
 import { useWindStore } from '@/store/modules/wind'
+import { routeRenderer } from './RouteRenderer'
 
 class AircraftController {
   /**
@@ -27,8 +28,9 @@ class AircraftController {
       ...options
     }
     this.#planeAttitudes = new Map() // routeId -> { heading, pitch, roll }
-    this.#keyboardEventListener = null
     this.#timelineEventListener = null
+    this.#websocket = null
+    this.#sendFlightDataInterval = null
     this.#activeRouteId = null
     this.#viewer = null
   }
@@ -195,7 +197,7 @@ class AircraftController {
     const tempJulianDate = new Cesium.JulianDate()
     const tempCartesian3 = new Cesium.Cartesian3()
     const heightDifference = keyPoints[1].z - keyPoints[0].z
-    
+
     for (let i = 0; i <= takeoffSteps; i++) {
       // 垂直起飞：只改变高度，经纬度保持不变
       Cesium.Cartesian3.clone(keyPoints[0], tempCartesian3)
@@ -216,7 +218,7 @@ class AircraftController {
     const cruiseStepTime = cruiseDuration / cruiseSteps
     const tempJulianDate = new Cesium.JulianDate()
     const tempCartesian3 = new Cesium.Cartesian3()
-    
+
     for (let i = 0; i <= cruiseSteps; i++) {
       const ratio = i / cruiseSteps
       Cesium.Cartesian3.lerp(keyPoints[1], keyPoints[2], ratio, tempCartesian3)
@@ -237,7 +239,7 @@ class AircraftController {
     const tempJulianDate = new Cesium.JulianDate()
     const tempCartesian3 = new Cesium.Cartesian3()
     const heightDifference = keyPoints[3].z - keyPoints[2].z
-    
+
     for (let i = 0; i <= landingSteps; i++) {
       // 垂直降落：只改变高度，经纬度保持不变
       Cesium.Cartesian3.clone(keyPoints[3], tempCartesian3)
@@ -257,10 +259,10 @@ class AircraftController {
     return new Cesium.CallbackProperty((time, result) => {
       // 获取基于速度的朝向
       const velocityQuaternion = velocityOrientation.getValue(time)
-      
+
       // 获取当前航线的飞机姿态调整参数（键盘调整）
       const attitude = this.#planeAttitudes.get(routeId)
-      
+
       // 只有当有姿态调整时才应用自定义姿态
       if (attitude && (attitude.heading !== 0 || attitude.pitch !== 0 || attitude.roll !== 0)) {
         // 创建自定义姿态的四元数
@@ -272,7 +274,7 @@ class AircraftController {
             Cesium.Math.toRadians(attitude.roll)
           )
         )
-        
+
         // 结合速度朝向和自定义姿态
         return Cesium.Quaternion.multiply(
           velocityQuaternion,
@@ -280,7 +282,7 @@ class AircraftController {
           result
         )
       }
-      
+
       // 没有姿态调整时，直接使用速度朝向
       return velocityQuaternion
     }, false)
@@ -317,7 +319,7 @@ class AircraftController {
     // 确保时间轴显示正确的时间范围
     if (this.#viewer.timeline) {
       this.#viewer.timeline.zoomTo(startTime, endTime)
-      
+
       // 添加时间轴交互事件监听器，当用户调整时间轴后自动重新启动动画
       this.#setupTimelineEventListener()
     }
@@ -332,7 +334,7 @@ class AircraftController {
     if (this.#timelineEventListener) {
       this.#viewer.timeline.removeEventListener('settime', this.#timelineEventListener)
     }
-    
+
     // 当用户调整时间轴时，重新启动动画
     this.#timelineEventListener = () => {
       if (this.#viewer && !this.#viewer.clock.shouldAnimate) {
@@ -342,7 +344,7 @@ class AircraftController {
         }, 100)
       }
     }
-    
+
     // 添加监听器
     this.#viewer.timeline.addEventListener('settime', this.#timelineEventListener)
   }
@@ -435,7 +437,7 @@ class AircraftController {
       const longitude = Cesium.Math.toDegrees(cartographic.longitude).toFixed(4)
       const latitude = Cesium.Math.toDegrees(cartographic.latitude).toFixed(4)
       const height = cartographic.height.toFixed(0)
-      
+
       // 获取实时风速
       let windSpeed = 0
 
@@ -500,22 +502,22 @@ class AircraftController {
    */
   setPlaneAttitude(routeId, attitude) {
     if (!routeId || !attitude) return
-    
+
     // 获取当前姿态
     const currentAttitude = this.#planeAttitudes.get(routeId) || { heading: 0, pitch: 0, roll: 0 }
-    
+
     // 更新姿态参数
     const newAttitude = {
       heading: attitude.heading !== undefined ? attitude.heading : currentAttitude.heading,
       pitch: attitude.pitch !== undefined ? attitude.pitch : currentAttitude.pitch,
       roll: attitude.roll !== undefined ? attitude.roll : currentAttitude.roll
     }
-    
+
     // 存储更新后的姿态
     this.#planeAttitudes.set(routeId, newAttitude)
-    
+
     console.log(`[${new Date().toLocaleTimeString()}] 调整飞机姿态 - 航线: ${routeId}, 姿态:`, newAttitude)
-    
+
     // 触发场景重绘
     if (this.#viewer) {
       this.#viewer.scene.requestRender()
@@ -548,89 +550,15 @@ class AircraftController {
    */
   toggleFlight() {
     if (!this.#viewer) return false
-    
+
     this.#viewer.clock.shouldAnimate = !this.#viewer.clock.shouldAnimate
     const isFlying = this.#viewer.clock.shouldAnimate
-    
+
     console.log(isFlying ? '飞机飞行已继续' : '飞机飞行已暂停')
     return isFlying
   }
 
-  /**
-   * 初始化键盘事件监听
-   */
-  initKeyboardControls() {
-    // 如果已经存在事件监听器，先移除
-    if (this.#keyboardEventListener) {
-      document.removeEventListener('keydown', this.#keyboardEventListener)
-    }
-    
-    // 键盘事件处理函数
-    this.#keyboardEventListener = (event) => {
-      if (!this.#activeRouteId) return
-      
-      // 获取当前姿态
-      const currentAttitude = this.#planeAttitudes.get(this.#activeRouteId) || { heading: 0, pitch: 0, roll: 0 }
-      // 姿态调整步长
-      const step = 2
-      
-      // 根据按键调整姿态
-      switch (event.key) {
-        case 'ArrowUp':
-          // 上箭头：抬头（增加俯仰角）
-          this.setPlaneAttitude(this.#activeRouteId, {
-            pitch: currentAttitude.pitch + step,
-            roll: currentAttitude.roll,
-            heading: currentAttitude.heading
-          })
-          break
-        case 'ArrowDown':
-          // 下箭头：低头（减少俯仰角）
-          this.setPlaneAttitude(this.#activeRouteId, {
-            pitch: currentAttitude.pitch - step,
-            roll: currentAttitude.roll,
-            heading: currentAttitude.heading
-          })
-          break
-        case 'ArrowLeft':
-          // 左箭头：向左滚转（减少滚转角）
-          this.setPlaneAttitude(this.#activeRouteId, {
-            roll: currentAttitude.roll - step,
-            pitch: currentAttitude.pitch,
-            heading: currentAttitude.heading
-          })
-          break
-        case 'ArrowRight':
-          // 右箭头：向右滚转（增加滚转角）
-          this.setPlaneAttitude(this.#activeRouteId, {
-            roll: currentAttitude.roll + step,
-            pitch: currentAttitude.pitch,
-            heading: currentAttitude.heading
-          })
-          break
-        case 'c':
-          // A键：向左偏航（减少偏航角）
-          this.setPlaneAttitude(this.#activeRouteId, {
-            heading: currentAttitude.heading - step,
-            pitch: currentAttitude.pitch,
-            roll: currentAttitude.roll
-          })
-          break
-        case 'v':
-          // D键：向右偏航（增加偏航角）
-          this.setPlaneAttitude(this.#activeRouteId, {
-            heading: currentAttitude.heading + step,
-            pitch: currentAttitude.pitch,
-            roll: currentAttitude.roll
-          })
-          break
-      }
-    }
-    
-    // 添加键盘事件监听器
-    document.addEventListener('keydown', this.#keyboardEventListener)
-    console.log('键盘控制已初始化，使用上下左右键调整飞机姿态，AD键调整偏航角')
-  }
+
 
   /**
    * 清理飞机姿态数据
@@ -641,30 +569,238 @@ class AircraftController {
   }
 
   /**
+   * 初始化websocket连接
+   */
+  initWebSocket() {
+    // 关闭现有的连接
+    this.#closeWebSocket()
+
+    // 建立新的websocket连接
+    try {
+      // 从环境变量获取WebSocket地址
+      const wsUrl = import.meta.env.VITE_WEBSOCKET_URL
+      this.#websocket = new WebSocket(wsUrl)
+
+      // 连接打开事件
+      this.#websocket.onopen = () => {
+        console.log('WebSocket连接已建立')
+        // 开始发送飞机状态信息
+        this.#startSendingFlightData()
+      }
+
+      // 接收消息事件
+      this.#websocket.onmessage = (event) => {
+        /**
+         * 
+         * {
+  "routeId": "route_123",
+  "attitude": {
+    "pitch": 0,
+    "roll": 0,
+    "heading": 90
+  }
+}
+         */
+        try {
+          const data = JSON.parse(event.data)
+          // 处理后端发送的姿态信息
+          this.#handleAttitudeData(data)
+        } catch (error) {
+          console.error('Error parsing websocket message:', error)
+        }
+      }
+
+      // 错误事件
+      this.#websocket.onerror = (error) => {
+        console.error('WebSocket错误:', error)
+      }
+
+      // 连接关闭事件
+      this.#websocket.onclose = () => {
+        console.log('WebSocket连接已关闭')
+        // 停止发送数据
+        this.#stopSendingFlightData()
+      }
+    } catch (error) {
+      console.error('Error initializing websocket:', error)
+    }
+  }
+
+  /**
+   * 开始发送飞行数据
+   * @private
+   */
+  #startSendingFlightData() {
+    // 从环境变量获取发送间隔
+    const sendInterval = parseInt(import.meta.env.VITE_WEBSOCKET_SEND_INTERVAL)
+    this.#sendFlightDataInterval = setInterval(() => {
+      this.#sendFlightData()
+    }, sendInterval)
+  }
+
+  /**
+   * 停止发送飞行数据
+   * @private
+   */
+  #stopSendingFlightData() {
+    if (this.#sendFlightDataInterval) {
+      clearInterval(this.#sendFlightDataInterval)
+      this.#sendFlightDataInterval = null
+    }
+  }
+
+  /**
+   * 发送飞行数据到后端
+   * @private
+   */
+  #sendFlightData() {
+    if (!this.#websocket || this.#websocket.readyState !== WebSocket.OPEN) {
+      return
+    }
+
+    if (!this.#activeRouteId) {
+      return
+    }
+
+    try {
+      // 获取当前航线的飞机实体
+      const routeData = routeRenderer.getRouteData(this.#activeRouteId)
+      if (!routeData || !routeData.plane) {
+        return
+      }
+
+      // 获取当前时间
+      const currentTime = this.#viewer.clock.currentTime
+
+      // 获取飞机当前位置
+      const position = routeData.plane.position.getValue(currentTime)
+      if (!position) {
+        return
+      }
+
+      // 转换为经纬度高度
+      const cartographic = Cesium.Cartographic.fromCartesian(position)
+      const longitude = Cesium.Math.toDegrees(cartographic.longitude)
+      const latitude = Cesium.Math.toDegrees(cartographic.latitude)
+      const height = cartographic.height
+
+      // 获取风速风向（这里使用模拟数据，实际应该从风场数据中获取）
+      let windSpeed = 0
+      let windU = 0
+      let windV = 0
+
+      try {
+        const windStore = useWindStore()
+        const windLayers = windStore.windLayer
+        if (windLayers && Array.isArray(windLayers) && windLayers.length > 0) {
+          const windLayer = windLayers[0]
+          if (windLayer && typeof windLayer.getDataAtLonLat === 'function') {
+            const windData = windLayer.getDataAtLonLat(longitude, latitude)
+            if (windData && windData.interpolated) {
+              windSpeed = windData.interpolated.speed
+              windU = windData.interpolated.u || 0
+              windV = windData.interpolated.v || 0
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Error getting wind data:', error)
+      }
+
+      // 准备发送的数据
+      const flightData = {
+        routeId: this.#activeRouteId,
+        timestamp: Date.now(),
+        position: {
+          longitude,
+          latitude,
+          height
+        },
+        wind: {
+          speed: windSpeed,
+          u: windU,
+          v: windV
+        },
+        temperature: 25, // 模拟温度数据
+        // 其他需要的参数
+      }
+
+      // 发送数据
+      this.#websocket.send(JSON.stringify(flightData))
+    } catch (error) {
+      console.error('Error sending flight data:', error)
+    }
+  }
+
+  /**
+   * 处理后端发送的姿态数据
+   * @private
+   * @param {Object} data - 后端发送的姿态数据
+   */
+  #handleAttitudeData(data) {
+    if (!data || !data.routeId || !data.attitude) {
+      return
+    }
+
+    const { routeId, attitude } = data
+
+    // 检查是否是当前激活的航线
+    if (routeId !== this.#activeRouteId) {
+      return
+    }
+
+    // 检查姿态数据是否完整
+    if (attitude.pitch === undefined || attitude.roll === undefined || attitude.heading === undefined) {
+      console.warn('Incomplete attitude data received:', data)
+      return
+    }
+
+    // 更新飞机姿态
+    this.setPlaneAttitude(routeId, {
+      pitch: attitude.pitch,
+      roll: attitude.roll,
+      heading: attitude.heading
+    })
+  }
+
+  /**
    * 清理所有资源
    */
   destroy() {
-    // 移除键盘事件监听器
-    if (this.#keyboardEventListener) {
-      document.removeEventListener('keydown', this.#keyboardEventListener)
-      this.#keyboardEventListener = null
-    }
-    
+    // 关闭websocket连接
+    this.#closeWebSocket()
+
     // 移除时间轴事件监听器
     if (this.#timelineEventListener && this.#viewer && this.#viewer.timeline) {
       this.#viewer.timeline.removeEventListener('settime', this.#timelineEventListener)
       this.#timelineEventListener = null
     }
-    
+
     this.#planeAttitudes.clear()
     this.#activeRouteId = null
     this.#viewer = null
   }
 
+  /**
+   * 关闭websocket连接
+   * @private
+   */
+  #closeWebSocket() {
+    if (this.#websocket) {
+      try {
+        this.#websocket.close()
+      } catch (error) {
+        console.error('Error closing websocket:', error)
+      }
+      this.#websocket = null
+    }
+  }
+
   // 私有属性
   #planeAttitudes
-  #keyboardEventListener
   #timelineEventListener
+  #websocket
+  #sendFlightDataInterval
   #activeRouteId
   #viewer
 }
