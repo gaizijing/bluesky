@@ -4,7 +4,6 @@ import eventManager from '@/cesium/core/eventManager'
 import { RouteRenderer } from './RouteRenderer'
 import { PlaneModel } from './PlaneModel'
 import { CameraController } from './CameraController'
-import { WebSocketController } from './WebSocketController'
 import { RouteInteraction } from './RouteInteraction'
 
 class RouteManager {
@@ -20,7 +19,6 @@ class RouteManager {
   #routeRenderer;
   #planeModel;
   #cameraController;
-  #webSocketController;
   #routeInteraction;
 
   // 私有构造函数，防止外部实例化
@@ -39,7 +37,6 @@ class RouteManager {
     this.#routeRenderer = null
     this.#planeModel = null
     this.#cameraController = null
-    this.#webSocketController = null
     this.#routeInteraction = null
   }
 
@@ -54,7 +51,6 @@ class RouteManager {
     this.#routeRenderer = new RouteRenderer(viewerInstance)
     this.#planeModel = new PlaneModel(viewerInstance)
     this.#cameraController = new CameraController(viewerInstance)
-    this.#webSocketController = new WebSocketController(this)
     this.#routeInteraction = new RouteInteraction(viewerInstance, this)
     
     this.#bindRouteEvents()
@@ -75,9 +71,6 @@ class RouteManager {
 
     // 设置当前激活的航线ID
     this.#activeRouteId = route.id
-
-    // 初始化WebSocket连接并发送航线ID
-    this.#webSocketController.initWebSocket()
 
     // 渲染航线和飞机
     const { segments, plane, positions } = this.#routeRenderer.renderRoute(route)
@@ -120,10 +113,6 @@ class RouteManager {
     this.#routeEntities.forEach((routeData, routeId) => this.#removeRoute(routeId))
     // 清理当前激活的航线ID
     this.#activeRouteId = null
-    // 断开WebSocket连接
-    if (this.#webSocketController) {
-      this.#webSocketController.destroy();
-    }
   }
 
   /**
@@ -178,7 +167,6 @@ class RouteManager {
     this.#routeRenderer = null;
     this.#planeModel = null;
     this.#cameraController = null;
-    this.#webSocketController = null;
     this.#routeInteraction = null;
     
     this.#activeRouteId = null;
@@ -197,10 +185,6 @@ class RouteManager {
 
   get cameraController() {
     return this.#cameraController;
-  }
-
-  get webSocketController() {
-    return this.#webSocketController;
   }
 
   get routeInteraction() {

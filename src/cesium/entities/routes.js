@@ -5,7 +5,6 @@ export * from './routes/RouteManager'
 export * from './routes/RouteRenderer'
 export * from './routes/PlaneModel'
 export * from './routes/CameraController'
-export * from './routes/WebSocketController'
 export * from './routes/RouteInteraction'
 export * from './routes/DangerLevel'
 
