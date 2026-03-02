@@ -1,6 +1,8 @@
 import { WeatherService } from './weatherService';
 import { useWeatherStore } from '@/store/modules/weather';
 import { useAreaStore } from '@/store/modules/area';
+import { getRoutes, getRouteDetail } from '@/api';
+import { useRouteStore } from '@/store/modules/routeStore';
 
 class RouteService {
   constructor() {
@@ -14,6 +16,10 @@ class RouteService {
 
   getAreaStore() {
     return useAreaStore();
+  }
+
+  getRouteStore() {
+    return useRouteStore();
   }
 
   // 加载飞行分析模块数据
@@ -41,8 +47,19 @@ class RouteService {
   // 加载航路列表数据
   async loadRouteListData() {
     try {
-      // 模拟航路列表数据
-      const routeData = {
+      const routeData = await getRoutes();
+      
+      // 更新 store
+      const routeStore = this.getRouteStore();
+      if (routeData && routeData.routes) {
+        routeStore.setRouteList(routeData.routes);
+      }
+      
+      return routeData;
+    } catch (error) {
+      console.error('加载航路列表数据失败:', error);
+      // 降级使用模拟数据
+      const mockData = {
         routes: [
           {
             id: 'ROUTE-001',
@@ -78,22 +95,22 @@ class RouteService {
         total: 3,
         available: 3
       };
-
-      return {
-        routeData,
-        timestamp: Date.now()
-      };
-    } catch (error) {
-      console.error('加载航路列表数据失败:', error);
-      throw error;
+      
+      const routeStore = this.getRouteStore();
+      routeStore.setRouteList(mockData.routes);
+      return mockData;
     }
   }
 
   // 加载航路分析详情数据
   async loadRouteAnalysisData(routeId) {
     try {
-      // 模拟航路分析详情数据
-      const analysisData = {
+      const analysisData = await getRouteDetail(routeId);
+      return analysisData;
+    } catch (error) {
+      console.error('加载航路分析详情数据失败:', error);
+      // 降级使用模拟数据
+      return {
         routeId,
         routeName: `航路${routeId.split('-')[1]}`,
         weatherAlongRoute: [
@@ -115,14 +132,6 @@ class RouteService {
           '注意中段风力变化'
         ]
       };
-
-      return {
-        analysisData,
-        timestamp: Date.now()
-      };
-    } catch (error) {
-      console.error('加载航路分析详情数据失败:', error);
-      throw error;
     }
   }
 }

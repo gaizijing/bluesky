@@ -11,7 +11,6 @@ import { addWhiteModel } from '@/cesium/layers/model3d'
 import { AreaManager } from '@/cesium/entities/area.js'
 import { initWind } from '@/cesium/visualization/wind'
 import { initHeatVolume } from '@/cesium/visualization/heatmap'
-import generateHeatmapData from '@/mock/heatmapData'
 import { routeManager } from '@/cesium/entities/routes' // 引入航线管理器
 import { useRouteStore } from '@/store/modules/routeStore'
 import { addDistrictInfo, addBoundGeo } from '@/cesium/layers/district'
@@ -52,23 +51,74 @@ export function useCesium(containerId) {
   // 监测点相关响应式数据
   const { areaList } = toRefs(areaStore)
 
+  // 监听区域变化
+  watch(
+    () => areaStore.selectedArea,
+    (newArea, oldArea) => {
+
+      
+      // 记录区域切换，但不立即更新热力图
+      // 热力图更新会在Cesium初始化后通过其他机制触发
+      console.log('区域已切换，热力图将在适当时机更新')
+      
+      // 如果当前有热力图实例且viewer已初始化，可以尝试更新
+      // 但通常热力图更新会由时间轴或其他机制触发
+      if (resources.value.heatMapInstance && viewer.value && newArea) {
+        console.log('尝试立即更新热力图...')
+        const currentTime = viewer.value.clock.currentTime
+        if (currentTime) {
+          const jsDate = Cesium.JulianDate.toDate(currentTime)
+          console.log('使用Viewer时间更新热力图:', jsDate)
+          updateHeatmapTime(jsDate)
+        } else {
+          console.log('使用当前时间更新热力图')
+          updateHeatmapTime(new Date())
+        }
+      } else {
+        console.log('热力图暂不更新，等待初始化完成')
+      }
+    },
+    { deep: true }
+  )
+
   // ==================== 初始化步骤 ====================
 
   /**
    * 初始化Cesium Viewer
    */
   const initViewer = () => {
-    viewer.value = createViewer(containerId)
-    viewer.value.cesiumWidget.creditContainer.style.display = 'none'
-    resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
-      cameraHeightThreshold: 240000
-    })
-    //  const atmosphere = new Atmosphere(viewer.value)
-    // atmosphere.show()
-    resources.value.cloud = new Cloud(viewer.value)
-    resources.value.cloud.show()
-    viewer.value.shadows = true;
-    viewer.value.terrainShadows = Cesium.ShadowMode.ENABLED;
+    try {
+      console.log('[Cesium] 创建Viewer...')
+      viewer.value = createViewer(containerId)
+      viewer.value.cesiumWidget.creditContainer.style.display = 'none'
+      console.log('[Cesium] Viewer创建成功')
+      
+      console.log('[Cesium] 初始化天空盒...')
+      try {
+        resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
+          cameraHeightThreshold: 240000
+        })
+        console.log('[Cesium] 天空盒初始化成功')
+      } catch (skyError) {
+        console.warn('[Cesium] 天空盒初始化失败:', skyError)
+      }
+      
+      console.log('[Cesium] 初始化云层...')
+      try {
+        resources.value.cloud = new Cloud(viewer.value)
+        resources.value.cloud.show()
+        console.log('[Cesium] 云层初始化成功')
+      } catch (cloudError) {
+        console.warn('[Cesium] 云层初始化失败:', cloudError)
+      }
+      
+      viewer.value.shadows = true;
+      viewer.value.terrainShadows = Cesium.ShadowMode.ENABLED;
+      console.log('[Cesium] Viewer配置完成')
+    } catch (error) {
+      console.error('[Cesium] initViewer失败:', error)
+      throw error
+    }
   }
   
   /**
@@ -194,14 +244,21 @@ export function useCesium(containerId) {
    * 加载基础图层
    */
   const loadBaseLayers = () => {
-    // 加载地形
-    loadTerrain(viewer.value)
-    // 添加行政区划边界 区名称的小牌子，和区的的整块面的颜色
-    // addBoundGeo(viewer.value)
-    // TODO: 如需添加天地图，取消以下注释
-    resources.value.tiandituLayer = addTiandituLayer(viewer.value)
-    // TODO: 如需添加完整行政区划信息，取消以下注释
-    // addDistrictInfo(viewer.value)
+    try {
+      console.log('[Cesium] 3.1 加载地形...')
+      loadTerrain(viewer.value)
+      console.log('[Cesium] 地形加载成功')
+    } catch (error) {
+      console.warn('[Cesium] 地形加载失败:', error)
+    }
+    
+    try {
+      console.log('[Cesium] 3.2 加载天地图...')
+      resources.value.tiandituLayer = addTiandituLayer(viewer.value)
+      console.log('[Cesium] 天地图加载成功')
+    } catch (error) {
+      console.warn('[Cesium] 天地图加载失败:', error)
+    }
 
   }
 
@@ -209,22 +266,36 @@ export function useCesium(containerId) {
    * 加载3D模型
    */
   const load3DModel = async () => {
-    resources.value.modelTileset = await addWhiteModel(viewer.value)
+    try {
+      console.log('[Cesium] 4.1 加载白膜模型...')
+      resources.value.modelTileset = await addWhiteModel(viewer.value)
+      console.log('[Cesium] 白膜模型加载成功')
+    } catch (error) {
+      console.warn('[Cesium] 白膜模型加载失败:', error)
+      // 模型加载失败不影响其他功能
+    }
   }
 
   /**
    * 初始化实体和可视化
    */
   const initEntitiesAndVisualizations = async () => {
-    // 初始化监测点管理器
+    try {
+      console.log('[Cesium] 5.1 初始化监测点管理器...')
+      resources.value.areaManager = AreaManager.getInstance(viewer.value, areaStore)
+      console.log('[Cesium] 5.2 渲染监测点:', areaList.value?.length || 0, '个')
+      resources.value.areaManager.render(areaList.value)
+    } catch (error) {
+      console.warn('[Cesium] 监测点管理器初始化失败:', error)
+    }
 
-    resources.value.areaManager = AreaManager.getInstance(viewer.value, areaStore)
-    resources.value.areaManager.render(areaList.value)
-
-
-
-    // 初始化风场
-    resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
+    try {
+      console.log('[Cesium] 5.3 初始化风场...')
+      resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
+      console.log('[Cesium] 风场初始化成功')
+    } catch (error) {
+      console.warn('[Cesium] 风场初始化失败:', error)
+    }
 
     // 等待风场数据加载完成后再执行可见性检查
     if (!windStore.windData) {
@@ -242,14 +313,41 @@ export function useCesium(containerId) {
     }
 
     // 设置相机高度监听，控制风场、云朵和监测点的显示/隐藏
-    setupCameraHeightWatcher()
+    try {
+      setupCameraHeightWatcher()
+      console.log('[Cesium] 相机高度监听设置成功')
+    } catch (error) {
+      console.warn('[Cesium] 相机高度监听设置失败:', error)
+    }
 
-    // 初始化热力图
-    resources.value.heatMapInstance = await initHeatVolume(viewer.value)
-    heatmapStore.setHeatmapLayer(resources.value.heatMapInstance)
+    try {
+      console.log('[Cesium] 5.4 初始化热力图...')
+      resources.value.heatMapInstance = await initHeatVolume(viewer.value)
+      heatmapStore.setHeatmapLayer(resources.value.heatMapInstance)
+      console.log('[Cesium] 热力图初始化成功')
+      
+      // 初始化后立即更新一次热力图数据
+      if (resources.value.heatMapInstance) {
+        const currentTime = new Date()
+        console.log('初始化后更新热力图数据:', currentTime)
+        await updateHeatmapTime(currentTime)
+        
+        // 检查是否有选中的区域，如果有，记录信息
+        if (areaStore.selectedArea) {
+          console.log('热力图初始化时已有选中区域:', areaStore.selectedArea.id)
+        }
+      }
+    } catch (error) {
+      console.warn('[Cesium] 热力图初始化失败:', error)
+    }
 
-    // 初始化航线管理器
-    routeManager.init(viewer.value)
+    try {
+      console.log('[Cesium] 5.5 初始化航线管理器...')
+      routeManager.init(viewer.value)
+      console.log('[Cesium] 航线管理器初始化成功')
+    } catch (error) {
+      console.warn('[Cesium] 航线管理器初始化失败:', error)
+    }
     
     // 配置时间轴显示中国时间
     if (viewer.value.timeline) {
@@ -325,10 +423,17 @@ export function useCesium(containerId) {
     // 监听选中监测点变化
     watch(
       () => areaStore.selectedArea,
-      (newArea) => {
+      async (newArea) => {
         if (newArea && viewer.value) {
           resources.value.areaManager.setSelected(`area_${newArea.id}`)
           flyToRegion(viewer.value, { bbox: newArea.bbox, duration: 1.0 })
+          
+          // 区域切换时重新加载热力图数据
+          if (resources.value.heatMapInstance) {
+            const currentTime = new Date()
+            console.log('区域切换，重新加载热力图数据:', newArea.name, currentTime)
+            await updateHeatmapTime(currentTime)
+          }
         }
       },
       { deep: true }
@@ -381,18 +486,36 @@ export function useCesium(containerId) {
   const initCesium = async () => {
     try {
       isLoading.value = true
+      console.log('[Cesium] 开始初始化...')
 
       // 执行初始化步骤
+      console.log('[Cesium] 1. 初始化Viewer...')
       initViewer()
+      
+      console.log('[Cesium] 2. 配置相机...')
       configCamera()
+      
+      console.log('[Cesium] 3. 加载基础图层...')
       loadBaseLayers()
+      
+      console.log('[Cesium] 4. 加载3D模型...')
       await load3DModel()
+      
+      console.log('[Cesium] 5. 初始化实体和可视化...')
       await initEntitiesAndVisualizations()
+      
+      console.log('[Cesium] 6. 设置响应式监听...')
       setupReactiveWatchers()
       
       // 系统初始化时默认隐藏时间轴
       setTimelineVisible(false)
+      
+      console.log('[Cesium] 初始化完成！')
 
+    } catch (error) {
+      console.error('[Cesium] 初始化失败:', error)
+      console.error('[Cesium] 错误堆栈:', error.stack)
+      throw error
     } finally {
       isLoading.value = false
     }
@@ -542,10 +665,17 @@ export function useCesium(containerId) {
    * 设置温度图层可见性
    */
   const setTemperatureVisibility = (visible) => {
-    console.log(resources.value.heatMapInstance);
+    console.log('设置温度图层可见性:', visible);
+    console.log('热力图实例:', resources.value.heatMapInstance);
 
-    if (resources.value.heatMapInstance && resources.value.heatMapInstance.heatmapState) {
-      resources.value.heatMapInstance.heatmapState.heatmapPrimitive.show = visible
+    if (resources.value.heatMapInstance) {
+      if (resources.value.heatMapInstance.heatmapState && resources.value.heatMapInstance.heatmapState.heatmapPrimitive) {
+        resources.value.heatMapInstance.heatmapState.heatmapPrimitive.show = visible
+      } else {
+        console.warn('热力图实例存在但heatmapState或heatmapPrimitive不存在');
+      }
+    } else {
+      console.warn('热力图实例未初始化');
     }
   };
 
@@ -553,7 +683,241 @@ export function useCesium(containerId) {
    * 更新热力图时间
    * @param {Date} time - JavaScript Date对象
    */
-  const updateHeatmapTime = async (time) => {
+  /**
+   * 转换后端热力图数据为Cesium需要的格式
+   * @param {Object} backendData - 后端返回的热力图数据
+   * @param {Object} currentArea - 当前选中的区域
+   * @returns {Array} Cesium热力图数据点数组
+   */
+  const convertHeatmapDataForCesium = (backendData, currentArea) => {
+    const dataPoints = []
+    
+    // 检查数据类型
+    const dataType = backendData.dataType || 'point_heatmap'
+    
+    console.log('转换热力图数据，数据类型:', dataType)
+    
+    if (dataType === 'geo_heatmap' || backendData.points) {
+      // 地理空间热力图数据（Cesium地图用）
+      return convertGeoHeatmapData(backendData, currentArea)
+    } else if (dataType === 'area_heatmap' || backendData.gridData) {
+      // 区域范围热力图数据
+      return convertAreaHeatmapData(backendData, currentArea)
+    } else {
+      // 单点热力图数据（保持原有逻辑）
+      return convertPointHeatmapData(backendData, currentArea)
+    }
+  }
+
+  /**
+   * 转换地理空间热力图数据（Cesium地图用）
+   */
+  const convertGeoHeatmapData = (backendData, currentArea) => {
+    const dataPoints = []
+    
+    const points = backendData.points || []
+    
+    console.log('转换地理空间热力图数据，点数量:', points.length)
+    
+    for (const point of points) {
+      const lng = point.lon || point.lng
+      const lat = point.lat
+      const value = point.value
+      const riskLevel = point.riskLevel
+      
+      if (lng !== undefined && lat !== undefined && value !== undefined) {
+        // 转换为Cesium需要的格式
+        dataPoints.push({
+          x: lng,
+          y: lat,
+          value: value,
+          // 添加元数据
+          metadata: {
+            riskLevel: riskLevel || getRiskLevel(value),
+            gridX: point.x,
+            gridY: point.y,
+            dataType: 'geo_heatmap'
+          }
+        })
+      } else {
+        console.warn('无效的点数据:', point)
+      }
+    }
+    
+    console.log('转换完成，Cesium数据点数量:', dataPoints.length)
+    if (dataPoints.length > 0) {
+      console.log('数据范围:', {
+        minLng: Math.min(...dataPoints.map(p => p.x)),
+        maxLng: Math.max(...dataPoints.map(p => p.x)),
+        minLat: Math.min(...dataPoints.map(p => p.y)),
+        maxLat: Math.max(...dataPoints.map(p => p.y)),
+        minValue: Math.min(...dataPoints.map(p => p.value)),
+        maxValue: Math.max(...dataPoints.map(p => p.value))
+      })
+    }
+    
+    return dataPoints
+  }
+
+  /**
+   * 转换区域范围热力图数据
+   */
+  const convertAreaHeatmapData = (backendData, currentArea) => {
+    const dataPoints = []
+    
+    const gridData = backendData.gridData || []
+    const times = backendData.times || []
+    
+    // 获取当前时间索引（默认使用第一个时间点）
+    const currentTimeIndex = 0
+    
+    for (const gridPoint of gridData) {
+      const lng = gridPoint.lng
+      const lat = gridPoint.lat
+      const riskData = gridPoint.riskData || {}
+      const timeSeries = riskData.timeSeries || []
+      
+      // 获取当前时间的风险值
+      let riskValue = 50 // 默认值
+      if (timeSeries.length > currentTimeIndex) {
+        riskValue = timeSeries[currentTimeIndex]
+      } else if (timeSeries.length > 0) {
+        riskValue = timeSeries[0]
+      }
+      
+      // 转换为Cesium需要的格式
+      dataPoints.push({
+        x: lng,
+        y: lat,
+        value: riskValue,
+        // 添加元数据
+        metadata: {
+          gridX: gridPoint.x,
+          gridY: gridPoint.y,
+          time: times[currentTimeIndex] || '当前',
+          riskLevel: getRiskLevel(riskValue),
+          dataType: 'area_heatmap'
+        }
+      })
+    }
+    
+    console.log(`转换区域热力图数据: ${gridData.length}个网格点`)
+    return dataPoints
+  }
+
+  /**
+   * 转换单点热力图数据
+   */
+  const convertPointHeatmapData = (backendData, currentArea) => {
+    const dataPoints = []
+    
+    // 从后端数据中提取热力图矩阵
+    const times = backendData.times || []
+    const heights = backendData.heights || []
+    const riskMatrix = backendData.data || []
+    
+    // 获取区域边界
+    let bbox = null
+    
+    // 首先尝试从bbox获取边界
+    if (currentArea.bbox) {
+      let bboxValue = currentArea.bbox
+      
+      // 处理字符串格式的bbox
+      if (typeof bboxValue === 'string') {
+        // 尝试解析字符串格式的坐标
+        const coordinates = bboxValue.split(',').map(coord => parseFloat(coord.trim())).filter(coord => !isNaN(coord))
+        if (coordinates.length >= 2) {
+          bboxValue = coordinates
+        }
+      }
+      
+      if (Array.isArray(bboxValue)) {
+        if (bboxValue.length >= 4) {
+          // bbox是边界框格式 [minLng, minLat, maxLng, maxLat]
+          bbox = bboxValue
+        } else if (bboxValue.length >= 2) {
+          // bbox是点坐标格式 [lng, lat]
+          const [lng, lat] = bboxValue
+          if (!isNaN(lng) && !isNaN(lat)) {
+            bbox = [
+              lng - 0.01, lat - 0.01,
+              lng + 0.01, lat + 0.01
+            ]
+          }
+        }
+      }
+    }
+    
+    // 使用默认边界
+    if (!bbox) {
+      bbox = [
+        currentArea.longitude - 0.01, currentArea.latitude - 0.01,
+        currentArea.longitude + 0.01, currentArea.latitude + 0.01
+      ]
+    }
+    
+    // 解析边界框
+    const [minLng, minLat, maxLng, maxLat] = bbox
+    
+    // 生成网格点
+    const gridSize = 10 // 10x10网格
+    for (let i = 0; i < gridSize; i++) {
+      for (let j = 0; j < gridSize; j++) {
+        // 计算网格点坐标
+        const lng = minLng + (maxLng - minLng) * (i / (gridSize - 1))
+        const lat = minLat + (maxLat - minLat) * (j / (gridSize - 1))
+        
+        // 根据位置计算风险值（模拟空间分布）
+        const xRatio = i / (gridSize - 1)
+        const yRatio = j / (gridSize - 1)
+        
+        // 从风险矩阵中获取对应的风险值
+        let riskValue = 50 // 默认值
+        
+        if (riskMatrix.length > 0) {
+          // 使用高度层和时间点的平均值
+          const heightIndex = Math.floor(yRatio * (heights.length - 1))
+          const timeIndex = Math.floor(xRatio * (times.length - 1))
+          
+          if (heightIndex >= 0 && heightIndex < riskMatrix.length &&
+              timeIndex >= 0 && timeIndex < riskMatrix[0].length) {
+            riskValue = riskMatrix[heightIndex][timeIndex]
+          }
+        }
+        
+        // 转换为Cesium需要的格式
+        dataPoints.push({
+          x: lng,
+          y: lat,
+          value: riskValue,
+          // 添加元数据
+          metadata: {
+            height: heights[Math.floor(yRatio * (heights.length - 1))] || 0,
+            time: times[Math.floor(xRatio * (times.length - 1))] || '当前',
+            riskLevel: getRiskLevel(riskValue),
+            dataType: 'point_heatmap'
+          }
+        })
+      }
+    }
+    
+    return dataPoints
+  }
+
+  /**
+   * 根据风险值获取风险等级
+   * @param {number} riskValue - 风险值 (0-100)
+   * @returns {string} 风险等级
+   */
+  const getRiskLevel = (riskValue) => {
+    if (riskValue >= 80) return 'high'
+    if (riskValue >= 60) return 'medium'
+    if (riskValue >= 40) return 'low'
+    return 'very_low'
+  }
+
+   const updateHeatmapTime = async (time) => {
     console.log('更新热力图时间:', time)
 
     if (!resources.value.heatMapInstance) {
@@ -562,17 +926,242 @@ export function useCesium(containerId) {
     }
 
     try {
-      // 使用模拟数据替代真实API请求
-      const timestamp = time.getTime()
-      const dataPoints = generateHeatmapData(timestamp)
+      // 获取当前选中的区域
+      const currentArea = areaStore.selectedArea
+      if (!currentArea) {
+        console.warn('未选中任何区域，无法获取热力图数据')
+        return
+      }
 
+      
+      // 检查是否有边界信息
+      let boundsToUse = null
+      
+      // 首先尝试从bbox获取边界
+      if (currentArea.bbox) {
+        let bboxValue = currentArea.bbox
+        
+        // 处理字符串格式的bbox
+        if (typeof bboxValue === 'string') {
+          // 尝试解析字符串格式的坐标
+          const coordinates = bboxValue.split(',').map(coord => parseFloat(coord.trim())).filter(coord => !isNaN(coord))
+          if (coordinates.length >= 2) {
+            bboxValue = coordinates
+            console.log('解析字符串bbox为坐标数组:', bboxValue)
+          }
+        }
+        
+        if (Array.isArray(bboxValue)) {
+          if (bboxValue.length >= 4) {
+            // bbox是边界框格式 [minLng, minLat, maxLng, maxLat]
+            boundsToUse = bboxValue
+            console.log('使用bbox属性作为边界框:', boundsToUse)
+          } else if (bboxValue.length >= 2) {
+            // bbox是点坐标格式 [lng, lat]
+            const [lng, lat] = bboxValue
+            if (!isNaN(lng) && !isNaN(lat)) {
+              boundsToUse = [
+                lng - 0.01, lat - 0.01,
+                lng + 0.01, lat + 0.01
+              ]
+              console.log('使用bbox点坐标生成边界:', boundsToUse)
+            }
+          }
+        }
+      }
+      // 然后尝试从bounds获取
+      else if (currentArea.bounds) {
+        let boundsValue = currentArea.bounds
+        
+        // 处理字符串格式的bounds
+        if (typeof boundsValue === 'string') {
+          // 尝试解析字符串格式的坐标
+          const coordinates = boundsValue.split(',').map(coord => parseFloat(coord.trim())).filter(coord => !isNaN(coord))
+          if (coordinates.length >= 2) {
+            boundsValue = coordinates
+            console.log('解析字符串bounds为坐标数组:', boundsValue)
+          }
+        }
+        
+        if (Array.isArray(boundsValue)) {
+          if (boundsValue.length >= 4) {
+            // bounds是边界框格式 [minLng, minLat, maxLng, maxLat]
+            boundsToUse = boundsValue
+            console.log('使用bounds属性作为边界框:', boundsToUse)
+          } else if (boundsValue.length >= 2) {
+            // bounds是点坐标格式 [lng, lat]
+            const [lng, lat] = boundsValue
+            if (!isNaN(lng) && !isNaN(lat)) {
+              boundsToUse = [
+                lng - 0.01, lat - 0.01,
+                lng + 0.01, lat + 0.01
+              ]
+              console.log('使用bounds点坐标生成边界:', boundsToUse)
+            }
+          }
+        }
+      }
+      // 然后尝试从coordinates获取（可能是边界框或点坐标）
+      else if (currentArea.coordinates) {
+        let coordinatesValue = currentArea.coordinates
+        
+        // 处理字符串格式的coordinates
+        if (typeof coordinatesValue === 'string') {
+          // 尝试解析字符串格式的坐标
+          const coordinates = coordinatesValue.split(',').map(coord => parseFloat(coord.trim())).filter(coord => !isNaN(coord))
+          if (coordinates.length >= 2) {
+            coordinatesValue = coordinates
+            console.log('解析字符串coordinates为坐标数组:', coordinatesValue)
+          }
+        }
+        
+        if (Array.isArray(coordinatesValue)) {
+          if (coordinatesValue.length >= 4) {
+            // coordinates是边界框格式 [minLng, minLat, maxLng, maxLat]
+            boundsToUse = coordinatesValue
+            console.log('使用coordinates属性作为边界框:', boundsToUse)
+          } else if (coordinatesValue.length >= 2) {
+            // coordinates是点坐标格式 [lng, lat]
+            const [lng, lat] = coordinatesValue
+            if (!isNaN(lng) && !isNaN(lat)) {
+              boundsToUse = [
+                lng - 0.01, lat - 0.01,
+                lng + 0.01, lat + 0.01
+              ]
+              console.log('使用coordinates点坐标生成边界:', boundsToUse)
+            }
+          }
+        }
+      }
+      
+      // 如果还没有边界，尝试从其他属性提取
+      if (!boundsToUse) {
+        console.warn('区域没有直接的边界信息，尝试从其他属性提取')
+        
+        // 尝试提取经纬度
+        let lng, lat
+        
+        // 1. 从longitude/latitude字段
+        if (currentArea.longitude !== undefined && currentArea.latitude !== undefined) {
+          lng = currentArea.longitude
+          lat = currentArea.latitude
+          console.log('使用longitude/latitude字段:', lng, lat)
+        }
+        // 2. 从coordinates点坐标
+        else if (currentArea.coordinates && Array.isArray(currentArea.coordinates) && currentArea.coordinates.length >= 2) {
+          [lng, lat] = currentArea.coordinates
+          console.log('从coordinates提取经纬度:', lng, lat)
+        }
+        // 3. 从bbox中心点计算
+        else if (currentArea.bbox && Array.isArray(currentArea.bbox) && currentArea.bbox.length >= 4) {
+          lng = (currentArea.bbox[0] + currentArea.bbox[2]) / 2
+          lat = (currentArea.bbox[1] + currentArea.bbox[3]) / 2
+          console.log('从bbox计算中心点:', lng, lat)
+        }
+        
+        if (lng !== undefined && lat !== undefined) {
+          boundsToUse = [
+            lng - 0.01, lat - 0.01,
+            lng + 0.01, lat + 0.01
+          ]
+          console.log('使用计算得到的边界:', boundsToUse)
+        } else {
+          console.error('无法从区域数据中提取边界信息，使用默认边界')
+          // 使用青岛的默认边界
+          boundsToUse = [120.3, 36.0, 120.5, 36.2]
+          console.log('使用默认边界:', boundsToUse)
+        }
+      }
+
+      // 调用后端API获取地理空间热力图数据（用于Cesium地图）
+      const { getWeatherHeatmapGeo } = await import('@/api')
+      
+      console.log('调用API参数:', {
+        time: time,
+        resolution: 'medium',
+        pointId: currentArea.id || currentArea.pointId
+      })
+      
+      const heatmapData = await getWeatherHeatmapGeo({
+        time: time,
+        resolution: 'medium',
+        pointId: currentArea.id || currentArea.pointId
+      })
+      
+      console.log('API返回数据:', heatmapData)
+      
+      // 处理数据格式：可能points在heatmapData.data中，也可能在顶层
+      let heatmapDataToConvert = heatmapData
+      if (heatmapData.data && (heatmapData.data.points || heatmapData.data.dataType)) {
+        // 数据在data属性中
+        heatmapDataToConvert = heatmapData.data
+        console.log('使用data属性中的数据')
+      }
+      
+      if (!heatmapDataToConvert || !heatmapDataToConvert.points) {
+        console.error('获取热力图数据失败，缺少points属性', {
+          heatmapData: heatmapData,
+          heatmapDataToConvert: heatmapDataToConvert
+        })
+        return
+      }
+
+      console.log('热力图数据详情:', {
+        dataType: heatmapDataToConvert.dataType || heatmapData.dataType,
+        pointCount: heatmapDataToConvert.pointCount || heatmapData.pointCount,
+        bbox: heatmapDataToConvert.bbox || heatmapData.bbox,
+        pointsCount: heatmapDataToConvert.points ? heatmapDataToConvert.points.length : 0
+      })
+
+      // 转换后端数据为Cesium热力图需要的格式
+      const convertedData = convertHeatmapDataForCesium(heatmapDataToConvert, currentArea)
+      console.log('转换后的原始数据数量:', convertedData.length)
+      if (convertedData.length > 0) {
+        console.log('原始数据示例:', convertedData.slice(0, 3))
+      }
+      
+      // 转换为heatmap.js期望的格式：{lnglat: [lon, lat], value: number}
+      const dataPoints = convertedData.map(point => ({
+        lnglat: [point.x, point.y],
+        value: point.value
+      }))
+      
+      console.log('转换后的热力图数据:', dataPoints.slice(0, 3));
+      console.log('数据点范围:', {
+        minLng: Math.min(...dataPoints.map(p => p.lnglat[0])),
+        maxLng: Math.max(...dataPoints.map(p => p.lnglat[0])),
+        minLat: Math.min(...dataPoints.map(p => p.lnglat[1])),
+        maxLat: Math.max(...dataPoints.map(p => p.lnglat[1]))
+      })
+      
       // 更新热力图数据
-      resources.value.heatMapInstance.updateData(dataPoints)
+      const result = resources.value.heatMapInstance.updateData(dataPoints)
+      
+      // 如果updateData返回了新的实例，更新引用
+      if (result) {
+        resources.value.heatMapInstance = result
+      }
+
+      console.log('热力图数据更新成功，基于区域:', currentArea.name)
+      console.log('区域边界:', boundsToUse)
+      
     } catch (error) {
       console.error('更新热力图时间失败:', error)
+      // 降级：使用模拟数据
+      try {
+        const timestamp = time.getTime()
+        const { default: generateHeatmapData } = await import('@/mock/heatmapData')
+        const dataPoints = generateHeatmapData(timestamp)
+        const result = resources.value.heatMapInstance.updateData(dataPoints)
+        if (result) {
+          resources.value.heatMapInstance = result
+        }
+        console.warn('使用模拟数据作为降级方案')
+      } catch (fallbackError) {
+        console.error('降级方案也失败:', fallbackError)
+      }
     }
   };
-
   /**
    * 设置当前时间
    * @param {Date} time - JavaScript Date对象

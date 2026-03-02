@@ -160,14 +160,21 @@ const initChart = () => {
 
 // 更新图表数据
 const updateChartData = () => {
-  // 即使没有moduleData也设置默认数据，确保组件能正常渲染
-  const adaptedData = {
-    timeInterval: '10min',
-    totalHours: 3,
-    factors: ['风速', '能见度', '降水量', '温度', '湿度', '气压', '云量'],
-    statusData: Array(7).fill().map(() => Array(19).fill(true)),
-    valueData: Array(7).fill().map(() => Array(19).fill().map(() => (Math.random() * 10).toFixed(1)))
-  };
+  let adaptedData;
+  
+  // 使用从store获取的实际数据
+  if (flightSuitableAnalysisPanelData.value) {
+    adaptedData = flightSuitableAnalysisPanelData.value;
+  } else {
+    // 没有数据时使用默认数据，确保组件能正常渲染
+    adaptedData = {
+      timeInterval: '10min',
+      totalHours: 3,
+      factors: ['风速', '能见度', '降水量', '温度', '湿度', '气压', '云量'],
+      statusData: Array(7).fill().map(() => Array(19).fill(true)),
+      valueData: Array(7).fill().map(() => Array(19).fill().map(() => (Math.random() * 10).toFixed(1)))
+    };
+  }
 
   chartData.value = adaptedData;
   initChart();

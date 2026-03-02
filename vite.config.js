@@ -56,10 +56,10 @@ export default defineConfig(({ mode }) => {
       open: true,
       proxy: {
         [env.VITE_API_BASE_URL]: {
-          target: 'https://dev-api.meteorological.com',
+          target: 'http://localhost:8080',
           changeOrigin: true,
-          rewrite: (path) => path.replace(new RegExp(`^${env.VITE_API_BASE_URL}`), ''),
-          secure: false, // 允许https
+          // rewrite: (path) => path.replace(new RegExp(`^${env.VITE_API_BASE_URL}`), ''),
+          secure: false,
           headers: {
             'Access-Control-Allow-Origin': '*'
           }

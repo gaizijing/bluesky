@@ -90,6 +90,12 @@ export class RouteRenderer {
    */
   renderRoute(route) {
     if (!this.viewer) return { segments: [], plane: null, positions: [] }
+    
+    // 检查航线数据完整性
+    if (!route || !route.waypoints || route.waypoints.length === 0) {
+      console.warn('航线数据不完整，跳过渲染:', route);
+      return { segments: [], plane: null, positions: [] };
+    }
 
     // 构建航点数组
     const enhancedWaypoints = [];

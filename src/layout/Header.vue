@@ -37,7 +37,7 @@
     </DialogContainer>
 
     <!-- 阈值管理弹窗 -->
-    <DialogContainer title="风险阈值设置" :visible="showThresholdDialog" @close="handleAddArea">
+    <DialogContainer title="风险阈值设置" :visible="showThresholdDialog" @close="showThresholdDialog = false">
       <ThresholdManagement />
     </DialogContainer>
 

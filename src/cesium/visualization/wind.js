@@ -40,7 +40,7 @@ export const initWind = async (viewer, layerSettingsStore) => {
   watch(
     () => windStore.windData,
     (newData) => {
-      if (newData && windLayerRefs.length > 0) {
+      if (newData && newData.layers && Array.isArray(newData.layers) && windLayerRefs.length > 0) {
         console.log('风场数据更新，使用updateWindData方法更新风场图层...', newData);
         // 使用updateWindData方法更新每个风场图层的数据
         newData.layers.forEach((layer, index) => {
@@ -55,7 +55,7 @@ export const initWind = async (viewer, layerSettingsStore) => {
             }
           }
         });
-      } else if (newData && windLayerRefs.length === 0) {
+      } else if (newData && newData.layers && Array.isArray(newData.layers) && windLayerRefs.length === 0) {
         // 如果还没有风场图层，直接创建
         console.log('风场数据已获取，开始创建风场图层...', newData);
         newData.layers.forEach((layer, index) => {

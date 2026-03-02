@@ -591,10 +591,22 @@ const getSegmentWidth = (segment, route) => {
 const loadRoutes = async () => {
   isLoading.value = true;
   try {
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    routes.value = generateRoutes();
+    const { getRoutes } = await import('@/api');
+    const routeData = await getRoutes();
+    if (routeData && routeData.routes) {
+      routes.value = routeData.routes.map(route => ({
+        ...route,
+        // 确保时间格式正确
+        startTime: route.startTime ? new Date(route.startTime) : new Date(),
+        endTime: route.endTime ? new Date(route.endTime) : new Date()
+      }));
+    } else {
+      routes.value = [];
+    }
   } catch (error) {
     console.error("加载航线数据失败:", error);
+    // 降级使用模拟数据
+    routes.value = generateRoutes();
   } finally {
     isLoading.value = false;
   }
@@ -604,8 +616,17 @@ const loadRoutes = async () => {
 const refreshRoutes = async () => {
   isRefreshing.value = true;
   try {
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    routes.value = generateRoutes();
+    const { getRoutes } = await import('@/api');
+    const routeData = await getRoutes();
+    if (routeData && routeData.routes) {
+      routes.value = routeData.routes.map(route => ({
+        ...route,
+        startTime: route.startTime ? new Date(route.startTime) : new Date(),
+        endTime: route.endTime ? new Date(route.endTime) : new Date()
+      }));
+    }
+  } catch (error) {
+    console.error("刷新航线数据失败:", error);
   } finally {
     isRefreshing.value = false;
   }
@@ -688,8 +709,26 @@ const getRiskText = (value) => {
   return "高风险";
 };
 // 新增：列表点击事件（核心！）
-const onRouteClick = (route) => {
-  routeStore.setCurrentRoute(route);
+const onRouteClick = async (route) => {
+  try {
+    // 获取航路详情
+    const { getRouteDetail } = await import('@/api');
+    const detailData = await getRouteDetail(route.id);
+    
+    // 合并详情数据
+    const fullRouteData = {
+      ...route,
+      ...detailData,
+      // 确保 segmentData 格式一致
+      segmentData: route.segmentData || []
+    };
+    
+    routeStore.setCurrentRoute(fullRouteData);
+  } catch (error) {
+    console.error("获取航路详情失败:", error);
+    // 降级使用列表数据
+    routeStore.setCurrentRoute(route);
+  }
 
   // 2. 可选：滚动/高亮当前航线
   document.querySelector(`[data-route-id="${route.id}"]`)?.scrollIntoView({

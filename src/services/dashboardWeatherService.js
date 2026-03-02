@@ -1,41 +1,29 @@
 
-import { getWeatherSuitability } from "@/api";
 import { getRiskWarnings } from "@/api";
 import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
+import { SuitabilityService } from './suitabilityService';
 
 class DashboardWeatherService {
     constructor() {
+        this.suitabilityService = new SuitabilityService();
     }
 
     getDashboardWeatherStore() {
         return useDashboardWeatherStore();
     }
 
-    async getRealTimeWeatherPanelData() {
-        const dashboardWeatherStore = this.getDashboardWeatherStore();
-        const data = {
-            cloud: "0",
-            dew: "-2",
-            feelsLike: "2",
-            humidity: "44",
-            icon: "101",
-            obsTime: "2026-01-12T16:34+08:00",
-            precip: "0.0",
-            pressure: "1003",
-            stabilityIndex: "C",
-            temp: "5",
-            text: "多云",
-            vis: "15",
-            wind360: "222",
-            windDir: "西南风",
-            windScale: "1",
-            windShearLevel: "medium",
-            windSpeed: "5"
-        };
-        dashboardWeatherStore.setRealTimeWeatherPanelData(data);
+    async getRealTimeWeatherPanelData(pointId) {
+        try {
+            const { fetchCurrentPointWeather } = await import('@/api');
+            const data = await fetchCurrentPointWeather(pointId);
+            this.getDashboardWeatherStore().setRealTimeWeatherPanelData(data);
+        } catch (error) {
+            console.error('加载实时天气数据失败:', error);
+            throw error;
+        }
     }
 
-    async getweatherForecastPanelData() {
+    async getweatherForecastPanelData(currentPoint) {
         try {
             // 导入天气预测数据
             const { getWeatherForecastTrend, getWeatherForecastHeatmap } = await import('@/api');
@@ -43,13 +31,12 @@ class DashboardWeatherService {
             // 并行获取趋势和热力图数据
             const [trendData, heatmapData] = await Promise.all([
                 getWeatherForecastTrend({}),
-                getWeatherForecastHeatmap({})
+                getWeatherForecastHeatmap({ currentPoint })
             ]);
 
             const data = {
                 trendData,
                 heatmapData,
-
             };
             this.getDashboardWeatherStore().setWeatherForecastPanelData(data);
         } catch (error) {
@@ -57,30 +44,12 @@ class DashboardWeatherService {
             throw error;
         }
     }
-    async loadFlightSuitableAnalysisPanel() {
-        try {
-            const data = await getWeatherSuitability();
-
-            const adaptedData = {
-                timeInterval: data.timeInterval,
-                totalHours: data.totalHours,
-                factors: data.suitabilityList.map(item => item.factor),
-                statusData: data.suitabilityList.map(item =>
-                    item.detail.map(detail => detail.statusData)
-                ),
-                valueData: data.suitabilityList.map(item =>
-                    item.detail.map(detail => detail.valueData)
-                )
-            };
-
-            this.getDashboardWeatherStore().setFlightSuitableAnalysisPanelData(adaptedData);
-        } catch (error) {
-            console.error('Failed to load weather suitability data:', error);
-        }
+    async loadFlightSuitableAnalysisPanel(currentPoint) {
+        await this.suitabilityService.loadFlightSuitableAnalysisPanel(currentPoint);
     }
     async loadRiskWarnings() {
-console.log("获取风险预警数据...");
-            
+        console.log("获取风险预警数据...");
+
         try {
             const result = await getRiskWarnings();
 
@@ -95,7 +64,7 @@ console.log("获取风险预警数据...");
                     }`,
             }));
             console.log("风险预警数据:", data);
-            
+
             this.getDashboardWeatherStore().setRiskWarningsData(data);
 
         } catch (err) {

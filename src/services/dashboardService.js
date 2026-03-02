@@ -2,6 +2,7 @@ import { DashboardWeatherService } from './dashboardWeatherService';
 import { DeviceService } from './deviceService';
 import { RouteService } from './routeService';
 import { DASHBOARD_MODULES } from '@/config/constants.js';
+import { useAreaStore } from '@/store/modules/area';
 
 class DashboardService {
   constructor() {
@@ -10,6 +11,9 @@ class DashboardService {
     this.routeService = new RouteService();
   }
 
+  getAreaStore() {
+    return useAreaStore();
+  }
 
   // 根据模块键加载数据
   async loadModuleData(moduleKey) {
@@ -23,9 +27,12 @@ class DashboardService {
         this.routeService.loadRouteListData();
         break;
       case DASHBOARD_MODULES.LANDING_MONITOR:
-        this.dashboardWeatherService.getRealTimeWeatherPanelData();
-        this.dashboardWeatherService.getweatherForecastPanelData();
-        this.dashboardWeatherService.loadFlightSuitableAnalysisPanel();
+        const areaStore = this.getAreaStore();
+        const currentArea = areaStore.selectedArea;
+        const pointId = currentArea?.id || 'point-1';
+        this.dashboardWeatherService.getRealTimeWeatherPanelData(pointId);
+        this.dashboardWeatherService.getweatherForecastPanelData(currentArea);
+        this.dashboardWeatherService.loadFlightSuitableAnalysisPanel(currentArea);
         this.dashboardWeatherService.loadRiskWarnings();
         console.log("加载风险预警数据完成");
         break

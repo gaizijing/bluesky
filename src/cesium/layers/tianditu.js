@@ -3,8 +3,54 @@ import * as Cesium from 'cesium'
 let tiandituLayer = null
 
 export const addTiandituLayer = (viewerInstance) => {
+  // 使用高德地图作为底图（更稳定）
+  console.log('[Tianditu] 加载高德地图底图...');
+  
+  // 高德卫星影像
+  const gaodeImg = new Cesium.UrlTemplateImageryProvider({
+    url: 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
+    minimumLevel: 1,
+    maximumLevel: 18,
+    tileWidth: 256,
+    tileHeight: 256,
+    enablePickFeatures: false,
+  });
+  
+  const imgLayer = viewerInstance.imageryLayers.addImageryProvider(gaodeImg);
+  
+  // 高德注记
+  const gaodeCia = new Cesium.UrlTemplateImageryProvider({
+    url: 'https://webst01.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}',
+    minimumLevel: 1,
+    maximumLevel: 18,
+    tileWidth: 256,
+    tileHeight: 256,
+    enablePickFeatures: false,
+  });
+  
+  const ciaLayer = viewerInstance.imageryLayers.addImageryProvider(gaodeCia);
+  
+  // 设置图层属性
+  if (imgLayer) {
+    imgLayer.brightness = 1.0;
+    imgLayer.contrast = 1.1;
+    imgLayer.saturation = 1.1;
+    imgLayer.alpha = 1.0;
+  }
+  
+  if (ciaLayer) {
+    ciaLayer.alpha = 0.8;
+  }
+  
+  console.log('[Tianditu] 高德地图底图加载完成');
+  tiandituLayer = imgLayer;
+  return tiandituLayer;
+};
+
+// 保留旧函数但修正
+export const addTiandituLayerOld = (viewerInstance) => {
   const tianditu = new Cesium.WebMapTileServiceImageryProvider({
-    url: `http://t0.tianditu.com/cia_w/wmts?service=wmts&request=GetTile&version=1.0.0&LAYER=cia&tileMatrixSet=w&TileMatrix={TileMatrix}&TileRow={TileRow}&TileCol={TileCol}&style=default&format=tiles&tk=`+"6b1c07f3a655588c6b86fa35ebb1c177",
+    url: `https://t0.tianditu.gov.cn/img_w/wmts?service=wmts&request=GetTile&version=1.0.0&LAYER=img&tileMatrixSet=w&TileMatrix={TileMatrix}&TileRow={TileRow}&TileCol={TileCol}&style=default&format=tiles&tk=`+"6b1c07f3a655588c6b86fa35ebb1c177",
     layer: "tianditu",
     style: "default",
     format: "image/jpeg",
@@ -13,12 +59,10 @@ export const addTiandituLayer = (viewerInstance) => {
     maximumLevel: 18,
     enablePickFeatures: false,
     pixelRatio: window.devicePixelRatio || 2,
-    maximumRetries: 3, // 失败重试次数
-    retryDelay: 1000, // 重试延迟1秒
-    requestHeaders: {}, // 不要加Accept-Encoding
-    // 可选：降低瓦片请求优先级（减少并发）
+    maximumRetries: 3,
+    retryDelay: 1000,
+    requestHeaders: {},
     priority:1,
-    tileMatrixSetID: "GoogleMapsCompatible",
   });
 
   tiandituLayer = viewerInstance.imageryLayers.addImageryProvider(tianditu)

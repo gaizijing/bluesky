@@ -62,7 +62,7 @@ class AreaManager {
     // 创建并添加重点关注区域实体
     areas.forEach(area => {
       const entity = this._createAreaEntity(dataSource, area)
-      dataSource.entities.add(entity)
+        dataSource.entities.add(entity)
     })
 
     this.viewer.zoomTo(dataSource)

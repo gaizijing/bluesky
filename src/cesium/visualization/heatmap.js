@@ -18,7 +18,7 @@ export const initHeatVolume = async (viewer) => {
     let heatmapPoints = [];
     
     // 如果有数据，转换数据格式
-    if(data) {
+    if(data && data.points && Array.isArray(data.points)) {
       heatmapPoints = data.points.map(point => ({
         lnglat: [point.lon, point.lat],
         value: point.value
@@ -540,10 +540,27 @@ export function updateHeatmapData(heatmapState, newDataPoints) {
     return;
   }
 
-  // 1. 更新数据点（只更新数值，位置保持不变）
+  console.log('热力图更新数据点数量:', newDataPoints.length);
+  console.log('热力图数据点示例:', newDataPoints.slice(0, 3));
+
+  // 1. 更新数据点
   heatmapState.dataPoints = newDataPoints;
   
-  // 2. 转换数据格式为热力图所需格式（使用现有位置层次结构）
+  // 2. 重新计算位置层次结构，确保使用新的数据点位置
+  heatmapState.positionHierarchy = [];
+  for (const [index, dataPoint] of heatmapState.dataPoints.entries()) {
+    const cartesianPosition = Cesium.Cartesian3.fromDegrees(
+      dataPoint.lnglat[0],
+      dataPoint.lnglat[1],
+      0
+    );
+    heatmapState.positionHierarchy.push(cartesianPosition);
+  }
+
+  // 3. 重新计算边界框
+  computeBoundingBox(heatmapState.positionHierarchy, heatmapState);
+  
+  // 4. 转换数据格式为热力图所需格式
   const heatmapPoints = heatmapState.positionHierarchy.map(
     (position, index) => {
       const normalizedCoords = computeNormalizedCoordinates(
@@ -558,76 +575,72 @@ export function updateHeatmapData(heatmapState, newDataPoints) {
     }
   );
 
-  // 3. 更新热力图数据范围
+  // 5. 更新热力图数据范围
   const values = heatmapPoints.map(p => p.value);
   const maxValue = values.length ? Math.max(...values) : 1;
   const minValue = values.length ? Math.min(...values) : 0;
 
-  // 4. 设置新数据到热力图实例
+  console.log('热力图数据范围:', { min: minValue, max: maxValue });
+
+  // 6. 设置新数据到热力图实例
   heatmapState.heatmapInstance.setData({
     max: maxValue,
     min: minValue,
     data: heatmapPoints
   });
 
-  // 5. 直接更新现有图元的材质，避免删除重画（消除闪烁）
+  // 7. 重新创建图元，确保位置和范围正确更新
   if (heatmapState.heatmapPrimitive) {
-    // 获取新的热力图数据URL
-    const newDataUrl = heatmapState.heatmapInstance.getDataURL();
-    
-    // 更新现有图元的材质
-    const appearance = heatmapState.heatmapPrimitive.appearance;
-    if (appearance && appearance.material) {
-      // 更新材质的image uniform
-      appearance.material.uniforms.image = newDataUrl;
-    }
-  } else {
-    // 如果图元不存在（首次创建），则创建新图元
-    const geometryInstance = new Cesium.GeometryInstance({
-      geometry: createHeatmapGeometry(heatmapState),
-    });
-
-    heatmapState.heatmapPrimitive = heatmapState.viewer.scene.primitives.add(
-      new Cesium.Primitive({
-      geometryInstances: geometryInstance,
-      appearance: new Cesium.MaterialAppearance({
-        material: new Cesium.Material({
-          fabric: {
-            type: "Image",
-            uniforms: {
-              image: heatmapState.heatmapInstance.getDataURL(),
-            },
-          },
-        }),
-        vertexShaderSource: `
-        in vec3 position3DHigh;
-        in vec3 position3DLow;
-        in vec2 st;
-        in float batchId;
-        uniform sampler2D image_0; 
-        out vec3 v_positionEC;
-        in vec3 normal;
-        out vec3 v_normalEC;
-        out vec2 v_st; 
-        void main(){
-            vec4 p = czm_computePosition();
-            
-            v_normalEC = czm_normal * normal;   
-            v_positionEC = (czm_modelViewRelativeToEye * p).xyz;
-            vec4 positionWC=czm_inverseModelView* vec4(v_positionEC,1.0);
-            v_st = st; 
-            vec4 color = texture(image_0, v_st); 
-            vec3 upDir = normalize(positionWC.xyz); 
-            p += vec4(color.r *upDir * 1000., 0.0); 
-            gl_Position = czm_modelViewProjectionRelativeToEye * p; 
-        }`,
-        translucent: true,
-        flat: true,
-      }),
-        asynchronous: false,
-        show: true
-      })
-    );
-    heatmapState.heatmapPrimitive.id = "heatmap3d";
+    heatmapState.viewer.scene.primitives.remove(heatmapState.heatmapPrimitive);
   }
+
+  // 创建新的图元
+  const geometryInstance = new Cesium.GeometryInstance({
+    geometry: createHeatmapGeometry(heatmapState),
+  });
+
+  heatmapState.heatmapPrimitive = heatmapState.viewer.scene.primitives.add(
+    new Cesium.Primitive({
+    geometryInstances: geometryInstance,
+    appearance: new Cesium.MaterialAppearance({
+      material: new Cesium.Material({
+        fabric: {
+          type: "Image",
+          uniforms: {
+            image: heatmapState.heatmapInstance.getDataURL(),
+          },
+        },
+      }),
+      vertexShaderSource: `
+      in vec3 position3DHigh;
+      in vec3 position3DLow;
+      in vec2 st;
+      in float batchId;
+      uniform sampler2D image_0; 
+      out vec3 v_positionEC;
+      in vec3 normal;
+      out vec3 v_normalEC;
+      out vec2 v_st; 
+      void main(){
+          vec4 p = czm_computePosition();
+          
+          v_normalEC = czm_normal * normal;   
+          v_positionEC = (czm_modelViewRelativeToEye * p).xyz;
+          vec4 positionWC=czm_inverseModelView* vec4(v_positionEC,1.0);
+          v_st = st; 
+          vec4 color = texture(image_0, v_st); 
+          vec3 upDir = normalize(positionWC.xyz); 
+          p += vec4(color.r *upDir * 1000., 0.0); 
+          gl_Position = czm_modelViewProjectionRelativeToEye * p; 
+      }`,
+      translucent: true,
+      flat: true,
+    }),
+      asynchronous: false,
+      show: true
+    })
+  );
+  heatmapState.heatmapPrimitive.id = "heatmap3d";
+  
+  console.log('热力图更新完成，图元已重新创建');
 }

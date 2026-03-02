@@ -1,337 +1,121 @@
 import axios from 'axios';
 import { fetchWeatherApi } from "openmeteo";
 
+// 创建axios实例
+const apiClient = axios.create({
+  baseURL: '/api',
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json;charset=utf-8'
+  }
+});
+
+// 响应拦截器 - 统一处理返回数据
+apiClient.interceptors.response.use(
+  (response) => {
+    const res = response.data;
+    if (res.code === 200) {
+      return res.data;
+    }
+    return Promise.reject(new Error(res.message || '请求失败'));
+  },
+  (error) => {
+    console.error('API请求错误:', error.message);
+    return Promise.reject(error);
+  }
+);
+
 // 获取重点关注区域列表
 export const fetchAreaList = async () => {
-  try {
-
-    // 在实际项目中，这里会是真实的API调用:
-    // const response = await axios.get('/api/monitoring-points')
-
-    const response = {
-      "code": 200,
-      "message": "success",
-      "data":
-        [
-          {
-            "id": "point-1",
-            "name": "青岛中心起降坪",
-            "type": "takeoff",
-            "location": "市南区-五四广场附近",
-            "coordinates": [120.3835, 36.0625],
-            "bbox": [[120.3735, 36.0525], [120.3935, 36.0725]],
-            "status": "available",
-            "warningReason": "",
-            "lastUpdate": 1640995200000,
-            "grids": ["BD_120.38_36.06", "BD_120.39_36.06"]
-          },
-          {
-            "id": "point-2",
-            "name": "崂山区起降点",
-            "type": "takeoff",
-            "location": "崂山区-石老人附近",
-            "coordinates": [120.4750, 36.1120],
-            "bbox": [[120.4650, 36.1020], [120.4850, 36.1220]],
-            "status": "available",
-            "warningReason": "",
-            "lastUpdate": 1640996400000,
-            "grids": ["BD_120.47_36.11", "BD_120.48_36.11"]
-          },
-          {
-            "id": "point-3",
-            "name": "西海岸作业点",
-            "type": "operation",
-            "location": "西海岸新区-金沙滩附近",
-            "coordinates": [120.1680, 35.9950],
-            "bbox": [[120.1580, 35.9850], [120.1780, 36.0050]],
-            "status": "warning",
-            "warningReason": "信号强度不稳定",
-            "lastUpdate": 1640997300000,
-            "grids": ["BD_120.16_35.99", "BD_120.17_35.99"]
-          },
-          {
-            "id": "point-4",
-            "name": "即墨区起降坪",
-            "type": "takeoff",
-            "location": "即墨区-蓝谷附近",
-            "coordinates": [120.4820, 36.3780],
-            "bbox": [[120.4720, 36.3680], [120.4920, 36.3880]],
-            "status": "available",
-            "warningReason": "",
-            "lastUpdate": 1640988000000,
-            "grids": ["BD_120.48_36.37", "BD_120.49_36.37"]
-          },
-          {
-            "id": "point-5",
-            "name": "城阳区作业点",
-            "type": "operation",
-            "location": "城阳区-流亭附近",
-            "coordinates": [120.3560, 36.3050],
-            "bbox": [[120.3460, 36.2950], [120.3660, 36.3150]],
-            "status": "unavailable",
-            "warningReason": "设备维护中",
-            "lastUpdate": 1640916000000,
-            "grids": ["BD_120.35_36.30", "BD_120.36_36.30"]
-          },
-          {
-            "id": "point-6",
-            "name": "青岛流亭机场起降点",
-            "type": "takeoff",
-            "location": "城阳区-流亭国际机场",
-            "coordinates": [120.3850, 36.3180],
-            "bbox": [[120.3750, 36.3080], [120.3950, 36.3280]],
-            "status": "warning",
-            "warningReason": "温度异常",
-            "lastUpdate": 1640998200000,
-            "grids": ["BD_120.38_36.31", "BD_120.39_36.31"]
-          },
-          {
-            "id": "point-7",
-            "name": "高新区作业点",
-            "type": "operation",
-            "location": "高新区-红岛附近",
-            "coordinates": [120.3150, 36.2320],
-            "bbox": [[120.3050, 36.2220], [120.3250, 36.2420]],
-            "status": "available",
-            "warningReason": "",
-            "lastUpdate": 1640996800000,
-            "grids": ["BD_120.31_36.23", "BD_120.32_36.23"]
-          },
-          {
-            "id": "point-8",
-            "name": "李沧区起降点",
-            "type": "takeoff",
-            "location": "李沧区-世园会附近",
-            "coordinates": [120.4480, 36.1850],
-            "bbox": [[120.4380, 36.1750], [120.4580, 36.1950]],
-            "status": "available",
-            "warningReason": "",
-            "lastUpdate": 1640998500000,
-            "grids": ["BD_120.44_36.18", "BD_120.45_36.18"]
-          },
-          {
-            "id": "point-9",
-            "name": "胶州市作业点",
-            "type": "operation",
-            "location": "胶州市-胶州湾附近",
-            "coordinates": [120.0560, 36.2950],
-            "bbox": [[120.0460, 36.2850], [120.0660, 36.3050]],
-            "status": "available",
-            "warningReason": "",
-            "lastUpdate": 1640994300000,
-            "grids": ["BD_120.05_36.29", "BD_120.06_36.29"]
-          },
-          {
-            "id": "point-10",
-            "name": "青岛港起降坪",
-            "type": "takeoff",
-            "location": "市南区-青岛港附近",
-            "coordinates": [120.3920, 36.0880],
-            "bbox": [[120.3820, 36.0780], [120.4020, 36.0980]],
-            "status": "unavailable",
-            "warningReason": "强风天气",
-            "lastUpdate": 1640998440000,
-            "grids": ["BD_120.39_36.08", "BD_120.40_36.08"]
-          }
-        ]
-
-    }
-
-    return response.data
-  } catch (error) {
-    console.error('获取重点关注区域数据失败:', error)
-    throw error
-  }
+ 
+    const data = await apiClient.get('/monitoring-points');
+    return data;
+ 
 }
 
 // 获取当前选中的重点关注区域
 export const fetchCurrentSelectedArea = async () => {
-  try {
-    // 在实际项目中，这里会是真实的API调用:
-    // const response = await axios.get('/api/monitoring-points/selected')
-    // return response.data
 
-    // 模拟API调用延迟
-    await new Promise(resolve => setTimeout(resolve, 300))
-
-    // 模拟成功响应
-    const response = {
-      "code": 200,
-      "message": "success",
-      "data": {
-        "id": "point-1",
-        "name": "青岛中心起降坪",
-        "type": "takeoff",
-        "location": "市南区-五四广场附近",
-        "coordinates": [120.3835, 36.0625],
-        "bbox": [[120.3735, 36.0525], [120.3935, 36.0725]],
-        "status": "available",
-        "warningReason": "",
-        "lastUpdate": 1640995200000,
-        "grids": ["BD_120.38_36.06", "BD_120.39_36.06"]
-      }
-    }
-
-    return response.data
-  } catch (error) {
-    console.error('获取当前选中重点关注区域失败:', error)
-    throw error
-  }
+    const data = await apiClient.get('/monitoring-points/selected');
+    return data;
+ 
 }
+
 // 更新选中的重点关注区域
 export const updateSelectedArea = async (area) => {
   try {
-    // 在实际项目中，这里会是真实的API调用:
-    // const response = await axios.post('/api/monitoring-points/selected', { pointId: point.id })
-    // return response.data
-
-    // 模拟API调用延迟
-    await new Promise(resolve => setTimeout(resolve, 300))
-
-    // 模拟成功响应
-    const response = {
-      "code": 200,
-      "message": "success",
-      "data": {
-        "pointId": area.id,
-        "selectedTime": new Date().toISOString(),
-        "status": "updated"
-      }
-    }
-
-    return response.data
+    const data = await apiClient.post('/monitoring-points/selected', { pointId: area.id });
+    return data;
   } catch (error) {
-    console.error('保存重点关注区域切换信息失败:', error)
-    throw error
+    console.error('保存重点关注区域切换信息失败:', error);
+    throw error;
   }
 }
 
 // 添加新的重点关注区域
 export const addNewArea = async (areaData) => {
   try {
-    // 在实际项目中，这里会是真实的API调用:
-    // const response = await axios.post('/api/monitoring-points', areaData)
-    // return response.data
-
-    // 模拟API调用延迟
-    await new Promise(resolve => setTimeout(resolve, 300))
-
-    // 模拟成功响应
-    const newArea = {
-      ...areaData,
-      id: `area-${Date.now()}`,
-      status: "available",
-      warningReason: "",
-      lastUpdate: Date.now()
-    }
-
-    const response = {
-      "code": 200,
-      "message": "success",
-      "data": newArea
-    }
-
-    return response.data
+    const data = await apiClient.post('/monitoring-points', areaData);
+    return data;
   } catch (error) {
-    console.error('添加重点关注区域失败:', error)
-    throw error
+    console.error('添加重点关注区域失败:', error);
+    throw error;
   }
-}
+};
 
-// 适飞分析
-export const getWeatherSuitability = async () => {
- 
+// 获取单点适飞指数分析数据
+export const getWeatherSuitability = async (params = {}) => {
 
-  // 在实际项目中，这里会是真实的API调用:
-  // const response = await axios.get(`/api/weather/point/${currentPoint.id}`)
-
-  // 原始数据
-  const factors = ["综合", "风", "风切变", "颠簸指数", "湍流", "降水", "能见度"];
-  const timePoints = [
-    "2025-11-17 10:00",
-    "2025-11-17 10:10",
-    "2025-11-17 10:20",
-    "2025-11-17 10:30",
-    "2025-11-17 10:40",
-    "2025-11-17 10:50",
-    "2025-11-17 11:00",
-    "2025-11-17 11:10",
-    "2025-11-17 11:20",
-    "2025-11-17 11:30",
-    "2025-11-17 11:40",
-    "2025-11-17 11:50",
-    "2025-11-17 12:00",
-    "2025-11-17 12:10",
-    "2025-11-17 12:20",
-    "2025-11-17 12:30",
-    "2025-11-17 12:40",
-    "2025-11-17 12:50",
-    "2025-11-17 13:00"
-  ];
-  const statusData = [
-    // 综合
-    [true, true, false, false, false, true, true, true, false, false, true, true, false, true, true, false, false, true, true],
-    // 风
-    [true, true, false, false, true, true, true, false, false, true, true, true, true, false, false, true, true, true, false],
-    // 风切变
-    [true, false, false, true, true, true, false, false, true, true, true, true, false, false, true, true, true, false, true],
-    // 颠簸指数
-    [true, true, true, false, false, true, true, true, true, false, false, true, true, true, false, false, true, true, false],
-    // 湍流（全适飞）
-    [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true],
-    // 降水（全适飞）
-    [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true],
-    // 能见度（全适飞）
-    [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true]
-  ];
-  const valueData = [
-    // 综合（无具体值）
-    ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-    // 风（异常值）
-    ["", "", "9m/s", "9m/s", "", "", "", "8m/s", "8m/s", "", "", "", "9m/s", "", "", "8m/s", "8m/s", "", "9m/s"],
-    // 风切变（异常值）
-    ["", "7m/s", "7m/s", "", "", "", "6m/s", "6m/s", "", "", "", "7m/s", "7m/s", "6m/s", "", "", "", "6m/s", "7m/s"],
-    // 颠簸指数（异常值）
-    ["", "", "", "中", "中", "", "", "", "", "中", "中", "", "", "", "中", "中", "", "", "中"],
-    // 湍流（无异常值）
-    ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-    // 降水（无异常值）
-    ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-    // 能见度（无异常值）
-    ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
-  ];
-
-  // 转换为新的数据结构
-  const suitabilityList = factors.map((factor, factorIndex) => {
-    const detail = timePoints.map((timePoint, timeIndex) => {
-      // 对于不同因素，使用不同格式的时间点
-      let formattedTimePoint = factorIndex === 0 ? timePoint.split(' ')[1] : timePoint;
-
-      return {
-        timePoint: formattedTimePoint,
-        statusData: statusData[factorIndex][timeIndex],
-        valueData: valueData[factorIndex][timeIndex]
-      };
-    });
-
-    return {
-      factor: factor,
-      detail: detail
-    };
-  });
-
-  const response = {
-    "code": 200,
-    "message": "success",
-    "data": {
-      "timeInterval": 10,
-      "totalHours": 3,
-      "suitabilityList": suitabilityList
+    const { 
+      currentPoint, 
+      timestamp = new Date(),
+      timeRange = '3h',
+      includeThresholds = true 
+    } = params;
+    
+    // 获取点ID
+    let pointId = null;
+    if (currentPoint) {
+      pointId = currentPoint.id || currentPoint.pointId;
     }
-  };
+    
+    // 构建API请求参数
+    const queryParams = new URLSearchParams();
+    if (pointId) queryParams.append('pointId', pointId);
+    queryParams.append('timestamp', timestamp.toISOString());
+    queryParams.append('timeRange', timeRange);
+    if (includeThresholds) queryParams.append('includeThresholds', 'true');
+    
+    // 尝试调用真实API - 注意：后端路径是 /api/suitability/status
+    // 使用提取的pointId，而不是currentPoint对象
+    const url = `/suitability/status?pointId=${encodeURIComponent(pointId || 'area-1')}&totalHours=3`;
+    
+      const response = await apiClient.get(url);
+    return response
+    
 
-  return response.data
 }
+
+
+// 获取实时适飞指数（单时间点）
+export const getCurrentSuitabilityIndex = async (currentPoint) => {
+  if (!currentPoint) {
+    throw new Error('未选择重点关注区域');
+  }
+  
+  const pointId = currentPoint.id || currentPoint.pointId;
+  
+  // 调用真实API - 使用现有的/suitability/status接口
+  const url = `/suitability/status?pointId=${encodeURIComponent(pointId)}&totalHours=1`;
+  const response = await apiClient.get(url);
+  
+  if (response && response.data) {
+    return response.data;
+  }
+  
+  throw new Error('实时适飞指数API返回数据为空');
+}
+
 export const getWeatherForecastTrend = async (params) => {
   const params1 = {
     latitude: 52.52,
@@ -382,239 +166,626 @@ export const getWeatherForecastTrend = async (params) => {
  */
 export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
   try {
-
-    const [longitude, latitude] = currentPoint.coordinates;
-    // 2. API核心配置（遵循官方规范）
-    const API_KEY = import.meta.env.VITE_QWEATHER_API_KEY;
-    // 拼接完整URL（HTTPS + 专属Host + 版本 + 接口）
-    const requestUrl = `https://m73yfr9h37.re.qweatherapi.com/v7/weather/now`;
-
-    // 3. 发起请求（符合官方认证和压缩规范）
-    const response = await axios.get(requestUrl, {
-      params: {
-        location: `${longitude},${latitude}`, // 纬度,经度 格式
-      },
-      headers: {
-        'X-QW-Api-Key': API_KEY, // 关键：请求头传Key（替代URL参数）
-        'Accept': 'application/json'
-      },
-      timeout: 15000, // 15秒超时保护
-      decompress: true // 自动解压Gzip（axios v1.0+ 支持）
-    });
-
-    // 4. 响应校验（遵循和风API错误码规范）
-    const { data } = response;
-    // 5. 格式化数据为项目可用格式
-    const nowData = data.now;
-    return nowData;
-
-  } catch (error) {
-    console.error('获取天气数据失败（遵循和风API规范）：', error.message);
-    throw error; // 抛出错误供调用方处理
-  }
-};
-
-
-
-// 原始的获取专业气象数据函数
-const fetchProfessionalWeatherDataFromAPI = async (currentPoint) => {
-  try {
     if (!currentPoint) {
-      throw new Error('未选择重点关注区域')
+      throw new Error('未选择重点关注区域');
     }
-
-    // 在实际项目中，这里可能需要：
-    // 1. 调用专业气象服务API
-    // 2. 使用算法模型计算（如通过风速梯度计算风切变）
-    // 3. 从特殊数据源获取
-
-    // 模拟专业气象数据（实际项目中需要根据具体计算或专业API获取）
-
-    // 模拟根据基本气象数据计算或从专业数据源获取的结果
-    const response = {
-      "code": 200,
-      "message": "success",
-      "data": {
-        "windShearLevel": "medium", // 风切变等级
-        "stabilityIndex": "C"       // 稳定度指数
+    
+    // 适配后端返回的数据格式：可能是 coordinates 数组，也可能是 longitude/latitude 分开
+    let longitude, latitude;
+    if (currentPoint.coordinates && Array.isArray(currentPoint.coordinates)) {
+      [longitude, latitude] = currentPoint.coordinates;
+    } else if (currentPoint.longitude !== undefined && currentPoint.latitude !== undefined) {
+      longitude = currentPoint.longitude;
+      latitude = currentPoint.latitude;
+    } else {
+      throw new Error('坐标信息缺失');
+    }
+    
+    // 2. API核心配置（使用代理避免跨域）
+    const API_KEY = import.meta.env.VITE_QWEATHER_API_KEY;
+    
+    // 使用代理路径（vite.config.js中配置）
+    const proxyUrl = `/api/weather/now?location=${longitude},${latitude}&key=${API_KEY}`;
+    
+    try {
+      const response = await axios.get(proxyUrl, {
+        timeout: 10000,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (response.data && response.data.now) {
+        console.log('[Weather] API调用成功:', response.data.now);
+        return response.data.now;
       }
+    } catch (apiError) {
+      console.warn('[Weather] API调用失败:', apiError.message);
     }
+    
+    // 降级：返回模拟数据
+    console.log('[Weather] 使用模拟数据');
+    return getMockWeatherData();
 
-    return response.data
   } catch (error) {
-    console.error('获取专业气象数据失败:', error)
-    throw error
+    console.error('获取天气数据失败：', error.message);
+    // 返回模拟数据，保证前端不崩溃
+    return getMockWeatherData();
   }
 };
 
-// 主函数：组合基本和专业气象数据，保持向后兼容
+// 模拟天气数据（降级使用）
+function getMockWeatherData() {
+  return {
+    temp: '25',
+    feelsLike: '24',
+    icon: '100',
+    text: '晴',
+    wind360: '45',
+    windDir: '东北风',
+    windScale: '3',
+    windSpeed: '12',
+    humidity: '68',
+    precip: '0.0',
+    pressure: '1013',
+    vis: '10',
+    cloud: '25',
+    dew: '18',
+    windShearLevel: 'low',
+    stabilityIndex: 'C'
+  };
+}
+
+
+// 主函数：获取当前监测点天气数据（调用后端接口）
 export const fetchCurrentPointWeather = async (currentPoint) => {
   try {
     if (!currentPoint) {
       throw new Error('未选择重点关注区域')
     }
 
-    // 并行获取两类数据以提高性能
-    const [basicData, professionalData] = await Promise.all([
-      fetchBasicWeatherDataFromAPI(currentPoint),
-      fetchProfessionalWeatherDataFromAPI(currentPoint)
-    ]);
-    // 合并两类数据
-    const combinedData = {
-      ...basicData,
-      ...professionalData
-    };
-    console.log(combinedData);
-
-    return combinedData;
+    // 获取监测点ID
+    const pointId = currentPoint.id || currentPoint.pointId || 'point-1';
+    
+    // 调用后端实时天气接口
+    const data = await apiClient.get(`/weather/realtime?pointId=${pointId}`);
+    
+    // 后端返回的数据格式：{ updateTime, data: { ... } }
+    // 适配前端期望的格式
+    if (data && data.data) {
+      const weatherData = data.data;
+      return {
+        temp: weatherData.temp?.toString() || '25',
+        feelsLike: weatherData.feelsLike?.toString() || '24',
+        icon: weatherData.icon?.toString() || '100',
+        text: weatherData.text || '晴',
+        wind360: weatherData.wind360?.toString() || '45',
+        windDir: weatherData.windDir || '东北风',
+        windScale: weatherData.windScale?.toString() || '3',
+        windSpeed: weatherData.windSpeed?.toString() || '12',
+        humidity: weatherData.humidity?.toString() || '68',
+        precip: weatherData.precip?.toString() || '0.0',
+        pressure: weatherData.pressure?.toString() || '1013',
+        vis: weatherData.vis?.toString() || '10',
+        cloud: weatherData.cloud?.toString() || '25',
+        dew: weatherData.dew?.toString() || '18',
+        windShearLevel: weatherData.windShearLevel || 'low',
+        stabilityIndex: weatherData.stabilityIndex || 'C',
+        obsTime: weatherData.obsTime || new Date().toISOString()
+      };
+    }
+    
+    // 如果后端没有数据，抛出错误
+    throw new Error('后端返回数据为空');
+    
   } catch (error) {
-    console.error('获取当前重点关注区域天气数据失败:', error)
-    throw error
+    console.error('获取当前重点关注区域天气数据失败:', error);
+    throw error; // 不返回模拟数据，直接抛出错误
   }
 }
-// 获取适飞分析数据
-export const getWeatherForecastHeatmap = async (currentPoint) => {
-  if (!currentPoint) {
-    throw new Error('未选择重点关注区域')
-  }
-
-  // 在实际项目中，这里会是真实的API调用:
-  // const response = await axios.get(`/api/weather/analysis/${currentPoint.id}`)
-
-  const response = {
-    "code": 200,
-    "message": "success",
-    "data": {
-
-      "times": [
-        "08:00",
-        "08:30",
-        "09:00",
-        "09:30",
-        "10:00",
-        "10:30",
-        "11:00"
-      ],
-      "heights": [
-        0,
-        50,
-        100,
-        150,
-        200,
-        250,
-        300
-      ],
-      "data": [
-        [
-          93,
-          91,
-         90,
-          93,
-          97,
-          94,
-          79
-
-        ],
-        [
-          87,
-          86,
-          87,
-          88,
-          85,
-          83,
-          77
-        ],
-        [
-          78,
-          74,
-          72,
-          76,
-          71,
-          76,
-          69
-        ],
-        [
-          61,
-          66,
-          66,
-          67,
-          63,
-          63,
-          59
-        ],
-        [
-          52,
-          50,
-          51,
-          59,
-          55,
-          55,
-          50
-        ],
-        [
-          42,
-          44,
-          49,
-          42,
-          47,
-          48,
-          42
-        ],
-        [
-          38,
-          43,
-          33,
-          34,
-          32,
-          33,
-          27
-        ],
-        [
-          27,
-          22,
-          29,
-          27,
-          23,
-          23,
-          17
-        ]
-      ]
-
+// 获取区域飞行风险热力图数据
+/**
+ * 格式化边界框为API需要的字符串格式
+ * @param {Array|Object} bounds - 边界框数据
+ * @returns {string} 格式化的边界字符串
+ */
+const formatBoundsForApi = (bounds) => {
+  try {
+    if (Array.isArray(bounds)) {
+      // 已经是数组格式
+      if (bounds.length >= 4) {
+        // 直接返回 [minLng,minLat,maxLng,maxLat] 格式
+        return `[${bounds[0]},${bounds[1]},${bounds[2]},${bounds[3]}]`;
+      }
+    } else if (bounds && typeof bounds === 'object') {
+      // 对象格式，尝试提取坐标
+      if (bounds.coordinates && Array.isArray(bounds.coordinates)) {
+        return formatBoundsForApi(bounds.coordinates);
+      } else if (bounds.bounds && Array.isArray(bounds.bounds)) {
+        return formatBoundsForApi(bounds.bounds);
+      }
     }
+    
+    // 无法识别的格式
+    console.warn('无法识别的边界框格式:', bounds);
+    return null;
+  } catch (error) {
+    console.error('格式化边界框失败:', error);
+    return null;
   }
-  return response.data
+};
+
+export const getWeatherForecastHeatmap = async (params = {}) => {
+  
+    const { 
+      currentPoint, 
+      timestamp, 
+      timeRange = '3h', 
+      resolution = 'medium',
+      forRouteAnalysis = false 
+    } = params;
+    
+    // 如果没有传入区域，尝试从store获取当前选中区域
+    let pointId = null;
+    let areaBounds = null;
+    
+    if (currentPoint) {
+      pointId = currentPoint.id || currentPoint.pointId;
+      // 获取区域边界（如果有）
+      if (currentPoint.bounds || currentPoint.coordinates) {
+        areaBounds = currentPoint.bounds || currentPoint.coordinates;
+      }
+    }
+    
+    // 构建API请求参数
+    const queryParams = new URLSearchParams();
+    if (pointId) queryParams.append('pointId', pointId);
+    if (timestamp) queryParams.append('timestamp', timestamp.toISOString());
+    if (timeRange) queryParams.append('timeRange', timeRange);
+    if (resolution) queryParams.append('resolution', resolution);
+    if (forRouteAnalysis) queryParams.append('forRouteAnalysis', 'true');
+    if (areaBounds) {
+      // 将边界框转换为后端期望的格式 [minLng,minLat,maxLng,maxLat]
+      const boundsStr = formatBoundsForApi(areaBounds);
+      if (boundsStr) {
+        queryParams.append('bounds', boundsStr);
+      }
+    }
+    
+    // 尝试调用真实API
+    const url = `/weather/heatmap?${queryParams.toString()}`;
+      const response = await apiClient.get(url);      
+      if (response && response.data) {
+        console.log('[Heatmap] API调用成功，返回真实数据');
+        return response.data;
+      }
 }
 
 // 获取风险预警数据
-export const getRiskWarnings = async () => {
+export const getRiskWarnings = async (params = {}) => {
   try {
-    const response = await import('@/mock/riskWarnings.json')
-    return response.default.data
+    const { pointId, timeRange } = params;
+    let url = '/weather/risk/report';
+    const queryParams = [];
+    if (pointId) queryParams.push(`pointId=${pointId}`);
+    if (timeRange) queryParams.push(`timeRange=${timeRange}`);
+    if (queryParams.length > 0) {
+      url += '?' + queryParams.join('&');
+    }
+    const data = await apiClient.get(url);
+    return data;
   } catch (error) {
-    console.error('获取风险预警数据失败：', error)
-    return { code: 500, message: '获取数据失败' }
+    console.error('获取风险预警数据失败：', error);
+    throw error;
+  }
+}
+
+// 获取地理空间热力图数据（用于Cesium地图）
+export const getWeatherHeatmapGeo = async (params = {}) => {
+  try {
+    const { 
+      time, 
+      resolution = 'medium',
+      pointId 
+    } = params;
+    
+    if (!pointId) {
+      throw new Error('监测点ID参数(pointId)是必需的');
+    }
+    
+    // 构建API请求参数
+    const queryParams = new URLSearchParams();
+    queryParams.append('pointId', pointId);
+    if (time) queryParams.append('time', time.toISOString ? time.toISOString() : time);
+    if (resolution) queryParams.append('resolution', resolution);
+    
+    const url = `/weather/heatmap/geo?${queryParams.toString()}`;
+    console.log('调用地理空间热力图API:', url);
+    
+    const response = await apiClient.get(url);
+    
+    if (response && response.data) {
+      console.log('地理空间热力图API调用成功');
+      return response.data;
+    } else {
+      throw new Error('API返回数据格式错误');
+    }
+  } catch (error) {
+    console.error('获取地理空间热力图数据失败:', error);
+    throw error;
   }
 }
 
 // 获取风场数据
 export const getWindData = async () => {
   try {
-    // 模拟API调用延迟
-    await new Promise(resolve => setTimeout(resolve, 300))
-    
-    // 在实际项目中，这里会是真实的API调用:
-    // const response = await request.get('/wind-data')
-    // return response
-    
-    // 开发环境使用模拟数据
-    const response = await import('@/mock/windData.js')
-    return response.default
+    const data = await apiClient.get('/weather/wind');
+    return data;
   } catch (error) {
-    console.error('获取风场数据失败：', error)
-    return { 
-      code: 500, 
-      message: '获取风场数据失败',
-      layers: []
+    console.error('获取风场数据失败，使用模拟数据：', error.message);
+    
+    // 返回模拟风场数据
+    return generateMockWindData();
+  }
+}
+
+// 生成模拟风场数据
+function generateMockWindData() {
+  const now = new Date();
+  const data = [];
+  
+  // 生成10个风场数据点
+  for (let i = 0; i < 10; i++) {
+    const lat = 30 + Math.random() * 5; // 30-35°N
+    const lon = 120 + Math.random() * 5; // 120-125°E
+    const speed = 5 + Math.random() * 15; // 5-20 m/s
+    const direction = Math.random() * 360; // 0-360°
+    
+    data.push({
+      id: `wind_${i}`,
+      latitude: lat,
+      longitude: lon,
+      speed: speed,
+      direction: direction,
+      timestamp: now.toISOString(),
+      altitude: 100 + i * 100 // 100-1000米
+    });
+  }
+  
+  return {
+    code: 200,
+    message: '成功',
+    data: {
+      timestamp: now.toISOString(),
+      points: data
+    }
+  };
+}
+
+// 获取热力图数据（微尺度天气）
+export const getHeatmapData = async (params = {}) => {
+  try {
+    const { region, timeRange } = params;
+    let url = '/weather/microscale';
+    const queryParams = [];
+    if (region) queryParams.push(`region=${region}`);
+    if (timeRange) queryParams.push(`timeRange=${timeRange}`);
+    if (queryParams.length > 0) {
+      url += '?' + queryParams.join('&');
+    }
+    const data = await apiClient.get(url);
+    return data;
+  } catch (error) {
+    console.error('获取热力图数据失败：', error.message);
+    throw error; // 不返回模拟数据，直接抛出错误
+  }
+}
+
+// 生成模拟微尺度热力图数据（用于getHeatmapData）
+function generateMockMicroscaleHeatmapData(params = {}) {
+  const { region = 'default', timeRange = '24h' } = params;
+  
+  // 生成网格数据 (10x10 网格)
+  const gridSize = 10;
+  const data = [];
+  
+  for (let x = 0; x < gridSize; x++) {
+    for (let y = 0; y < gridSize; y++) {
+      // 风险等级: 1-5 (1=低风险, 5=高风险)
+      const riskLevel = Math.floor(Math.random() * 5) + 1;
+      // 风速: 0-20 m/s
+      const windSpeed = Math.random() * 20;
+      // 风切变: 0-1.5
+      const windShear = Math.random() * 1.5;
+      // 湍流: 0-1.0
+      const turbulence = Math.random();
+      
+      data.push({
+        id: `${region}_${x}_${y}`,
+        region,
+        data_time: new Date().toISOString(),
+        grid_size: gridSize,
+        grid_x: x,
+        grid_y: y,
+        risk_level: riskLevel,
+        wind_speed: windSpeed,
+        wind_shear: windShear,
+        turbulence: turbulence,
+        created_at: new Date().toISOString()
+      });
     }
   }
+  
+  return {
+    code: 200,
+    message: '成功',
+    data: {
+      region,
+      time_range: timeRange,
+      grid_size: gridSize,
+      data: data.slice(0, 100) // 限制返回100条数据
+    }
+  };
+}
+
+// ==================== 设备监测接口 ====================
+
+// 获取设备统计
+export const getDeviceCount = async () => {
+  try {
+    const data = await apiClient.get('/devices/count');
+    return data;
+  } catch (error) {
+    console.error('获取设备统计失败:', error);
+    throw error;
+  }
+}
+
+// 获取设备告警
+export const getDeviceAlarms = async (params = {}) => {
+  try {
+    const { date, level, limit } = params;
+    let url = '/devices/alarms';
+    const queryParams = [];
+    if (date) queryParams.push(`date=${date}`);
+    if (level) queryParams.push(`level=${level}`);
+    if (limit) queryParams.push(`limit=${limit}`);
+    if (queryParams.length > 0) {
+      url += '?' + queryParams.join('&');
+    }
+    const data = await apiClient.get(url);
+    return data;
+  } catch (error) {
+    console.error('获取设备告警失败:', error);
+    throw error;
+  }
+}
+
+// 获取设备历史数据
+export const getDeviceHistory = async () => {
+  try {
+    const data = await apiClient.get('/devices/history');
+    return data;
+  } catch (error) {
+    console.error('获取设备历史数据失败:', error);
+    throw error;
+  }
+}
+
+// ==================== 摄像头接口 ====================
+
+// 获取摄像头列表
+export const getCameras = async (status) => {
+  try {
+    let url = '/cameras';
+    if (status) url += `?status=${status}`;
+    const data = await apiClient.get(url);
+    return data;
+  } catch (error) {
+    console.error('获取摄像头列表失败:', error);
+    throw error;
+  }
+}
+
+// ==================== 航路分析接口 ====================
+
+// 获取航路列表
+export const getRoutes = async () => {
+  try {
+    const data = await apiClient.get('/routes');
+    return data;
+  } catch (error) {
+    console.error('获取航路列表失败（后端RouteService有IndexOutOfBoundsException）:', error);
+    // 临时返回空数组，避免前端崩溃
+    return {
+      code: 200,
+      message: '成功',
+      data: {
+        routes: [],
+        total: 0,
+        available: 0
+      }
+    };
+  }
+}
+
+// 获取航路详情
+export const getRouteDetail = async (routeId) => {
+  try {
+    const data = await apiClient.get(`/routes/${routeId}`);
+    return data;
+  } catch (error) {
+    console.error('获取航路详情失败（后端RouteService有IndexOutOfBoundsException）:', error);
+    // 临时返回空数据，避免前端崩溃
+    return {
+      code: 200,
+      message: '成功',
+      data: {
+        routeId,
+        routeName: `航路${routeId}`,
+        weatherAlongRoute: [],
+        riskAssessment: { overallRisk: '未知', factors: [] },
+        recommendations: ['后端服务暂时不可用']
+      }
+    };
+  }
+}
+
+// 生成模拟航路列表数据
+function generateMockRoutesData() {
+  const routes = [
+    {
+      id: 'ROUTE-001',
+      name: '航路一',
+      start: '起飞点A',
+      end: '降落点B',
+      distance: '120km',
+      estimatedTime: '15min',
+      weatherCondition: '良好',
+      status: '可用',
+      riskLevel: '低'
+    },
+    {
+      id: 'ROUTE-002',
+      name: '航路二',
+      start: '起飞点A',
+      end: '降落点C',
+      distance: '180km',
+      estimatedTime: '22min',
+      weatherCondition: '一般',
+      status: '可用',
+      riskLevel: '中'
+    },
+    {
+      id: 'ROUTE-003',
+      name: '航路三',
+      start: '起飞点B',
+      end: '降落点C',
+      distance: '90km',
+      estimatedTime: '12min',
+      weatherCondition: '良好',
+      status: '可用',
+      riskLevel: '低'
+    },
+    {
+      id: 'ROUTE-004',
+      name: '训练航路',
+      start: '训练场A',
+      end: '训练场B',
+      distance: '60km',
+      estimatedTime: '8min',
+      weatherCondition: '较差',
+      status: '限制',
+      riskLevel: '高'
+    }
+  ];
+  
+  return {
+    code: 200,
+    message: '成功',
+    data: {
+      routes,
+      total: routes.length,
+      available: routes.filter(r => r.status === '可用').length
+    }
+  };
+}
+
+// 生成模拟航路详情数据
+function generateMockRouteDetailData(routeId) {
+  const routeDetails = {
+    'ROUTE-001': {
+      routeId: 'ROUTE-001',
+      routeName: '航路一',
+      description: '主要商业航路，连接A-B两个主要机场',
+      weatherAlongRoute: [
+        { segment: '起点', wind: '3-4级', visibility: '10km', precipitation: '无', temperature: '25°C' },
+        { segment: '中段', wind: '4-5级', visibility: '8km', precipitation: '无', temperature: '23°C' },
+        { segment: '终点', wind: '3级', visibility: '12km', precipitation: '无', temperature: '26°C' }
+      ],
+      riskAssessment: {
+        overallRisk: '低',
+        factors: [
+          { factor: '风速', risk: '低', value: '3.5m/s' },
+          { factor: '能见度', risk: '低', value: '9.2km' },
+          { factor: '降水量', risk: '低', value: '0mm' },
+          { factor: '湍流', risk: '中', value: '0.4' },
+          { factor: '风切变', risk: '低', value: '0.2' }
+        ]
+      },
+      recommendations: [
+        '建议飞行高度：300-500米',
+        '建议飞行速度：60-80km/h',
+        '注意中段风力变化',
+        '保持与地面通讯畅通'
+      ]
+    },
+    'ROUTE-002': {
+      routeId: 'ROUTE-002',
+      routeName: '航路二',
+      description: '山区航路，地形复杂',
+      weatherAlongRoute: [
+        { segment: '起点', wind: '4-5级', visibility: '8km', precipitation: '小雨', temperature: '22°C' },
+        { segment: '山区段', wind: '5-6级', visibility: '5km', precipitation: '中雨', temperature: '20°C' },
+        { segment: '终点', wind: '3-4级', visibility: '10km', precipitation: '无', temperature: '24°C' }
+      ],
+      riskAssessment: {
+        overallRisk: '中',
+        factors: [
+          { factor: '风速', risk: '中', value: '5.2m/s' },
+          { factor: '能见度', risk: '中', value: '6.5km' },
+          { factor: '降水量', risk: '中', value: '2.1mm/h' },
+          { factor: '湍流', risk: '高', value: '0.7' },
+          { factor: '地形', risk: '高', value: '复杂' }
+        ]
+      },
+      recommendations: [
+        '建议飞行高度：500-800米',
+        '建议飞行速度：50-70km/h',
+        '山区段注意强风和低能见度',
+        '建议绕行或延迟飞行'
+      ]
+    },
+    'ROUTE-003': {
+      routeId: 'ROUTE-003',
+      routeName: '航路三',
+      description: '短途训练航路',
+      weatherAlongRoute: [
+        { segment: '起点', wind: '2-3级', visibility: '15km', precipitation: '无', temperature: '26°C' },
+        { segment: '训练区', wind: '3-4级', visibility: '12km', precipitation: '无', temperature: '25°C' },
+        { segment: '终点', wind: '2-3级', visibility: '15km', precipitation: '无', temperature: '27°C' }
+      ],
+      riskAssessment: {
+        overallRisk: '低',
+        factors: [
+          { factor: '风速', risk: '低', value: '2.8m/s' },
+          { factor: '能见度', risk: '低', value: '13.2km' },
+          { factor: '降水量', risk: '低', value: '0mm' },
+          { factor: '湍流', risk: '低', value: '0.2' },
+          { factor: '空域', risk: '低', value: '空闲' }
+        ]
+      },
+      recommendations: [
+        '适合训练飞行',
+        '建议飞行高度：200-400米',
+        '注意其他训练飞机',
+        '保持目视飞行规则'
+      ]
+    }
+  };
+  
+  const detail = routeDetails[routeId] || {
+    routeId,
+    routeName: `航路${routeId.split('-')[1] || '未知'}`,
+    description: '航路信息',
+    weatherAlongRoute: [],
+    riskAssessment: { overallRisk: '未知', factors: [] },
+    recommendations: ['暂无建议']
+  };
+  
+  return {
+    code: 200,
+    message: '成功',
+    data: detail
+  };
 }

@@ -40,9 +40,9 @@ export class InitializationService {
 
       ]);
 
-      await this.initializeAreaWeatherData();
+        await this.initializeAreaWeatherData();
 
-      // 加载地图天气图层
+        // 加载地图天气图层
       await this.initializeMapWeatherLayer()
 
       return true;

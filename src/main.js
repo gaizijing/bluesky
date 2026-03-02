@@ -9,6 +9,19 @@ import '@/styles/index.scss'
 import 'vue-cesium/dist/index.css'
 
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+
+// 设置Cesium配置（必须）
+if (import.meta.env.VITE_CESIUM_BASE_URL) {
+  window.CESIUM_BASE_URL = import.meta.env.VITE_CESIUM_BASE_URL;
+} else {
+  window.CESIUM_BASE_URL = '/cesium';
+}
+
+// 设置Cesium Ion token（必须）
+if (import.meta.env.VITE_CESIUM_TOKEN) {
+  window.CESIUM_ION_TOKEN = import.meta.env.VITE_CESIUM_TOKEN;
+}
+
 const app = createApp(App)
 
 // 全局注册 Element Plus 图标组件

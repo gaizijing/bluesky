@@ -50,12 +50,13 @@ class WeatherService {
   }
   async loadHeatMapData() {
     try {
-      const response = await fetch(import.meta.env.VITE_TEM_DATA_URL);
-    const data = await response.json();
-    this.getHeatmapStore().setHeatmapData(data);
+      const { getHeatmapData } = await import('@/api');
+      const heatmapData = await getHeatmapData();
+      this.getHeatmapStore().setHeatmapData(heatmapData);
     } catch (error) {
-      console.error('加载区域天气数据失败:', error);
-      throw error;
+      console.error('加载热力图数据失败，使用空数据:', error.message);
+      // 不抛出错误，而是设置空数据
+      this.getHeatmapStore().setHeatmapData(null);
     }
   }
 

@@ -10,6 +10,18 @@ export const useRouteStore = defineStore('route', {
     renderedRouteId: ''
   }),
   actions: {
+    // 设置航线列表
+    setRouteList(routes) {
+      this.routeList = routes
+    },
+    // 添加航线到列表
+    addRoute(route) {
+      this.routeList.push(route)
+    },
+    // 清空航线列表
+    clearRouteList() {
+      this.routeList = []
+    },
     // 设置选中航线（列表点击时调用）
     setCurrentRoute(route) {
       // 转换列表航线数据为Cesium需要的格式
