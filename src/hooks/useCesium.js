@@ -91,7 +91,10 @@ export function useCesium(containerId) {
       console.log('[Cesium] 创建Viewer...')
       viewer.value = createViewer(containerId)
       viewer.value.cesiumWidget.creditContainer.style.display = 'none'
-      console.log('[Cesium] Viewer创建成功')
+      
+      // 设置为全局变量，供其他模块访问（如ISIM动画）
+      window.viewer = viewer.value
+      console.log('[Cesium] Viewer创建成功并设置为全局变量')
       
       console.log('[Cesium] 初始化天空盒...')
       try {
@@ -594,6 +597,12 @@ export function useCesium(containerId) {
 
       // 销毁Viewer
       destroyViewer(viewer.value)
+      
+      // 移除全局viewer引用
+      if (window.viewer === viewer.value) {
+        delete window.viewer
+      }
+      
       viewer.value = null
     }
   }

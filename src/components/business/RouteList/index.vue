@@ -1,27 +1,11 @@
 <template>
   <div class="route-list-container">
-    <!-- 顶部工具栏：添加按钮和视角控制 -->
+    <!-- 顶部工具栏：添加按钮 -->
     <div class="top-toolbar">
       <button class="add-route-btn" @click="showAddRouteModal">+ 添加航线</button>
-      <!-- 当前没有航线时隐藏视角控制 -->
-      <div v-if="routeStore.currentRoute" class="view-controls">
-        <span class="view-label">视角控制:</span>
-        <button class="view-btn" @click="viewTopDown" title="俯视视角">
-          俯视
-        </button>
-        <button class="view-btn" @click="viewSide" title="侧视视角">
-          侧视
-        </button>
-        <button class="view-btn" @click="viewCurrentAircraft" title="跟踪飞机">
-          跟踪
-        </button>
-        <button class="view-btn" @click="releaseTracking" title="自由视角">
-          自由
-        </button>
-        <button class="view-btn" @click="releaseRoute" title="清空">
-          清空
-        </button>
-      </div>
+      <button class="clear-screen-btn" @click="clearScreen">
+        清屏
+      </button>
     </div>
 
     <!-- 当前正在查看的航线 -->
@@ -737,28 +721,16 @@ const onRouteClick = async (route) => {
   });
 };
 
-const viewTopDown = () => {
-  routeManager.viewTopDown();
-};
-
-const viewSide = () => {
-  routeManager.viewSide();
-};
-
-const viewCurrentAircraft = () => {
-  if (routeStore.currentRoute && routeStore.currentRoute.id) {
-    routeManager.viewAircraft(routeStore.currentRoute.id);
-  }
-};
-
-const releaseTracking = () => {
-  routeManager.releaseTracking();
-};
 const releaseRoute = () => {
   currentRoute.value = null;
   routeStore.clearCurrentRoute();
 
   routeManager.clearAllRoutes();
+};
+
+// 清屏功能，取消屏幕上的航线预览
+const clearScreen = () => {
+  releaseRoute();
 };
 
 onMounted(() => {
@@ -1126,6 +1098,27 @@ const generateRouteDataForCustomRoute = (waypoints, totalLength) => {
 
   &:hover {
     background: #2563eb;
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.clear-screen-btn {
+  padding: 8px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.2);
     transform: translateY(-1px);
   }
 

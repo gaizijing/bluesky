@@ -1,12 +1,10 @@
 // src/cesium/entities/routes/RouteRenderer.js
 import * as Cesium from 'cesium'
-import { PlaneModel } from './PlaneModel'
 import { DangerLevel } from './DangerLevel'
 
 export class RouteRenderer {
   constructor(viewer) {
     this.viewer = viewer
-    this.planeModel = new PlaneModel(viewer)
     this.dangerLevel = new DangerLevel()
   }
 
@@ -86,15 +84,15 @@ export class RouteRenderer {
   /**
    * 渲染航线
    * @param {Object} route 航线数据
-   * @returns {Object} 包含航线分段、飞机和位置的对象
+   * @returns {Object} 包含航线分段和位置的对象
    */
   renderRoute(route) {
-    if (!this.viewer) return { segments: [], plane: null, positions: [] }
+    if (!this.viewer) return { segments: [], positions: [] }
     
     // 检查航线数据完整性
     if (!route || !route.waypoints || route.waypoints.length === 0) {
       console.warn('航线数据不完整，跳过渲染:', route);
-      return { segments: [], plane: null, positions: [] };
+      return { segments: [], positions: [] };
     }
 
     // 构建航点数组
@@ -144,15 +142,6 @@ export class RouteRenderer {
       segment && segmentEntities.push(segment)
     }
 
-    // 创建飞机模型
-    const planeEntity = this.planeModel.createRoutePlane(
-      route.id,
-      positions,
-      route.duration,
-      route.startTime,
-      route.endTime
-    )
-
     // 创建起点标签
     const startLabel = this.#createStartLabel(positions, route);
 
@@ -163,7 +152,6 @@ export class RouteRenderer {
 
     return {
       segments: segmentEntities,
-      plane: planeEntity,
       positions: positions
     }
   }
@@ -174,8 +162,7 @@ export class RouteRenderer {
   removeRoute(routeId, routeData) {
     if (!this.viewer || !routeData) return
 
-    // 移除航线分段和飞机
+    // 移除航线分段
     routeData.segments.forEach(segment => this.viewer.entities.remove(segment))
-    if (routeData.plane) this.viewer.entities.remove(routeData.plane)
   }
 }

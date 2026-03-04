@@ -30,44 +30,34 @@ export class CameraController {
 
   /**
    * 俯视视角查看航线
+   * @param {Array} positions 航线位置数据
    */
-  viewTopDown() {
-    if (!this.viewer) return;
+  viewTopDown(positions) {
+    if (!this.viewer || !positions || positions.length === 0) return;
 
-    const allPositions = [];
-    // 这里需要从外部获取所有航线的位置数据
-    // 暂时留空，后续可以通过参数传入
-
-    if (allPositions.length > 0) {
-      const boundingSphere = Cesium.BoundingSphere.fromPoints(allPositions);
-      this.viewer.camera.flyToBoundingSphere(boundingSphere, {
-        offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-90), boundingSphere.radius * 6), // 提高俯视视角高度
-        duration: 1.5
-      });
-    }
+    const boundingSphere = Cesium.BoundingSphere.fromPoints(positions);
+    this.viewer.camera.flyToBoundingSphere(boundingSphere, {
+      offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-90), boundingSphere.radius * 6), // 提高俯视视角高度
+      duration: 1.5
+    });
   }
 
   /**
    * 侧视视角查看航线
+   * @param {Array} positions 航线位置数据
    */
-  viewSide() {
-    if (!this.viewer) return;
+  viewSide(positions) {
+    if (!this.viewer || !positions || positions.length === 0) return;
 
-    const allPositions = [];
-    // 这里需要从外部获取所有航线的位置数据
-    // 暂时留空，后续可以通过参数传入
-
-    if (allPositions.length > 0) {
-      const boundingSphere = Cesium.BoundingSphere.fromPoints(allPositions);
-      this.viewer.camera.flyToBoundingSphere(boundingSphere, {
-        offset: new Cesium.HeadingPitchRange(
-          Cesium.Math.toRadians(-90),
-          Cesium.Math.toRadians(-15),
-          Math.max(boundingSphere.radius, 7000) // 提高相机高度
-        ),
-        duration: 1.5
-      });
-    }
+    const boundingSphere = Cesium.BoundingSphere.fromPoints(positions);
+    this.viewer.camera.flyToBoundingSphere(boundingSphere, {
+      offset: new Cesium.HeadingPitchRange(
+        Cesium.Math.toRadians(-90),
+        Cesium.Math.toRadians(-15),
+        Math.max(boundingSphere.radius, 7000) // 提高相机高度
+      ),
+      duration: 1.5
+    });
   }
 
   /**

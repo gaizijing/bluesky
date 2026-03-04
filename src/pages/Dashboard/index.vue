@@ -21,11 +21,38 @@
       <div v-show="currentModule === DASHBOARD_MODULES.FLIGHT_ANALYSIS">
         <div class="left-panel">
           <div class="main-panel left_bg">
-            <div class="panel-header">
-              <span class="panel-title">航路分析</span>
+            <!-- Tab导航 -->
+            <div class="tab-nav">
+              <button 
+                class="tab-btn" 
+                :class="{ active: flightAnalysisTab === 'preview' }"
+                @click="flightAnalysisTab = 'preview'"
+              >
+                航线预览
+              </button>
+              <button 
+                class="tab-btn" 
+                :class="{ active: flightAnalysisTab === 'flight' }"
+                @click="flightAnalysisTab = 'flight'"
+              >
+                联机飞行
+              </button>
             </div>
-            <div class="panel-content">
-              <RouteList />
+            
+            <!-- 航线预览Tab -->
+            <div v-if="flightAnalysisTab === 'preview'" class="tab-content">
+            
+              <div class="panel-content">
+                <RouteList />
+              </div>
+            </div>
+            
+            <!-- 联机飞行Tab -->
+            <div v-if="flightAnalysisTab === 'flight'" class="tab-content">
+            
+              <div class="panel-content">
+                <IsimAnimation />
+              </div>
             </div>
           </div>
         </div>
@@ -121,7 +148,7 @@
   </div>
 </template>
 <script setup>
-import { watch, computed } from "vue";
+import { watch, computed, ref } from "vue";
 import { DASHBOARD_MODULES, MODULE_LIST } from "@/config/constants.js";
 import { useModuleStore } from "@/store/modules/module";
 import { DashboardService } from "../../services/dashboardService";
@@ -149,6 +176,9 @@ const RiskWarnings = defineAsyncComponent(() =>
 const RouteList = defineAsyncComponent(() =>
   import("@/components/business/RouteList/index.vue")
 );
+const IsimAnimation = defineAsyncComponent(() =>
+  import("@/components/business/IsimAnimation/index.vue")
+);
 const RealTimeWeatherPanel = defineAsyncComponent(() =>
   import("@/components/business/Real-timeWeatherPanel/index.vue")
 );
@@ -166,6 +196,9 @@ const currentModule = computed({
   get: () => moduleStore.currentModule,
   set: (value) => moduleStore.switchModule(value),
 });
+
+// 航路分析Tab状态
+const flightAnalysisTab = ref('preview'); // preview: 航线预览, flight: 联机飞行
 
 // 修改切换模块的方法
 const switchModule = (moduleKey) => {
@@ -308,5 +341,71 @@ watch(
 .analysis-panel {
   width: 100%;
   height: 100%;
+}
+
+/* Tab导航样式 */
+.tab-nav {
+  display: flex;
+  background: rgba(0, 0, 0, 0.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: #a0aec0;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  text-align: center;
+}
+
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.tab-btn.active {
+  color: #ffffff;
+  background: rgba(66, 153, 225, 0.2);
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #4299e1;
+}
+
+.tab-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 45px); /* 减去Tab导航高度 */
+}
+
+.tab-content .panel-header {
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tab-content .panel-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.tab-content .panel-content {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
 }
 </style>

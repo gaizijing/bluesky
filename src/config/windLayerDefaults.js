@@ -46,7 +46,7 @@ export const WIND_LAYER_DEFAULTS = {
       max: 10                  
     }
 };
-export const CAMERA_HEIGHT_THRESHOLD = 3000; // Show wind field only when camera is below 500m
+export const CAMERA_HEIGHT_THRESHOLD = 10000; // Show wind field only when camera is below 500m
 
 // 预定义颜色方案
 export const COLOR_SCHEMES = {

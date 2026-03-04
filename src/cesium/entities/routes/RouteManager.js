@@ -72,13 +72,12 @@ class RouteManager {
     // 设置当前激活的航线ID
     this.#activeRouteId = route.id
 
-    // 渲染航线和飞机
-    const { segments, plane, positions } = this.#routeRenderer.renderRoute(route)
+    // 渲染航线
+    const { segments, positions } = this.#routeRenderer.renderRoute(route)
     
     // 存储航线信息
     this.#routeEntities.set(route.id, {
       segments: segments,
-      plane: plane,
       positions: positions,
       dangers: route.dangers || [],
       info: route.info || {},
@@ -155,6 +154,46 @@ class RouteManager {
     
     console.log(isFlying ? '飞机飞行已继续' : '飞机飞行已暂停');
     return isFlying;
+  }
+
+  /**
+   * 俯视视角查看航线
+   */
+  viewTopDown() {
+    if (this.#cameraController && this.#activeRouteId && this.#routeEntities.has(this.#activeRouteId)) {
+      const routeData = this.#routeEntities.get(this.#activeRouteId);
+      this.#cameraController.viewTopDown(routeData.positions);
+    }
+  }
+
+  /**
+   * 侧视视角查看航线
+   */
+  viewSide() {
+    if (this.#cameraController && this.#activeRouteId && this.#routeEntities.has(this.#activeRouteId)) {
+      const routeData = this.#routeEntities.get(this.#activeRouteId);
+      this.#cameraController.viewSide(routeData.positions);
+    }
+  }
+
+  /**
+   * 跟踪指定航线的飞机
+   * @param {String} routeId 航线ID
+   */
+  viewAircraft(routeId) {
+    if (this.#cameraController && this.#routeEntities.has(routeId)) {
+      const routeData = this.#routeEntities.get(routeId);
+      // 这里需要飞机实体，后续从iSim数据中获取
+    }
+  }
+
+  /**
+   * 取消跟踪实体，恢复自由视角
+   */
+  releaseTracking() {
+    if (this.#cameraController) {
+      this.#cameraController.releaseTracking();
+    }
   }
 
   /**

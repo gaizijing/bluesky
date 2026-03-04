@@ -55,6 +55,17 @@ export default defineConfig(({ mode }) => {
       port: 8081,
       open: true,
       proxy: {
+        // 和风天气API代理（只代理特定的天气API请求）
+        '/api/weather/now': {
+          target: 'https://devapi.qweather.com/v7',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/weather/, ''),
+          secure: false,
+          headers: {
+            'Access-Control-Allow-Origin': '*'
+          }
+        },
+        // 通用API代理
         [env.VITE_API_BASE_URL]: {
           target: 'http://localhost:8080',
           changeOrigin: true,
@@ -63,21 +74,6 @@ export default defineConfig(({ mode }) => {
           headers: {
             'Access-Control-Allow-Origin': '*'
           }
-        },
-        '/api/weather': {
-          target: 'https://devapi.qweather.com/v7',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/weather/, ''),
-          secure: false, // 允许https
-          headers: {
-            'Access-Control-Allow-Origin': '*'
-          }
-        },
-        '/ws/mqtt': {
-          target: 'http://localhost:8088',
-          changeOrigin: true,
-          ws: true,
-          secure: false
         }
       }
     },

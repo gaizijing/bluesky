@@ -122,7 +122,8 @@ const updateTrendChart = (data) => {
         fontSize: 13
       },
       padding: [8, 12],
-      formatter: tooltipFormatter
+      formatter: tooltipFormatter,
+      extraCssText: 'z-index: 9999 !important; max-width: 280px;'
     },
     legend: {
       data: ['风速', '能见度', '降水量'],
@@ -336,11 +337,11 @@ const updateProfileChart = (data) => {
   // 处理高度标签
   let heightLabels;
   if (chartData.heights) {
-    heightLabels = chartData.heights.map(h => `${h}m`);
+    heightLabels = chartData.heights;
   } else if (chartData.heightLabels) {
     heightLabels = chartData.heightLabels;
   } else {
-    heightLabels = ['0m', '20m', '40m', '60m', '80m', '100m'];
+    heightLabels = ['0m', '100m', '200m', '300m', '400m', '500m'];
   }
 
   // 准备热力图数据
@@ -350,6 +351,46 @@ const updateProfileChart = (data) => {
       heatmapData.push([t, h, flightSuitabilityData[h][t]]);
     }
   }
+
+  // 修正的适飞等级判断函数
+  const getFlightSuitabilityInfo = (value) => {
+    if (value >= 90) {
+      return {
+        level: '优',
+        color: '#10b981', // 绿色
+        recommendation: '气象条件优秀，适合所有类型飞行任务。',
+        details: ['风速适宜', '能见度良好', '无降水影响', '湍流轻微']
+      };
+    } else if (value >= 70) {
+      return {
+        level: '良',
+        color: '#a3e635', // 亮绿色
+        recommendation: '气象条件良好，适合大部分飞行任务。',
+        details: ['风速可接受', '能见度较好', '降水影响小', '湍流中等']
+      };
+    } else if (value >= 50) {
+      return {
+        level: '中',
+        color: '#fbbf24', // 黄色
+        recommendation: '气象条件一般，需谨慎飞行，建议限制飞行高度。',
+        details: ['风速偏大', '能见度一般', '可能有降水', '湍流明显']
+      };
+    } else if (value >= 30) {
+      return {
+        level: '差',
+        color: '#f97316', // 橙色
+        recommendation: '气象条件较差，不建议飞行，如需飞行需严格限制条件。',
+        details: ['风速较大', '能见度较差', '降水明显', '湍流较强']
+      };
+    } else {
+      return {
+        level: '极差',
+        color: '#ef4444', // 红色
+        recommendation: '气象条件恶劣，禁止飞行。',
+        details: ['风速过大', '能见度极差', '强降水', '强湍流']
+      };
+    }
+  };
 
   // 配置图表
   const option = {
@@ -361,35 +402,50 @@ const updateProfileChart = (data) => {
         const timeIdx = dataIndex % timeLabels.length;
         const heightIdx = Math.floor(dataIndex / timeLabels.length);
         const value = flightSuitabilityData[heightIdx][timeIdx];
-
-        // 适飞等级判断
-        let level = '优';
-        let levelColor = '#10b981';
-        if (value < 60) {
-          level = '差';
-          levelColor = '#ef4444';
-        } else if (value < 80) {
-          level = '良';
-          levelColor = '#f59e0b';
+        
+        // 获取适飞信息
+        const suitabilityInfo = getFlightSuitabilityInfo(value);
+        
+        // 构建详细的建议HTML
+        let detailsHtml = '';
+        if (suitabilityInfo.details && suitabilityInfo.details.length > 0) {
+          detailsHtml = suitabilityInfo.details.map(detail => 
+            `<div style="margin: 2px 0; font-size: 12px; color: #94a3b8">• ${detail}</div>`
+          ).join('');
         }
-
+        
         return `
-          <div>
-            <div>时间：${timeLabels[timeIdx]}</div>
-            <div>高度：${heightLabels[heightIdx]}</div>
-            <div>适飞指数：${value}</div>
-            <div>适飞等级：<span style="color: ${levelColor}; font-weight: bold">${level}</span></div>
+          <div style="max-width: 280px">
+            <div style="font-weight: bold; margin-bottom: 8px; color: #3b82f6">
+              ${timeLabels[timeIdx]} | ${heightLabels[heightIdx]}
+            </div>
+            <div style="margin-bottom: 6px">
+              <span style="color: #94a3b8">适飞指数：</span>
+              <span style="font-weight: bold; color: ${suitabilityInfo.color}">${value.toFixed(1)}</span>
+            </div>
+            <div style="margin-bottom: 6px">
+              <span style="color: #94a3b8">适飞等级：</span>
+              <span style="font-weight: bold; color: ${suitabilityInfo.color}">${suitabilityInfo.level}</span>
+            </div>
+            <div style="margin-bottom: 8px; padding: 6px; background: rgba(0,0,0,0.1); border-radius: 4px">
+              <div style="font-size: 12px; color: #e2e8f0">${suitabilityInfo.recommendation}</div>
+            </div>
+            ${detailsHtml}
+            <div style="margin-top: 8px; font-size: 11px; color: #64748b">
+              <i>数据更新时间：${new Date().toLocaleTimeString('zh-CN')}</i>
+            </div>
           </div>
         `;
       },
-      backgroundColor: 'rgba(15, 23, 51, 0.95)',
+      backgroundColor: 'rgba(15, 23, 51, 0.98)',
       borderColor: '#3b82f6',
       borderWidth: 1,
       textStyle: {
         color: '#e2e8f0',
         fontSize: 13
       },
-      padding: [8, 12]
+      padding: [10, 12],
+      extraCssText: 'z-index: 9999 !important; max-width: 280px;'
     },
     grid: {
       left: '1%',
@@ -423,13 +479,13 @@ const updateProfileChart = (data) => {
       }
     },
     visualMap: {
-      show: false,
+      show: false,  // 隐藏右侧色阶
       min: 0,
       max: 100,
       calculable: true,
       dimension: 2,
       inRange: {
-        color: ['#10b981 ', '#a3e635 ', '#fbbf24', '#f97316 ','#ef4444']
+        color: ['#ef4444', '#f97316', '#fbbf24', '#a3e635', '#10b981']
       }
     },
     series: [
@@ -438,15 +494,20 @@ const updateProfileChart = (data) => {
         data: heatmapData,
         label: {
           show: true,
+          formatter: (params) => {
+            const value = params.data[2];
+            return value >= 70 ? '✓' : value >= 30 ? '~' : '✗';
+          },
           color: '#fff',
-          fontSize: 12
+          fontSize: 12,
+          fontWeight: 'bold'
         },
         emphasis: {
           itemStyle: {
             borderColor: '#fff',
-            borderWidth: 1,
-            shadowBlur: 10,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
+            borderWidth: 2,
+            shadowBlur: 15,
+            shadowColor: 'rgba(0, 0, 0, 0.7)'
           }
         }
       }
