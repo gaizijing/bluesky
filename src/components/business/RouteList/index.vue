@@ -140,119 +140,104 @@
     <!-- 使用封装好的DialogContainer组件 -->
 
   </div>
-      <DialogContainer
-      :visible="showAddRouteModalFlag"
-      title="添加新航线"
-      @close="closeAddRouteModal"
-    >
-      <form @submit.prevent="addNewRoute" class="add-route-form">
-        <div class="form-group">
-          <label>起始地点:</label>
-          <input v-model="newRouteForm.startName" type="text" placeholder="起始地名" required />
-          <div class="coordinate-inputs">
-            <input v-model.number="newRouteForm.startLon" type="number" step="0.000001" placeholder="经度" required />
-            <input v-model.number="newRouteForm.startLat" type="number" step="0.000001" placeholder="纬度" required />
-            <button type="button" class="map-select-btn" @click="startMapSelection('start')">
-              地图选点
-            </button>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>终点:</label>
-          <input v-model="newRouteForm.endName" type="text" placeholder="终点地名" required />
-          <div class="coordinate-inputs">
-            <input v-model.number="newRouteForm.endLon" type="number" step="0.000001" placeholder="经度" required />
-            <input v-model.number="newRouteForm.endLat" type="number" step="0.000001" placeholder="纬度" required />
-            <button type="button" class="map-select-btn" @click="startMapSelection('end')">
-              地图选点
-            </button>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>途经点:</label>
-          <div class="waypoints-list">
-            <div v-for="(waypoint, index) in newRouteForm.waypoints" :key="index" class="waypoint-item">
-              <input v-model="waypoint.name" type="text" placeholder="途经点名称" />
-              <div class="coordinate-inputs">
-                <input v-model.number="waypoint.lon" type="number" step="0.000001" placeholder="经度" required />
-                <input v-model.number="waypoint.lat" type="number" step="0.000001" placeholder="纬度" required />
-                <button type="button" class="map-select-btn" @click="startMapSelection(`waypoint_${index}`)">
-                  地图选点
-                </button>
-              </div>
-              <button type="button" class="remove-waypoint-btn" @click="removeWaypoint(index)">
-                删除
-              </button>
-            </div>
-          </div>
-          <button type="button" class="add-waypoint-btn" @click="addWaypoint">
-            + 添加途经点
+  <DialogContainer :visible="showAddRouteModalFlag" title="添加新航线" @close="closeAddRouteModal">
+    <form @submit.prevent="addNewRoute" class="add-route-form">
+      <div class="form-group">
+        <label>起始地点:</label>
+        <input v-model="newRouteForm.startName" type="text" placeholder="起始地名" required />
+        <div class="coordinate-inputs">
+          <input v-model.number="newRouteForm.startLon" type="number" step="0.000001" placeholder="经度" required />
+          <input v-model.number="newRouteForm.startLat" type="number" step="0.000001" placeholder="纬度" required />
+          <button type="button" class="map-select-btn" @click="startMapSelection('start')">
+            地图选点
           </button>
         </div>
+      </div>
 
-        <div class="form-group">
-              <label>飞行器型号:</label>
-              <input v-model="newRouteForm.aircraftModel" type="text" placeholder="例如: DJI Mavic 3" required />
-            </div>
-            
-            <div class="form-group">
-              <label>总飞行高度:</label>
-              <input v-model.number="newRouteForm.flightHeight" type="number" step="10" placeholder="飞行高度(m)" required />
-            </div>
-            
-            <div class="form-row">
-              <div class="form-group half-width">
-                <label>起始时间:</label>
-                <input 
-                  v-model="newRouteForm.startTime" 
-                  type="datetime-local" 
-                  :min="todayMin" 
-                  :max="todayMax"
-                  required 
-                />
-              </div>
-              
-              <div class="form-group half-width">
-                <label>终止时间:</label>
-                <input 
-                  v-model="newRouteForm.endTime" 
-                  type="datetime-local" 
-                  :min="newRouteForm.startTime || todayMin" 
-                  :max="todayMax"
-                  required 
-                />
-              </div>
-            </div>
-      </form>
-      <template #footer>
-        <div class="dialog-footer">
-          <button class="cancel-btn" @click="closeAddRouteModal">取消</button>
-          <button class="confirm-btn" @click="addNewRoute">确定添加</button>
+      <div class="form-group">
+        <label>终点:</label>
+        <input v-model="newRouteForm.endName" type="text" placeholder="终点地名" required />
+        <div class="coordinate-inputs">
+          <input v-model.number="newRouteForm.endLon" type="number" step="0.000001" placeholder="经度" required />
+          <input v-model.number="newRouteForm.endLat" type="number" step="0.000001" placeholder="纬度" required />
+          <button type="button" class="map-select-btn" @click="startMapSelection('end')">
+            地图选点
+          </button>
         </div>
-      </template>
-    </DialogContainer>
+      </div>
+
+      <div class="form-group">
+        <label>途经点:</label>
+        <div class="waypoints-list">
+          <div v-for="(waypoint, index) in newRouteForm.waypoints" :key="index" class="waypoint-item">
+            <input v-model="waypoint.name" type="text" placeholder="途经点名称" />
+            <div class="coordinate-inputs">
+              <input v-model.number="waypoint.lon" type="number" step="0.000001" placeholder="经度" required />
+              <input v-model.number="waypoint.lat" type="number" step="0.000001" placeholder="纬度" required />
+              <button type="button" class="map-select-btn" @click="startMapSelection(`waypoint_${index}`)">
+                地图选点
+              </button>
+            </div>
+            <button type="button" class="remove-waypoint-btn" @click="removeWaypoint(index)">
+              删除
+            </button>
+          </div>
+        </div>
+        <button type="button" class="add-waypoint-btn" @click="addWaypoint">
+          + 添加途经点
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label>飞行器型号:</label>
+        <input v-model="newRouteForm.aircraftModel" type="text" placeholder="例如: DJI Mavic 3" required />
+      </div>
+
+      <div class="form-group">
+        <label>总飞行高度:</label>
+        <input v-model.number="newRouteForm.flightHeight" type="number" step="10" placeholder="飞行高度(m)" required />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group half-width">
+          <label>起始时间:</label>
+          <input v-model="newRouteForm.startTime" type="datetime-local" :min="todayMin" :max="todayMax" required />
+        </div>
+
+        <div class="form-group half-width">
+          <label>终止时间:</label>
+          <input v-model="newRouteForm.endTime" type="datetime-local" :min="newRouteForm.startTime || todayMin"
+            :max="todayMax" required />
+        </div>
+      </div>
+    </form>
+    <template #footer>
+      <div class="dialog-footer">
+        <button class="cancel-btn" @click="closeAddRouteModal">取消</button>
+        <button class="confirm-btn" @click="addNewRoute">确定添加</button>
+      </div>
+    </template>
+  </DialogContainer>
 </template>
 
 <script setup>
-import { ref, computed, onMounted,watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import * as Cesium from 'cesium';
 import RouterRisk from "@/components/business/RouterRisk/index.vue";
 import { useCesium } from "@/hooks/useCesium";
 import eventManager from "@/cesium/core/eventManager";
 import DialogContainer from "@/components/common/DialogContainer.vue";
 import { useRouteStore } from "@/store/modules/routeStore"; // 引入store
+import { useHeatmapStore } from "@/store/modules/heatmap"; // 引入热力图store
 import routeManager from "@/cesium/entities/routes"; // 导入航线管理器
-import {useWindStore} from '@/store/modules/wind'
+import { useWindStore } from '@/store/modules/wind'
 const routeStore = useRouteStore();
+const heatmapStore = useHeatmapStore();
 
 // 状态管理
 const routes = ref([]);
 const isLoading = ref(true);
-const isRefreshing = ref(false);
 const searchKeyword = ref("");
-const showAnalysisModal = ref(false);
 const currentRoute = ref(null);
 const currentRouteData = ref([]);
 // 历史记录展开状态管理
@@ -274,10 +259,10 @@ const startMapSelection = (target) => {
   selectingPointTarget.value = target;
   // 关闭弹窗
   showAddRouteModalFlag.value = false;
-  
+
   // // 修改鼠标样式
   // document.body.style.cursor = 'crosshair';
-  
+
   // 添加地图点击事件监听
   const handleMapClick = (viewer, movement) => {
     // 使用Cesium API将屏幕坐标转换为经纬度
@@ -293,13 +278,13 @@ const startMapSelection = (target) => {
         stopMapSelection();
         // 重新打开弹窗
         console.log('dakai');
-        
+
         showAddRouteModalFlag.value = true;
       }
     }
     return true; // 表示事件已处理
   };
-  
+
   // 使用eventManager注册点击事件
   eventManager.registerClickHandler(handleMapClick);
 };
@@ -307,7 +292,7 @@ const startMapSelection = (target) => {
 // 填充选中的坐标
 const fillSelectedCoordinates = (position) => {
   const [longitude, latitude] = position;
-  
+
   if (selectingPointTarget.value === 'start') {
     newRouteForm.value.startLon = longitude;
     newRouteForm.value.startLat = latitude;
@@ -341,306 +326,30 @@ const filteredRoutes = computed(() => {
   );
 });
 
-// 生成模拟航线列表数据
-const generateRoutes = () => {
-  const routeCount = 5 + Math.floor(Math.random() * 6);
-  const result = [];
 
-  for (let i = 0; i < routeCount; i++) {
-    const segments = 3 + Math.floor(Math.random() * 8); // 3-10段（便于可视化）
-    const length = 10 + Math.random() * 40; // 10-50km
-
-    const segmentData = generateRouteData(segments, length);
-    const risks = segmentData.map((s) => s.risk);
-    const averageRisk = risks.reduce((sum, r) => sum + r, 0) / risks.length;
-    const highestRisk = Math.max(...risks);
-    const highestRiskSegment = risks.indexOf(highestRisk) + 1;
-
-    // 生成贴合截图的航线名称
-    const locationPairs = [
-      "万达天健湖站-柳树塘公交站",
-      "血液中心站-华安脑科医院站",
-      "合肥三院-滨湖站",
-      "合肥妇保东区站-南院站",
-      "基地X-作业区1",
-      "机场A-作业区2",
-      "作业区3-机场B",
-    ];
-    const randomName =
-      locationPairs[Math.floor(Math.random() * locationPairs.length)];
-
-    // 从完整名称中解析出起点和终点名称
-    const [startName, endName] = randomName.split("-");
-
-    // 在初始生成时就创建waypoints数组，避免后续点击时转换
-    const waypoints = [];
-    const dangers = []; // 存储每个航段的危险等级
-
-    if (segmentData.length > 0) {
-      // 添加第一个航段的起点
-      waypoints.push({
-        longitude: segmentData[0].startCoordinates[0],
-        latitude: segmentData[0].startCoordinates[1],
-      });
-
-      // 添加所有航段的终点，并设置对应的危险等级
-      segmentData.forEach((segment, index) => {
-        waypoints.push({
-          longitude: segment.endCoordinates[0],
-          latitude: segment.endCoordinates[1],
-        });
-        // 根据风险值设置危险等级（0-10范围），与地图组件的颜色映射保持一致
-        dangers.push(Math.round(segment.risk * 10));
-      });
-    }
-
-    // 为历史航线添加默认的时间信息
-    const now = new Date();
-    const startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0, 0); // 默认开始时间：今天10:00
-    const endTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 30, 0); // 默认结束时间：今天10:30
-    
-    result.push({
-      id: `route-${i + 1}`,
-      name: randomName,
-      startName,
-      endName,
-      length,
-      segments,
-      averageRisk,
-      highestRisk,
-      highestRiskSegment,
-      segmentData,
-      waypoints,
-      dangers, // 存储航段危险等级，用于地图上的颜色显示
-      height:300,
-      startTime: startTime,
-      endTime: endTime
-    });
-  }
-  return result;
-};
-
-// 生成单个航线的详细数据（优化航段距离计算）
-const generateRouteData = (segments, totalLength) => {
-  const segmentData = [];
-  let accumulatedDistance = 0;
-
-  // 获取风场数据，确保航线穿过风场区
-  const windStore = useWindStore();
-  const windData = windStore.windData;
-  
-  // 默认风场边界（从mock数据中提取的实际边界）
-  let windBounds = {
-    west: 120.30,
-    south: 36.05,
-    east: 120.45,
-    north: 36.20
-  };
-  
-  // 如果有风场数据，使用实际的风场边界
-  if (windData && windData.layers && windData.layers.length > 0) {
-    windBounds = windData.layers[0].windData.bounds;
-  }
-  
-  // 在风场边界内生成起点坐标
-  const startLon = windBounds.west + Math.random() * (windBounds.east - windBounds.west);
-  const startLat = windBounds.south + Math.random() * (windBounds.north - windBounds.south);
-  
-  // 生成终点坐标，在风场边界内，距离起点有一定距离
-  const distanceFactor = 0.3; // 控制终点与起点的距离，0.3表示30%的风场宽度
-  const maxDistanceLon = (windBounds.east - windBounds.west) * distanceFactor;
-  const maxDistanceLat = (windBounds.north - windBounds.south) * distanceFactor;
-  
-  let endLon = startLon + (Math.random() * maxDistanceLon * 2 - maxDistanceLon);
-  let endLat = startLat + (Math.random() * maxDistanceLat * 2 - maxDistanceLat);
-  
-  // 确保终点也在风场范围内
-  endLon = Math.max(windBounds.west, Math.min(windBounds.east, endLon));
-  endLat = Math.max(windBounds.south, Math.min(windBounds.north, endLat));
-
-  for (let i = 0; i < segments; i++) {
-    // 随机生成单个航段长度（总和=总长度）
-    const segmentLength = 
-      i === segments - 1 
-        ? totalLength - accumulatedDistance 
-        : (totalLength - accumulatedDistance) * (0.1 + Math.random() * 0.2);
-
-    accumulatedDistance += segmentLength;
-    const baseRisk = 0.2 + Math.sin(i * 0.6) * 0.3 + Math.random() * 0.4;
-    const risk = Math.min(1, Math.max(0, baseRisk));
-
-    // 计算当前段的起始和结束坐标
-    const progress = i / segments;
-    const nextProgress = (i + 1) / segments;
-
-    // 基础直线坐标
-    const startSegmentLon = startLon + (endLon - startLon) * progress;
-    const startSegmentLat = startLat + (endLat - startLat) * progress;
-    const endSegmentLon = startLon + (endLon - startLon) * nextProgress;
-    const endSegmentLat = startLat + (endLat - startLat) * nextProgress;
-
-    // 增加随机偏移，使航线更加曲折
-    // 生成多个控制点，增加路径的曲折度
-    const offsetScale = 0.04; // 增加偏移范围，使航线更曲折
-    
-    // 生成两个控制点，增加路径的曲折度
-    const t1 = 1/3;
-    const t2 = 2/3;
-    
-    // 第一个控制点
-    const mid1Lon = startSegmentLon + (endSegmentLon - startSegmentLon) * t1;
-    const mid1Lat = startSegmentLat + (endSegmentLat - startSegmentLat) * t1;
-    const offset1Lon = (Math.random() - 0.5) * offsetScale;
-    const offset1Lat = (Math.random() - 0.5) * offsetScale;
-    
-    // 第二个控制点
-    const mid2Lon = startSegmentLon + (endSegmentLon - startSegmentLon) * t2;
-    const mid2Lat = startSegmentLat + (endSegmentLat - startSegmentLat) * t2;
-    const offset2Lon = (Math.random() - 0.5) * offsetScale;
-    const offset2Lat = (Math.random() - 0.5) * offsetScale;
-
-    // 使用三次贝塞尔曲线生成更曲折的路径
-    const pathCoordinates = generateCubicBezierPath(
-      [startSegmentLon, startSegmentLat],
-      [mid1Lon + offset1Lon, mid1Lat + offset1Lat],
-      [mid2Lon + offset2Lon, mid2Lat + offset2Lat],
-      [endSegmentLon, endSegmentLat],
-      15 // 每个航段15个点，使路径更平滑
-    );
-
-    segmentData.push({
-      segment: i + 1,
-      distance: accumulatedDistance,
-      segmentLength, // 单个航段长度（用于可视化）
-      risk,
-      windSpeed: +(3 + Math.random() * 12).toFixed(1),
-      windDir: Math.floor(Math.random() * 360),
-      windShear: risk * 10,
-      turbulence: +(risk * 8 + Math.random() * 2).toFixed(1),
-      rainfall: +(risk * 4 + Math.random() * 1).toFixed(1),
-      startCoordinates: [startSegmentLon, startSegmentLat],
-      endCoordinates: [endSegmentLon, endSegmentLat],
-      pathCoordinates: pathCoordinates, // 存储完整的航段路径坐标
-    });
-  }
-  return segmentData;
-};
-
-// 使用二次贝塞尔曲线生成平滑路径
-const generateBezierPath = (start, control, end, numPoints) => {
-  const path = [];
-  for (let i = 0; i <= numPoints; i++) {
-    const t = i / numPoints;
-    const x = 
-      (1 - t) * (1 - t) * start[0] + 
-      2 * (1 - t) * t * control[0] + 
-      t * t * end[0];
-    const y = 
-      (1 - t) * (1 - t) * start[1] + 
-      2 * (1 - t) * t * control[1] + 
-      t * t * end[1];
-    path.push([x, y]);
-  }
-  return path;
-};
-
-// 使用三次贝塞尔曲线生成更曲折的路径
-const generateCubicBezierPath = (start, control1, control2, end, numPoints) => {
-  const path = [];
-  for (let i = 0; i <= numPoints; i++) {
-    const t = i / numPoints;
-    
-    // 三次贝塞尔曲线公式
-    const x = Math.pow(1 - t, 3) * start[0] + 
-              3 * Math.pow(1 - t, 2) * t * control1[0] + 
-              3 * (1 - t) * Math.pow(t, 2) * control2[0] + 
-              Math.pow(t, 3) * end[0];
-    
-    const y = Math.pow(1 - t, 3) * start[1] + 
-              3 * Math.pow(1 - t, 2) * t * control1[1] + 
-              3 * (1 - t) * Math.pow(t, 2) * control2[1] + 
-              Math.pow(t, 3) * end[1];
-    
-    path.push([x, y]);
-  }
-  return path;
-};
-
-// 计算航段可视化宽度（占总长度的百分比）
-const getSegmentWidth = (segment, route) => {
-  return (segment.segmentLength / route.length) * 95; // 95%避免溢出，留5%间距
-};
 
 // 加载航线数据
 const loadRoutes = async () => {
   isLoading.value = true;
-  try {
-    const { getRoutes } = await import('@/api');
-    const routeData = await getRoutes();
-    if (routeData && routeData.routes) {
-      routes.value = routeData.routes.map(route => ({
-        ...route,
-        // 确保时间格式正确
-        startTime: route.startTime ? new Date(route.startTime) : new Date(),
-        endTime: route.endTime ? new Date(route.endTime) : new Date()
-      }));
-    } else {
-      routes.value = [];
-    }
-  } catch (error) {
-    console.error("加载航线数据失败:", error);
-    // 降级使用模拟数据
-    routes.value = generateRoutes();
-  } finally {
-    isLoading.value = false;
-  }
-};
 
-// 刷新航线数据
-const refreshRoutes = async () => {
-  isRefreshing.value = true;
-  try {
-    const { getRoutes } = await import('@/api');
-    const routeData = await getRoutes();
-    if (routeData && routeData.routes) {
-      routes.value = routeData.routes.map(route => ({
-        ...route,
-        startTime: route.startTime ? new Date(route.startTime) : new Date(),
-        endTime: route.endTime ? new Date(route.endTime) : new Date()
-      }));
-    }
-  } catch (error) {
-    console.error("刷新航线数据失败:", error);
-  } finally {
-    isRefreshing.value = false;
-  }
-};
-
-// 查询当前航线（底部面板）
-const queryCurrentRoute = (route) => {
-  // 确保当前航线已选择
-  if (route.id !== routeStore.renderedRouteId) {
-    onRouteClick(route);
+  const { getRoutes } = await import('@/api');
+  const routeData = await getRoutes();
+  if (routeData && routeData.routes) {
+    routes.value = routeData.routes.map(route => ({
+      ...route,
+      // 确保时间格式正确
+      startTime: route.startTime ? new Date(route.startTime) : new Date(),
+      endTime: route.endTime ? new Date(route.endTime) : new Date()
+    }));
+  } else {
+    routes.value = [];
   }
 
-  // 设置航线数据用于分析
-  currentRouteData.value = route.segmentData;
+  isLoading.value = false;
+
 };
 
-// 关闭查询面板
-const closeQueryPanel = () => {
-  currentRouteData.value = [];
-};
 
-// 打开航线分析弹窗（保留但不再使用）
-const openAnalysis = (route) => {
-  // 这个方法现在不再使用，改为底部面板显示
-};
-
-// 关闭弹窗（保留但不再使用）
-const closeModal = () => {
-  // 这个方法现在不再使用
-};
 
 // 清空历史分析记录
 const clearHistory = () => {
@@ -649,39 +358,7 @@ const clearHistory = () => {
   }
 };
 
-// 导出分析报告
-const exportAnalysis = () => {
-  if (!currentRoute.value) {
-    console.warn("没有选中的航线可供导出");
-    return;
-  }
 
-  alert(`正在导出 ${currentRoute.value.name} 的分析报告...`);
-};
-/**
- * todo :
- */
-// 航段tooltip位置设置
-const setTooltipPos = (idx, routeId) => {
-  // 使用 nextTick 确保 DOM 更新后再获取位置
-  setTimeout(() => {
-    const element = document.querySelector(
-      `[data-route-id="${routeId}"] .segment-bar:nth-child(${idx + 1})`
-    );
-    if (element) {
-      const rect = element.getBoundingClientRect();
-      tooltipLeft.value = rect.left + window.scrollX + 10;
-      tooltipTop.value = rect.bottom + window.scrollY + 10;
-    }
-  }, 0);
-};
-
-// 风险辅助函数（复用原有）
-const getRiskColor = (value) => {
-  if (value < 0.3) return "#10b981"; // 低风险-绿
-  if (value < 0.7) return "#f59e0b"; // 中风险-黄
-  return "#ef4444"; // 高风险-红
-};
 const getRiskClass = (value) => {
   if (value < 0.3) return "low";
   if (value < 0.7) return "medium";
@@ -694,25 +371,25 @@ const getRiskText = (value) => {
 };
 // 新增：列表点击事件（核心！）
 const onRouteClick = async (route) => {
-  try {
-    // 获取航路详情
-    const { getRouteDetail } = await import('@/api');
-    const detailData = await getRouteDetail(route.id);
-    
-    // 合并详情数据
-    const fullRouteData = {
-      ...route,
-      ...detailData,
-      // 确保 segmentData 格式一致
-      segmentData: route.segmentData || []
-    };
-    
-    routeStore.setCurrentRoute(fullRouteData);
-  } catch (error) {
-    console.error("获取航路详情失败:", error);
-    // 降级使用列表数据
-    routeStore.setCurrentRoute(route);
-  }
+
+  // 获取航路详情
+  const { getRouteDetail } = await import('@/api');
+  const detailData = await getRouteDetail(route.id);
+
+  // 合并详情数据
+  const fullRouteData = {
+    ...route,
+    ...detailData,
+    // 确保 segmentData 格式一致
+    segmentData: route.segmentData || []
+  };
+
+  routeStore.setCurrentRoute(fullRouteData);
+
+
+  // 切换到全市热力图模式
+  heatmapStore.switchToCitywideMode();
+  console.log('切换到全市热力图模式，当前模式:', heatmapStore.heatmapMode);
 
   // 2. 可选：滚动/高亮当前航线
   document.querySelector(`[data-route-id="${route.id}"]`)?.scrollIntoView({
@@ -731,6 +408,9 @@ const releaseRoute = () => {
 // 清屏功能，取消屏幕上的航线预览
 const clearScreen = () => {
   releaseRoute();
+  // 恢复区域热力图模式
+  heatmapStore.resetToDefault();
+  console.log('清屏，恢复区域热力图模式，当前模式:', heatmapStore.heatmapMode);
 };
 
 onMounted(() => {
@@ -793,7 +473,7 @@ const closeAddRouteModal = () => {
     endTime: todayMax.value,
   };
   console.log('guanbi ');
-  
+
 };
 
 // 添加途经点
@@ -810,8 +490,8 @@ const removeWaypoint = (index) => {
   newRouteForm.value.waypoints.splice(index, 1);
 };
 
-// 添加新航线
-const addNewRoute = () => {
+// 添加新航线（前端只传递基本数据，后端计算里程、风险等）
+const addNewRoute = async () => {
   // 表单验证
   if (
     !newRouteForm.value.startName ||
@@ -831,7 +511,7 @@ const addNewRoute = () => {
   // 验证时间范围
   const startTime = new Date(newRouteForm.value.startTime);
   const endTime = new Date(newRouteForm.value.endTime);
-  
+
   if (endTime <= startTime) {
     alert("终止时间必须晚于起始时间");
     return;
@@ -851,143 +531,49 @@ const addNewRoute = () => {
     }
   }
 
-  // 构造航线数据，使用总飞行高度
-  const flightHeight = newRouteForm.value.flightHeight;
-  const waypoints = [
-    {
-      name: newRouteForm.value.startName,
-      longitude: newRouteForm.value.startLon,
-      latitude: newRouteForm.value.startLat,
-      height: flightHeight, // 使用总飞行高度
-    },
-    ...newRouteForm.value.waypoints.map((wp) => ({
-      name: wp.name || "途经点",
-      longitude: wp.lon,
-      latitude: wp.lat,
-      height: flightHeight, // 使用总飞行高度
-    })),
-    {
-      name: newRouteForm.value.endName,
-      longitude: newRouteForm.value.endLon,
-      latitude: newRouteForm.value.endLat,
-      height: flightHeight, // 使用总飞行高度
-    },
-  ];
-
-  // 计算航线段数
-  const segments = waypoints.length - 1;
-
-  // 生成模拟航线数据
-  const totalLength = calculateTotalDistance(waypoints);
-  const segmentData = generateRouteDataForCustomRoute(waypoints, totalLength);
-
-  const risks = segmentData.map((s) => s.risk);
-  const averageRisk = risks.reduce((sum, r) => sum + r, 0) / risks.length;
-  const highestRisk = Math.max(...risks);
-  const highestRiskSegment = risks.indexOf(highestRisk) + 1;
-
-  // 创建新航线对象
-  const newRoute = {
-    id: `route-${Date.now()}`,
-    name: `${newRouteForm.value.startName}-${newRouteForm.value.endName}`,
+  // 构造发送给后端的基本数据（不包含计算字段）
+  const routeRequestData = {
     startName: newRouteForm.value.startName,
+    startLon: newRouteForm.value.startLon,
+    startLat: newRouteForm.value.startLat,
     endName: newRouteForm.value.endName,
-    length: totalLength,
-    segments: segments,
-    averageRisk: averageRisk,
-    highestRisk: highestRisk,
-    highestRiskSegment: highestRiskSegment,
-    segmentData: segmentData,
-    waypoints: waypoints.map((wp) => ({
-      longitude: wp.longitude,
-      latitude: wp.latitude,
+    endLon: newRouteForm.value.endLon,
+    endLat: newRouteForm.value.endLat,
+    waypoints: newRouteForm.value.waypoints.map(wp => ({
+      name: wp.name || "途经点",
+      lon: wp.lon,
+      lat: wp.lat
     })),
-    dangers: risks.map((risk) => Math.round(risk * 10)),
     aircraftModel: newRouteForm.value.aircraftModel,
-    startTime: startTime, // 添加起始时间（Date对象）
-    endTime: endTime,     // 添加终止时间（Date对象）
+    flightHeight: newRouteForm.value.flightHeight,
+    startTime: startTime.toISOString(), // ISO字符串格式
+    endTime: endTime.toISOString(),     // ISO字符串格式
   };
 
-  // 添加到航线列表开头
-  routes.value.unshift(newRoute);
+  // 调用API保存航线到后端
+  const { createRoute } = await import('@/api');
+  const response = await createRoute(routeRequestData);
+  if (response && response.success) {
+    // 后端返回完整航线数据（包含计算后的字段）
+    const routeFromBackend = response.route;
 
-  // 设置当前航线，触发地图更新
-  routeStore.setCurrentRoute(newRoute);
+    // 保存成功后重新加载航线列表
+    await loadRoutes();
 
-  // 关闭模态框并重置表单
-  closeAddRouteModal();
+    // 设置当前航线，触发地图更新（使用后端返回的完整数据）
+    routeStore.setCurrentRoute(routeFromBackend);
+    heatmapStore.switchToCitywideMode();
 
-  alert("航线添加成功！");
-};
+    // 关闭模态框并重置表单
+    closeAddRouteModal();
 
-// 计算总距离
-const calculateTotalDistance = (waypoints) => {
-  let total = 0;
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    total += calculateDistance(
-      waypoints[i].longitude,
-      waypoints[i].latitude,
-      waypoints[i + 1].longitude,
-      waypoints[i + 1].latitude
-    );
-  }
-  return total;
-};
-
-// 计算两点间距离（简化版）
-const calculateDistance = (lon1, lat1, lon2, lat2) => {
-  // 使用简单的欧几里得距离估算（实际应用中应使用更精确的方法）
-  const dx = (lon2 - lon1) * 111.32; // 经度差转换为公里
-  const dy = (lat2 - lat1) * 110.57; // 纬度差转换为公里
-  return Math.sqrt(dx * dx + dy * dy);
-};
-
-// 为自定义航线生成数据
-const generateRouteDataForCustomRoute = (waypoints, totalLength) => {
-  const segmentData = [];
-  let accumulatedDistance = 0;
-
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    const start = [waypoints[i].longitude, waypoints[i].latitude];
-    const end = [waypoints[i + 1].longitude, waypoints[i + 1].latitude];
-
-    // 计算当前段长度
-    const segmentLength = calculateDistance(start[0], start[1], end[0], end[1]);
-    accumulatedDistance += segmentLength;
-
-    // 生成随机风险值
-    const baseRisk = 0.2 + Math.random() * 0.6;
-    const risk = Math.min(1, Math.max(0, baseRisk));
-
-    // 生成该航段的路径点
-    const pathCoordinates = generateBezierPath(
-      start,
-      [
-        (start[0] + end[0]) / 2 + (Math.random() - 0.5) * 0.02,
-        (start[1] + end[1]) / 2 + (Math.random() - 0.5) * 0.02,
-      ],
-      end,
-      10
-    );
-
-    segmentData.push({
-      segment: i + 1,
-      distance: accumulatedDistance,
-      segmentLength: segmentLength,
-      risk: risk,
-      windSpeed: +(3 + Math.random() * 12).toFixed(1),
-      windDir: Math.floor(Math.random() * 360),
-      windShear: risk * 10,
-      turbulence: +(risk * 8 + Math.random() * 2).toFixed(1),
-      rainfall: +(risk * 4 + Math.random() * 1).toFixed(1),
-      startCoordinates: start,
-      endCoordinates: end,
-      pathCoordinates: pathCoordinates,
-    });
+    alert("航线添加成功！");
+  } else {
+    alert(`航线添加失败: ${response?.message || '未知错误'}`);
   }
 
-  return segmentData;
 };
+
 </script>
 
 <style scoped lang="scss">
@@ -1930,12 +1516,12 @@ input[type="datetime-local"] {
   font-size: 14px;
   width: 100%;
   box-sizing: border-box;
-  
+
   &:focus {
     outline: none;
     border-color: #3b82f6;
   }
-  
+
   &::-webkit-calendar-picker-indicator {
     filter: invert(1);
     cursor: pointer;

@@ -12,135 +12,198 @@ export class PlaneModel {
     this.#entities = new Map() // routeId -> entity 存储创建的实体
   }
 
-  /**
-   * 创建实时数据驱动的飞机模型
-   * 用于WebSocket接收的模拟机数据驱动飞机运动
+
+/**
+   * 创建增强的飞机实体
+   * @param {String} routeId 飞机ID
+   * @param {Cesium.Cartesian3} position 初始位置
+   * @param {Object} options 配置选项
+   * @param {Function} options.getAttitude 获取姿态数据的函数 () => { heading, pitch, roll }
+   * @param {Function} options.getAltitude 获取高度数据的函数 () => number
+   * @param {Function} options.getFlightPath 获取飞行路径的函数 () => Array
+   * @param {Function} options.getRecordFlightPath 获取是否记录飞行路径的函数 () => boolean
    */
-  createRoutePlane(routeId, initialPosition, modelOptions = {}) {
-    if (!this.viewer) {
-      throw new Error('PlaneModel: Viewer is required');
-    }
-
-    if (!initialPosition) {
-      throw new Error('PlaneModel: initialPosition is required');
-    }
-
-    // 模型路径 - 优先使用自定义模型，否则使用Cesium内置模型
-    // 使用本地飞机模型路径
-    const modelUrl = '/cesium/model/plane/plane.glb';
-
-    // 初始化当前航线的飞机姿态
-    this.#planeAttitudes.set(routeId, {
-      heading: 0,
-      pitch: 0,
-      roll: 0
-    });
-
-    // 直接使用位置对象，不使用CallbackProperty
-    // 这样可以直接更新position属性
-
-    // 创建飞机 Entity
-    const planeEntity = this.viewer.entities.add({
-      id: routeId,
-      position: initialPosition,
-      // 飞机姿态（动态更新）
-      // orientation: new Cesium.CallbackProperty(
-      //   // 创建闭包函数，避免私有字段访问
-      //   (function (attitude, initialPosition) {
-      //     return function (time, result) {
-      //       if (!attitude) {
-      //         return result || Cesium.Quaternion.IDENTITY;
-      //       }
-
-      //       // 转换角度为弧度
-      //       const heading = Cesium.Math.toRadians(attitude.heading);
-      //       const pitch = Cesium.Math.toRadians(attitude.pitch);
-      //       const roll = Cesium.Math.toRadians(attitude.roll);
-
-      //       // 使用传入的初始位置，不要在回调中获取实体
-      //       const position = initialPosition;
-
-      //       // 计算姿态四元数
-      //       return Cesium.Transforms.headingPitchRollQuaternion(
-      //         position,
-      //         new Cesium.HeadingPitchRoll(heading, pitch, roll),
-      //         result
-      //       );
-      //     };
-      //   })(
-      //     // 传入当前姿态和初始位置（在创建时确定）
-      //     this.#planeAttitudes.get(routeId),
-      //     initialPosition
-      //   ),
-      //   false
-      // ),
-      model: {
-        uri: modelUrl,
-        scale: 4.0,
-        show: true,
-        minimumPixelSize: 64,
-        maximumScale: 20000,
-      },
-      // 添加飞机飞行路径
-      path: {
-        resolution: 1,
-        width: 15,
-        material: new Cesium.PolylineGlowMaterialProperty({
-          glowPower: 0.1,
-          color: Cesium.Color.ORANGE
-        })
-      },
-      // 添加常显标签，显示位置和高度信息
-      label: {
-        // 使用CallbackProperty动态更新标签内容
-        text: new Cesium.CallbackProperty((time) => {
+  createRoutePlane(routeId, position, options = {}) {
+    try {
+      console.log('[DEBUG] 创建增强飞机实体')
+      
+      // 使用本地小型飞机模型
+      const modelUri = '/cesium/model/plane/plane.glb'
+      
+      const entity = this.viewer.entities.add({
+        id: routeId,
+        name: 'ISIM实时飞机',
+        position: position,
+        // 使用优化的姿态更新
+        orientation: new Cesium.CallbackProperty((time) => {
           try {
-            const entity = planeEntity;
+            // 从选项中获取姿态数据
+            const attitude = options.getAttitude ? options.getAttitude() : { heading: 0, pitch: 0, roll: 0 }
+            // 将角度转换为弧度
+            const heading = Cesium.Math.toRadians(attitude.heading || 0)
+            const pitch = Cesium.Math.toRadians(attitude.pitch || 0)
+            const roll = Cesium.Math.toRadians(attitude.roll || 0)
+            
+            // 获取当前位置
+            const currentPosition = entity.position.getValue(time)
+            if (!currentPosition) {
+              return Cesium.Quaternion.IDENTITY
+            }
+            
+            return Cesium.Transforms.headingPitchRollQuaternion(
+              currentPosition,
+              new Cesium.HeadingPitchRoll(heading, pitch, roll)
+            )
+          } catch (error) {
+            console.warn('[DEBUG] 计算姿态时出错:', error)
+            return Cesium.Quaternion.IDENTITY
+          }
+        }, false),
+        // 使用本地小型飞机模型
+        model: {
+          uri: modelUri,
+          scale: 20.0, // 适当放大
+          show: true,
+          minimumPixelSize: 40, // 增大最小像素大小
+          maximumScale: 80000,
+          runAnimations: true,
+          
+        },
+        // 添加增强的标签
+        label: {
+          // 使用CallbackProperty动态更新标签内容
+          text: new Cesium.CallbackProperty((time) => {
+            const entity = this.#entities.get(routeId);
             if (!entity) return '';
-
+            
             const position = entity.position.getValue(time);
             if (position) {
               const cartographic = Cesium.Cartographic.fromCartesian(position);
               const longitude = Cesium.Math.toDegrees(cartographic.longitude).toFixed(4);
               const latitude = Cesium.Math.toDegrees(cartographic.latitude).toFixed(4);
               const height = cartographic.height.toFixed(0);
+              
+              // 获取实时风速
+              let windSpeed = 0;
 
-              // 获取当前姿态
-              const attitude = this.#planeAttitudes.get(routeId);
-              if (!attitude) return '';
+              try {
+                // 尝试获取风场数据，但确保在风场数据未准备好时不会影响飞机显示
+                const windStore = useWindStore();
+                const windLayers = windStore.windLayer;
 
-              return `ISIM实时飞机\n经度: ${longitude}°\n纬度: ${latitude}°\n高度: ${height}m\n姿态: 滚转${attitude.roll.toFixed(1)}° 俯仰${attitude.pitch.toFixed(1)}° 航向${attitude.heading.toFixed(1)}°`;
+                if (windLayers && Array.isArray(windLayers) && windLayers.length > 0) {
+                  // 获取当前位置的经纬度（转换为数字类型）
+                  const lonNum = parseFloat(longitude);
+                  const latNum = parseFloat(latitude);
+
+                  // 遍历所有风场图层，获取最接近当前高度的风场数据
+                  let closestWindData = null;
+                  let minHeightDiff = Infinity;
+
+                  for (const windLayer of windLayers) {
+                    if (windLayer && typeof windLayer.getDataAtLonLat === 'function') {
+                      try {
+                        const windData = windLayer.getDataAtLonLat(lonNum, latNum);
+                        if (windData && typeof windData.interpolated.speed === 'number') {
+                          // 获取当前图层的高度
+                          const layerIndex = windLayers.indexOf(windLayer);
+                          const layerHeight = windStore.windData?.layers?.[layerIndex]?.height || 0;
+                          const heightDiff = Math.abs(parseFloat(height) - layerHeight);
+
+                          // 找到最接近当前高度的风场数据
+                          if (heightDiff < minHeightDiff) {
+                            minHeightDiff = heightDiff;
+                            closestWindData = windData;
+                          }
+                        }
+                      } catch (error) {
+                        // 忽略风场数据获取错误，确保飞机正常显示
+                      }
+                    }
+                  }
+
+                  // 使用最接近的风场数据
+                  if (closestWindData) {
+                    windSpeed = closestWindData.interpolated.speed.toFixed(1);
+                  }
+                }
+              } catch (error) {
+                // 忽略所有错误，确保飞机正常显示
+              }
+
+              return `经：${longitude}° 纬：${latitude}°
+  高：${height}m 风速：${windSpeed}m/s`;
             }
             return '';
-          } catch (error) {
-            console.error('更新标签失败:', error);
-            return '';
-          }
-        }, false),
-        // 标签样式
-        font: '12px sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(0, 0, 0, 0.7)'),
-        backgroundPadding: new Cesium.Cartesian2(10, 5),
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        verticalOrigin: Cesium.VerticalOrigin.TOP,
-        pixelOffset: new Cesium.Cartesian2(0, -60), // 显示在飞机上方
-        disableDepthTestDistance: Number.POSITIVE_INFINITY // 确保标签始终可见
-      }
-    });
-
-    // 存储实体引用
-    this.#entities.set(routeId, planeEntity);
-
-    // 触发场景重绘
-    this.viewer.scene.requestRender();
-
-    return planeEntity;
+          }, false),
+          // 标签样式
+          font: '12px sans-serif',
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          showBackground:true,
+          backgroundColor: Cesium.Color.fromCssColorString('rgba(0, 0, 0, 0.7)'),
+          backgroundPadding: new Cesium.Cartesian2(10, 5),
+          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+          verticalOrigin: Cesium.VerticalOrigin.TOP,
+          pixelOffset: new Cesium.Cartesian2(0, -60), // 显示在飞机上方
+          disableDepthTestDistance: Number.POSITIVE_INFINITY // 确保标签始终可见
+        },
+        // 添加增强的路径线
+        path: {
+          resolution: 1,
+          width: 8,
+          material: new Cesium.PolylineGlowMaterialProperty({
+            glowPower: 0.2,
+            color: Cesium.Color.fromBytes(59, 130, 246, 180) // 半透明蓝色
+          }),
+          show: options.getRecordFlightPath ? options.getRecordFlightPath() : false,
+          leadTime: 0,
+          trailTime: 60, // 轨迹保留60秒
+          zIndex: 1
+        },
+        // 添加飞机灯光效果
+        point: {
+          pixelSize: 10,
+          color: Cesium.Color.fromBytes(255, 255, 0, 200),
+          outlineColor: Cesium.Color.YELLOW,
+          outlineWidth: 2,
+          show: true
+        },
+        // 添加尾迹效果
+        polyline: {
+          positions: new Cesium.CallbackProperty(() => {
+            const flightPath = options.getFlightPath ? options.getFlightPath() : []
+            if (flightPath.length < 2) return []
+            const recentPath = flightPath.slice(-20) // 最近20个点
+            return recentPath.map(point => Cesium.Cartesian3.fromDegrees(
+              point.lon,
+              point.lat,
+              point.alt
+            ))
+          }, false),
+          width: 6,
+          material: new Cesium.PolylineGlowMaterialProperty({
+            glowPower: 0.3,
+            color: Cesium.Color.fromBytes(16, 185, 129, 150)
+          }),
+          show: new Cesium.CallbackProperty(() => {
+            return options.getRecordFlightPath ? options.getRecordFlightPath() : false
+          }, false)
+        }
+      })
+      
+      // 存储实体引用
+      this.#entities.set(routeId, entity)
+      
+      console.log('[DEBUG] 增强飞机实体创建成功')
+      return entity
+      
+    } catch (error) {
+      console.error('[DEBUG] 创建增强飞机实体失败:', error)
+      return null
+    }
   }
-
   /**
    * 更新飞机位置
    * @param {String} routeId 飞机ID

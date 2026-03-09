@@ -24,25 +24,10 @@ export const useRouteStore = defineStore('route', {
     },
     // 设置选中航线（列表点击时调用）
     setCurrentRoute(route) {
-      try {
-        // 确保route对象有效
-        if (!route || typeof route !== 'object') {
-          console.error('无效的航线数据:', route);
-          throw new Error('无效的航线数据');
-        }
-        
-        // 确保有必要的属性
-        if (!route.id) {
-          console.warn('航线缺少id属性，使用默认id');
-          route.id = `route_${Date.now()}`;
-        }
-        
-        if (!route.name) {
-          route.name = '未命名航线';
-        }
-        
+          const [startName, endName] = route.name.split("-");
+
         // 转换列表航线数据为Cesium需要的格式
-        const cesiumRoute = {
+        this.currentRoute  = {
           id: route.id,
           name: route.name,
           // 航点：从segmentData提取首尾坐标（如果列表有经纬度，替换成真实值）
@@ -66,36 +51,14 @@ export const useRouteStore = defineStore('route', {
           segmentData: route.segmentData || [],
           // 添加时间信息
           startTime: route.startTime,
-          endTime: route.endTime
+          endTime: route.endTime,
+          length:1,startName:startName,endName:endName
         }
-        
-        // 创建新的currentRoute对象，确保包含所有必要属性
-        this.currentRoute = {
-          ...route,
-          waypoints: cesiumRoute.waypoints,
-          startTime: route.startTime || Date.now(),
-          endTime: route.endTime || Date.now() + 3600000, // 默认1小时后
-          id: route.id,
-          name: route.name
-        };
         
         this.renderedRouteId = route.id;
         
         console.log('成功设置当前航线:', route.id, route.name);
-      } catch (error) {
-        console.error('设置当前航线失败:', error);
-        // 设置一个最小化的有效航线对象，防止应用崩溃
-        this.currentRoute = {
-          id: route?.id || `error_route_${Date.now()}`,
-          name: route?.name || '错误航线',
-          waypoints: [],
-          segmentData: [],
-          startTime: Date.now(),
-          endTime: Date.now() + 3600000
-        };
-        this.renderedRouteId = '';
-        throw error; // 重新抛出错误，让调用者知道
-      }
+       
     },
     // 把列表的segmentData转成Cesium的waypoints（关键转换）
     convertSegmentsToWaypoints(segmentData) {

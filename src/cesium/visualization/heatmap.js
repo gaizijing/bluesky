@@ -3,15 +3,70 @@ import h337 from 'heatmap.js';
 import { useHeatmapStore } from '@/store/modules/heatmap';
 import { useLayerSettingsStore } from '@/store/modules/layerSettings';
 import { watch } from 'vue';
+import { getCitywideHeatmap, getWeatherHeatmapGeo } from '@/api';
 /**
- * 👉 生成热力图数据
+ * 👉 加载热力图数据（根据当前模式）
+ */
+const loadHeatmapData = async (heatmapMode, currentPointId = null) => {
+  try {
+    let heatmapData = null;
+    
+    if (heatmapMode === 'citywide') {
+      console.log('[热力图] 加载全市热力图数据');
+      // 使用API获取全市热力图数据
+      const response = await getCitywideHeatmap({
+        resolution: 'medium'
+      });
+      
+      if (response && response.data && response.data.points) {
+        heatmapData = {
+          points: response.data.points
+        };
+        console.log('[热力图] 使用API获取的全市热力图数据，点数:', heatmapData.points.length);
+      } 
+    } else {
+      // 区域模式 - 使用API获取区域热力图数据
+      console.log('[热力图] 加载区域热力图数据');
+      if (currentPointId) {
+        const response = await getWeatherHeatmapGeo({
+          pointId: currentPointId,
+          resolution: 'medium',
+          time: new Date()
+        });
+        
+        if (response && response.data && response.data.points) {
+          heatmapData = {
+            points: response.data.points
+          };
+          console.log('[热力图] 使用API获取的区域热力图数据，点数:', heatmapData.points.length);
+        } 
+      } 
+    }
+    
+    return heatmapData;
+  } catch (error) {
+    console.error('[热力图] 加载热力图数据失败:', error);
+  }
+};
+
+/**
+ * 👉 生成热力图
  */
 export const initHeatVolume = async (viewer) => {
   try {
     const heatmapStore = useHeatmapStore();
     const layerSettingsStore = useLayerSettingsStore();
+    
+    // 初始加载数据
+    const initialData = await loadHeatmapData(heatmapStore.heatmapMode, heatmapStore.currentPointId);
+    
+    // 如果有数据，设置到store
+    if (initialData) {
+      heatmapStore.setHeatmapData(initialData);
+    }
+    
     const data = heatmapStore.heatmapData;
-    console.log('热力图数据:', data);
+    console.log('[热力图] 初始化，模式:', heatmapStore.heatmapMode, '数据:', data);
     
     // 创建3D热力图
     let heatMapInstance;
@@ -23,10 +78,11 @@ export const initHeatVolume = async (viewer) => {
         lnglat: [point.lon, point.lat],
         value: point.value
       }));
+      console.log('[热力图] 转换数据点数量:', heatmapPoints.length);
     } else {
       // 如果没有数据，使用默认的空数据
       heatmapPoints = [];
-      console.log('热力图数据未加载，使用空数据初始化');
+      console.log('[热力图] 数据未加载，使用空数据初始化');
     }
 
     // 创建3D热力图
@@ -43,27 +99,160 @@ export const initHeatVolume = async (viewer) => {
       },
     });
     
+    // 存储热力图实例到store（关键修复）
+    if (heatMapInstance) {
+      heatmapStore.setHeatmapLayer(heatMapInstance);
+    }
+    
     // 监听热力图数据变化，使用updateData方法更新热力图
     if (heatMapInstance) {
       watch(
-        [() => heatmapStore.heatmapData, () => layerSettingsStore.layers.temperature?.visible],
-        ([newData, isHeatmapVisible]) => {
+        [
+          () => heatmapStore.heatmapData, 
+          () => layerSettingsStore.layers.temperature?.visible,
+          () => heatmapStore.heatmapMode,  // 监听模式变化
+          () => heatmapStore.currentPointId  // 新增：监听区域ID变化
+        ],
+        async ([newData, isHeatmapVisible, newMode, newPointId], [oldData, oldVisible, oldMode, oldPointId]) => {
+          // 1. 模式变化时处理数据（优先级最高）
+          if (newMode !== oldMode) {
+            console.log('[热力图] 模式变化:', oldMode, '->', newMode);
+            try {
+              // 销毁当前热力图实例，避免叠加绘制
+              const currentInstance = heatmapStore.heatmapLayer;
+              if (currentInstance && currentInstance.destroy) {
+                console.log('[热力图] 销毁当前热力图实例');
+                currentInstance.destroy();
+                heatmapStore.setHeatmapLayer(null);
+              }
+              
+              // 加载新数据
+              let heatmapData = null;
+              if (newMode === 'area' && heatmapStore.lastAreaHeatmapData && 
+                  heatmapStore.lastAreaPointId === newPointId) {
+                console.log('[热力图] 切回区域模式，使用存储的区域热力图数据，pointId:', newPointId);
+                heatmapData = heatmapStore.lastAreaHeatmapData;
+              } else {
+                // 调用API加载数据
+                heatmapData = await loadHeatmapData(newMode, newPointId);
+              }
+              
+              // 如果有数据，创建新的热力图实例
+              if (heatmapData && heatmapData.points && heatmapData.points.length > 0) {
+                console.log('[热力图] 创建新的热力图实例，数据点数:', heatmapData.points.length);
+                // 转换数据格式
+                const heatmapPoints = heatmapData.points.map(point => ({
+                  lnglat: [point.lon, point.lat],
+                  value: point.value
+                }));
+                
+                // 创建新的热力图实例
+                const newHeatMapInstance = create3DHeatmap(viewer, {
+                  dataPoints: heatmapPoints,
+                  radius: 15,
+                  baseElevation: 100,
+                  primitiveType: "TRIANGLES",
+                  colorGradient: {
+                    ".3": "blue",
+                    ".5": "green",
+                    ".7": "yellow",
+                    ".95": "red",
+                  },
+                });
+                
+                // 存储到store
+                heatmapStore.setHeatmapLayer(newHeatMapInstance);
+                // 更新store数据（确保一致性）
+                heatmapStore.setHeatmapData(heatmapData);
+                console.log('[热力图] 模式切换完成，新实例已创建');
+              } else {
+                console.warn('[热力图] 模式切换失败：未获取到有效数据');
+                // 设置空数据，避免显示旧数据
+                heatmapStore.setHeatmapData(null);
+              }
+            } catch (error) {
+              console.error('[热力图] 模式切换时处理数据失败:', error);
+            }
+            return; // 模式切换处理完毕，不执行下面的数据更新逻辑
+          }
+          
+          // 2. 区域ID变化时处理（仅在区域模式下）
+          if (newPointId !== oldPointId && newMode === 'area') {
+            console.log('[热力图] 区域ID变化:', oldPointId, '->', newPointId, '，重新加载区域热力图数据');
+            try {
+              // 销毁当前实例
+              const currentInstance = heatmapStore.heatmapLayer;
+              if (currentInstance && currentInstance.destroy) {
+                console.log('[热力图] 销毁当前热力图实例');
+                currentInstance.destroy();
+                heatmapStore.setHeatmapLayer(null);
+              }
+              
+              // 加载新数据
+              let heatmapData = null;
+              if (heatmapStore.lastAreaHeatmapData && heatmapStore.lastAreaPointId === newPointId) {
+                console.log('[热力图] 使用存储的区域热力图数据，pointId:', newPointId);
+                heatmapData = heatmapStore.lastAreaHeatmapData;
+              } else {
+                heatmapData = await loadHeatmapData('area', newPointId);
+              }
+              
+              if (heatmapData && heatmapData.points && heatmapData.points.length > 0) {
+                console.log('[热力图] 创建新的区域热力图实例，数据点数:', heatmapData.points.length);
+                const heatmapPoints = heatmapData.points.map(point => ({
+                  lnglat: [point.lon, point.lat],
+                  value: point.value
+                }));
+                
+                const newHeatMapInstance = create3DHeatmap(viewer, {
+                  dataPoints: heatmapPoints,
+                  radius: 15,
+                  baseElevation: 100,
+                  primitiveType: "TRIANGLES",
+                  colorGradient: {
+                    ".3": "blue",
+                    ".5": "green",
+                    ".7": "yellow",
+                    ".95": "red",
+                  },
+                });
+                
+                heatmapStore.setHeatmapLayer(newHeatMapInstance);
+                heatmapStore.setHeatmapData(heatmapData);
+                console.log('[热力图] 区域切换完成');
+              } else {
+                console.warn('[热力图] 区域切换失败：未获取到有效数据');
+                heatmapStore.setHeatmapData(null);
+              }
+            } catch (error) {
+              console.error('[热力图] 区域切换时处理数据失败:', error);
+            }
+            return; // 区域切换处理完毕
+          }
+          
+          // 3. 同模式下数据更新（非模式切换，非区域切换）
           if (isHeatmapVisible && newData && newData.points && newData.points.length > 0) {
-            console.log('热力图数据更新，开始更新热力图...', newData);
+            console.log('[热力图] 数据更新，开始更新热力图...', newData);
             // 转换数据格式
             const newHeatmapPoints = newData.points.map(point => ({
               lnglat: [point.lon, point.lat],
               value: point.value
             }));
-            // 使用updateData方法更新热力图
-            try {
-              heatMapInstance.updateData(newHeatmapPoints);
-              console.log('热力图更新成功');
-            } catch (error) {
-              console.error('热力图更新失败：', error);
+            
+            // 使用store中的热力图实例进行更新
+            const instance = heatmapStore.heatmapLayer;
+            if (instance && instance.updateData) {
+              try {
+                instance.updateData(newHeatmapPoints);
+                console.log('[热力图] 更新成功');
+              } catch (error) {
+                console.error('[热力图] 更新失败：', error);
+              }
+            } else {
+              console.warn('[热力图] 无法更新：热力图实例不存在或没有updateData方法');
             }
           } else if (!isHeatmapVisible) {
-            console.log('热力图未显示，跳过更新');
+            console.log('[热力图] 未显示，跳过更新');
           }
         },
         { deep: true }

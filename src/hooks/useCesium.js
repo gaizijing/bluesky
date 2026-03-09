@@ -126,20 +126,24 @@ export function useCesium(containerId) {
   
   /**
    * 设置时钟参数
-   * @param {Date} startTime - 起始时间（必须是今天）
-   * @param {Date} endTime - 终止时间（必须是今天）
+   * @param {Date|string} startTime - 起始时间
+   * @param {Date|string} endTime - 终止时间
    */
   const setClockParams = (startTime, endTime) => {
     if (!viewer.value) return;
+      const now = new Date();
+      const nowJulian = Cesium.JulianDate.fromDate(now);
+      const oneHourLater = new Date(now.getTime() + 3600000);
+      const oneHourLaterJulian = Cesium.JulianDate.fromDate(oneHourLater);
+      
+      viewer.value.clock.startTime = nowJulian;
+      viewer.value.clock.stopTime = oneHourLaterJulian;
+      viewer.value.clock.currentTime = nowJulian;
+      viewer.value.clock.multiplier = 30;
+      viewer.value.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK_MULTIPLIER;
+      viewer.value.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
+      viewer.value.clock.shouldAnimate = true;
     
-    // 设置时钟参数
-    viewer.value.clock.startTime = startTime;
-    viewer.value.clock.stopTime = endTime;
-    viewer.value.clock.currentTime = startTime; // 默认从起始时间开始
-    viewer.value.clock.multiplier = 30;
-    viewer.value.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK_MULTIPLIER;
-    viewer.value.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
-    viewer.value.clock.shouldAnimate = true; // 有飞机飞的时候自动开始动画
   };
   
   /**
@@ -155,17 +159,52 @@ export function useCesium(containerId) {
         // 当时间轴从隐藏变为显示时，重新设置时间范围并触发更新
         if (visible) {
           setTimeout(() => {
-            // 获取当前时钟的时间范围
-            const startTime = viewer.value.clock.startTime;
-            const stopTime = viewer.value.clock.stopTime;
-            
-            // 重新设置时间轴的时间范围
-            if (startTime && stopTime) {
-              viewer.value.timeline.zoomTo(startTime, stopTime);
+            try {
+              // 获取当前时钟的时间范围
+              const startTime = viewer.value.clock.startTime;
+              const stopTime = viewer.value.clock.stopTime;
+              
+              // 验证时间参数有效性
+              if (startTime && stopTime && 
+                  Cesium.JulianDate.isValid(startTime) && 
+                  Cesium.JulianDate.isValid(stopTime)) {
+                // 重新设置时间轴的时间范围
+                viewer.value.timeline.zoomTo(startTime, stopTime);
+                console.log('时间轴zoomTo成功');
+              } else {
+                console.warn('无效的时间参数，跳过zoomTo');
+                // 使用默认时间范围
+                const now = new Date();
+                const nowJulian = Cesium.JulianDate.fromDate(now);
+                const oneHourLater = new Date(now.getTime() + 3600000);
+                const oneHourLaterJulian = Cesium.JulianDate.fromDate(oneHourLater);
+                
+                viewer.value.clock.startTime = nowJulian;
+                viewer.value.clock.stopTime = oneHourLaterJulian;
+                viewer.value.clock.currentTime = nowJulian;
+                viewer.value.timeline.zoomTo(nowJulian, oneHourLaterJulian);
+              }
+              
+              // 触发场景重新渲染
+              viewer.value.scene.requestRender();
+            } catch (error) {
+              console.error('设置时间轴范围失败:', error);
+              // 使用默认时间范围作为 fallback
+              try {
+                const now = new Date();
+                const nowJulian = Cesium.JulianDate.fromDate(now);
+                const oneHourLater = new Date(now.getTime() + 3600000);
+                const oneHourLaterJulian = Cesium.JulianDate.fromDate(oneHourLater);
+                
+                viewer.value.clock.startTime = nowJulian;
+                viewer.value.clock.stopTime = oneHourLaterJulian;
+                viewer.value.clock.currentTime = nowJulian;
+                viewer.value.timeline.zoomTo(nowJulian, oneHourLaterJulian);
+                viewer.value.scene.requestRender();
+              } catch (fallbackError) {
+                console.error('fallback也失败:', fallbackError);
+              }
             }
-            
-            // 触发场景重新渲染
-            viewer.value.scene.requestRender();
           }, 100);
         }
       }
@@ -449,7 +488,7 @@ export function useCesium(containerId) {
         if (newRoute && viewer.value) {
           // 检查新航线是否包含起始时间和终止时间
           if (newRoute.startTime && newRoute.endTime) {
-            // 先设置时钟参数
+            // 先设置时钟参数            
             setClockParams(newRoute.startTime, newRoute.endTime)
             // 再渲染航线
             routeManager.render(newRoute)
@@ -1114,13 +1153,6 @@ export function useCesium(containerId) {
         })
         return
       }
-
-      console.log('热力图数据详情:', {
-        dataType: heatmapDataToConvert.dataType || heatmapData.dataType,
-        pointCount: heatmapDataToConvert.pointCount || heatmapData.pointCount,
-        bbox: heatmapDataToConvert.bbox || heatmapData.bbox,
-        pointsCount: heatmapDataToConvert.points ? heatmapDataToConvert.points.length : 0
-      })
 
       // 转换后端数据为Cesium热力图需要的格式
       const convertedData = convertHeatmapDataForCesium(heatmapDataToConvert, currentArea)

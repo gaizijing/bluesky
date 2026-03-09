@@ -1,7 +1,6 @@
 <template>
   <div class="isim-animation-container">
-    <!-- 3D动画容器 -->
-    <div ref="animationContainer" class="animation-container">
+    
       <!-- 连接配置区域 - 平铺展示 -->
       <div class="connection-config">
         <!-- 输入项平铺展示 -->
@@ -57,7 +56,7 @@
           {{ connectionError }}
         </div>
       </div>
-    </div>
+   
     
     <!-- 状态面板 -->
     <div class="status-panel">
@@ -157,6 +156,7 @@ import { ref, computed, onMounted, onUnmounted, watch, markRaw } from 'vue'
 import * as Cesium from 'cesium'
 import { useIsimWebSocket } from './useIsimWebSocket'
 import { useIsimStore } from './isimStore'
+import { useHeatmapStore } from '@/store/modules/heatmap'
 import { PlaneModel } from '@/cesium/entities/routes/PlaneModel'
 
 // 使用WebSocket Hook
@@ -170,6 +170,7 @@ const {
 
 // 使用状态管理
 const isimStore = useIsimStore()
+const heatmapStore = useHeatmapStore()
 
 // Cesium相关
 const planeEntity = ref(null)
@@ -177,8 +178,6 @@ const planeModel = ref(null)
 const isimPlaneId = 'isim_live_aircraft'
 
 // 本地状态
-const animationContainer = ref(null)
-const isAnimating = ref(false)
 const autoSendWeather = ref(true)
 const recordFlightPath = ref(true)
 
@@ -216,13 +215,7 @@ const flightDuration = computed(() => {
   return flightPath.value.length
 })
 
-// 2D飞机样式（临时方案）
-const aircraftStyle = computed(() => {
-  const scale = 1 + aircraftAlt.value / 1000 // 高度越高，飞机越小
-  return {
-    transform: `rotate(${aircraftHeading.value}deg) scale(${scale})`
-  }
-})
+
 
 // 方法
 const connectToIsim = async () => {
@@ -246,12 +239,13 @@ const connectToIsim = async () => {
     
     if (!response.ok) {
       throw new Error(result.message || '更新目标地址失败')
-    }
-    
-    console.log('ISIM目标地址已更新:', result)
-    
+    }    
     // 2. 连接WebSocket
     await connectWebSocket()
+    
+    // 3. 切换到全市热力图模式
+    heatmapStore.switchToCitywideMode()
+    console.log('ISIM连接成功，切换到全市热力图模式，当前模式:', heatmapStore.heatmapMode)
     
   } catch (error) {
     console.error('连接ISIM失败:', error)
@@ -261,41 +255,17 @@ const connectToIsim = async () => {
 
 const toggleConnection = async () => {
   if (isWebSocketConnected.value) {
-    await disconnectWebSocket()
-    stopAnimation()
+    disconnectWebSocket()
     clearCesiumAircraft()
+    // 断开连接时恢复区域热力图模式
+    heatmapStore.resetToDefault()
+    console.log('ISIM断开连接，恢复区域热力图模式，当前模式:', heatmapStore.heatmapMode)
   } else {
     await connectToIsim()
   }
 }
 
-const startAnimation = () => {
-  if (!isAnimating.value) {
-    isAnimating.value = true
-    sendTakeoffCommand()
-    // 这里可以启动3D渲染
-  } else {
-    stopAnimation()
-  }
-}
 
-const stopAnimation = () => {
-  isAnimating.value = false
-  // 停止3D渲染
-}
-
-const resetAnimation = () => {
-  stopAnimation()
-  isimStore.resetPosition()
-}
-
-const sendTakeoffCommand = () => {
-  sendMessage({
-    type: 'command',
-    command: 'TAKEOFF',
-    timestamp: new Date().toISOString()
-  })
-}
 
 const sendTestCommand = () => {
   sendMessage({
@@ -330,21 +300,96 @@ const exportFlightData = () => {
  * 聚焦到ISIM飞机并跟随
  */
 const focusOnIsimAircraft = () => {
-  const viewer = window.viewer
-  if (!viewer || !planeEntity.value) {
+    // 聚焦到飞机
+    viewer.trackedEntity = planeEntity.value
+ 
+}
+
+
+
+
+
+
+
+
+const updateCesiumAircraft = async () => {
+  if (!simData.value || !planeModel.value) {
     return
   }
   
+  // 调试：检查Cesium状态
+  console.log('[DEBUG] updateCesiumAircraft called', {
+    aircraftPos: [aircraftLon.value, aircraftLat.value, aircraftAlt.value],
+    aircraftAtt: [aircraftRoll.value, aircraftPitch.value, aircraftHeading.value],
+    simDataExists: !!simData.value,
+  })
+  
   try {
-    // 聚焦到飞机
-    viewer.trackedEntity = planeEntity.value
-    console.log('已聚焦到ISIM飞机并开始跟随')
+    // 检查Cesium viewer是否存在且正常
+    let viewer = window.viewer
+    // 检查viewer是否可用
+    if (!viewer) {
+      console.error('[DEBUG] Cesium viewer not found in window.viewer')
+      return
+    }
+    
+    // 获取飞机位置（Cartesian3）
+    const position = Cesium.Cartesian3.fromDegrees(
+      aircraftLon.value,
+      aircraftLat.value,
+      aircraftAlt.value
+    )
+    
+    // 检查是否已存在飞机实体
+    let existingEntity = viewer.entities.getById(isimPlaneId)
+    
+    if (!existingEntity) {
+      console.log('[DEBUG] 创建新的ISIM飞机实体')
+      
+      // 使用PlaneModel创建飞机实体
+      planeEntity.value = planeModel.value.createRoutePlane(
+        isimPlaneId,
+        position,
+        {
+          getAttitude: () => ({
+            heading: aircraftHeading.value,
+            pitch: aircraftPitch.value,
+            roll: aircraftRoll.value
+          }),
+          getAltitude: () => aircraftAlt.value,
+          getFlightPath: () => flightPath.value,
+          getRecordFlightPath: () => recordFlightPath.value
+        }
+      )
+      
+      // 聚焦到飞机并跟随
+      setTimeout(() => {
+        focusOnIsimAircraft()
+      }, 100)
+    } else {
+      // 更新现有实体的位置
+      planeModel.value.updatePlanePosition(isimPlaneId, position)
+      console.log('[DEBUG] 更新ISIM飞机实体位置')
+    }
   } catch (error) {
-    console.error('聚焦飞机失败:', error)
+    console.error('[DEBUG] 更新Cesium飞机模型失败:', error)
   }
 }
 
-// ========== Cesium飞机模型管理 ==========
+// 补全缺失的clearCesiumAircraft方法
+const clearCesiumAircraft = () => {
+  if (planeModel.value) {
+    planeModel.value.removePlane(isimPlaneId)
+    planeEntity.value = null
+  }
+}
+
+// 监听simData变化更新飞机模型
+watch(simData, (newVal) => {
+  if (newVal && isWebSocketConnected.value) {
+    updateCesiumAircraft()
+  }
+}, { deep: true })
 
 /**
  * 初始化Cesium飞机模型
@@ -385,287 +430,9 @@ const initCesiumPlane = async () => {
   return false
 }
 
-/**
- * 创建增强的飞机实体
- */
-const createSimpleAircraftEntity = (viewer, position) => {
-  try {
-    console.log('[DEBUG] 创建增强飞机实体')
-    
-    // 使用本地小型飞机模型
-    const modelUri = '/cesium/model/plane/plane1.glb'
-    
-    const entity = viewer.entities.add({
-      id: isimPlaneId,
-      name: 'ISIM实时飞机',
-      position: position,
-      // 使用优化的姿态更新
-      orientation: new Cesium.CallbackProperty((time) => {
-        try {
-          // 将角度转换为弧度
-          const heading = Cesium.Math.toRadians(aircraftHeading.value)
-          const pitch = Cesium.Math.toRadians(aircraftPitch.value)
-          const roll = Cesium.Math.toRadians(aircraftRoll.value)
-          
-          // 获取当前位置
-          const currentPosition = entity.position.getValue(time)
-          if (!currentPosition) {
-            return Cesium.Quaternion.IDENTITY
-          }
-          
-          return Cesium.Transforms.headingPitchRollQuaternion(
-            currentPosition,
-            new Cesium.HeadingPitchRoll(heading, pitch, roll)
-          )
-        } catch (error) {
-          console.warn('[DEBUG] 计算姿态时出错:', error)
-          return Cesium.Quaternion.IDENTITY
-        }
-      }, false),
-      // 使用本地小型飞机模型
-      model: {
-        uri: modelUri,
-        scale: 20.0, // 适当放大
-        show: true,
-        minimumPixelSize: 40, // 增大最小像素大小
-        maximumScale: 80000,
-        runAnimations: true,
-        // 添加详细的错误处理
-        error: (error) => {
-          console.error('[DEBUG] 飞机模型加载失败:', error)
-          console.log('[DEBUG] 降级为简单几何体表示')
-          // 降级为几何体
-          entity.model = undefined
-          entity.box = {
-            dimensions: new Cesium.Cartesian3(20, 10, 10),
-            material: Cesium.Color.fromBytes(59, 130, 246, 200),
-            outline: true,
-            outlineColor: Cesium.Color.WHITE
-          }
-        }
-      },
-      // 添加增强的标签
-      label: {
-        text: new Cesium.CallbackProperty(() => {
-          return `ISIM飞机\n高度: ${aircraftAlt.value.toFixed(0)}m\n航向: ${aircraftHeading.value.toFixed(1)}°`
-        }, false),
-        font: '14px sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(15, 23, 42, 0.9)'),
-        backgroundPadding: new Cesium.Cartesian2(8, 6),
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        verticalOrigin: Cesium.VerticalOrigin.TOP,
-        pixelOffset: new Cesium.Cartesian2(0, -60),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      },
-      // 添加增强的路径线
-      path: {
-        resolution: 1,
-        width: 8,
-        material: new Cesium.PolylineGlowMaterialProperty({
-          glowPower: 0.2,
-          color: Cesium.Color.fromBytes(59, 130, 246, 180) // 半透明蓝色
-        }),
-        show: recordFlightPath.value,
-        leadTime: 0,
-        trailTime: 60, // 轨迹保留60秒
-        zIndex: 1
-      },
-      // 添加飞机灯光效果
-      point: {
-        pixelSize: 10,
-        color: Cesium.Color.fromBytes(255, 255, 0, 200),
-        outlineColor: Cesium.Color.YELLOW,
-        outlineWidth: 2,
-        show: true
-      },
-      // 添加尾迹效果
-      polyline: {
-        positions: new Cesium.CallbackProperty(() => {
-          if (flightPath.value.length < 2) return []
-          const recentPath = flightPath.value.slice(-20) // 最近20个点
-          return recentPath.map(point => Cesium.Cartesian3.fromDegrees(
-            point.lon,
-            point.lat,
-            point.alt
-          ))
-        }, false),
-        width: 6,
-        material: new Cesium.PolylineGlowMaterialProperty({
-          glowPower: 0.3,
-          color: Cesium.Color.fromBytes(16, 185, 129, 150)
-        }),
-        show: new Cesium.CallbackProperty(() => recordFlightPath.value, false)
-      }
-    })
-    
-    console.log('[DEBUG] 增强飞机实体创建成功')
-    return entity
-    
-  } catch (error) {
-    console.error('[DEBUG] 创建增强飞机实体失败:', error)
-    return null
-  }
-}
-
-/**
- * 专门更新飞机姿态的函数
- * 根据当前姿态数据实时更新飞机模型姿态
- */
-const updateAircraftAttitude = () => {
-  if (!planeModel.value || !planeEntity.value) {
-    console.log('[ISIM] 姿态更新跳过：模型或实体未初始化');
-    return;
-  }
-  
-  // 直接更新姿态，不重新创建实体
-  try {
-    planeModel.value.setPlaneAttitude(isimPlaneId, {
-      roll: aircraftRoll.value,
-      pitch: aircraftPitch.value,
-      heading: aircraftHeading.value
-    });
-    
-    // 调试信息
-    console.log('[ISIM] 姿态更新成功:', {
-      roll: aircraftRoll.value.toFixed(2),
-      pitch: aircraftPitch.value.toFixed(2),
-      heading: aircraftHeading.value.toFixed(2)
-    });
-  } catch (error) {
-    console.error('[ISIM] 姿态更新失败:', error);
-  }
-}
-
-const updateCesiumAircraft = async () => {
-  if (!simData.value) {
-    return
-  }
-  
-  // 调试：检查Cesium状态
-  console.log('[DEBUG] updateCesiumAircraft called', {
-    aircraftPos: [aircraftLon.value, aircraftLat.value, aircraftAlt.value],
-    aircraftAtt: [aircraftRoll.value, aircraftPitch.value, aircraftHeading.value],
-    simDataExists: !!simData.value,
-  })
-  
-  try {
-    // 检查Cesium viewer是否存在且正常
-    let viewer = window.viewer
-    // 检查viewer是否可用
-    if (!viewer) {
-      console.error('[DEBUG] Cesium viewer not found in window.viewer')
-      // 尝试从全局查找
-      const cesiumViewer = document.querySelector('.cesium-viewer')
-      if (cesiumViewer) {
-        console.log('[DEBUG] Found Cesium viewer DOM element, but viewer object missing')
-      }
-      return
-    }
-    
-    // 检查viewer是否已销毁
-    if (viewer.isDestroyed && viewer.isDestroyed()) {
-      console.error('[DEBUG] Cesium viewer is destroyed')
-      return
-    }
-    
-    // 检查canvas元素
-    if (!viewer.canvas) {
-      console.error('[DEBUG] Cesium viewer has no canvas element')
-      return
-    }
-    
-    console.log('[DEBUG] Cesium viewer check passed')
-    
-    // 获取飞机位置（Cartesian3）
-    const position = Cesium.Cartesian3.fromDegrees(
-      aircraftLon.value,
-      aircraftLat.value,
-      aircraftAlt.value
-    )
-    
-    // 检查是否已存在飞机实体
-    let existingEntity = viewer.entities.getById(isimPlaneId)
-    
-    if (!existingEntity) {
-      console.log('[DEBUG] 创建新的ISIM飞机实体')
-      
-      // 创建新的飞机实体
-      if (planeModel.value) {
-        // 尝试使用PlaneModel创建飞机
-        try {
-          planeEntity.value = planeModel.value.createRoutePlane(
-            isimPlaneId,
-            position, // 初始位置
-            {
-              scale: 10.0,
-              pathColor: Cesium.Color.fromBytes(59, 130, 246, 200),
-              showPath: recordFlightPath.value
-            }
-          )
-          
-          console.log('[DEBUG] 已使用PlaneModel创建ISIM实时飞机模型')
-          
-          // 更新飞机姿态（使用专用函数）
-          updateAircraftAttitude()
-          
-          // 聚焦到飞机并跟随
-          setTimeout(() => {
-            focusOnIsimAircraft()
-          }, 100)
-        } catch (e) {
-          console.error('[DEBUG] PlaneModel创建失败，降级为基础实体:', e)
-          planeEntity.value = createSimpleAircraftEntity(viewer, position)
-          
-          // 聚焦到飞机并跟随
-          setTimeout(() => {
-            focusOnIsimAircraft()
-          }, 100)
-        }
-      } else {
-        // 直接创建基础飞机实体
-        planeEntity.value = createSimpleAircraftEntity(viewer, position)
-        
-        // 聚焦到飞机并跟随
-        setTimeout(() => {
-          focusOnIsimAircraft()
-        }, 100)
-      }
-    } else {
-      // 更新现有实体的位置
-      existingEntity.position = position
-      console.log('[DEBUG] 更新ISIM飞机实体位置')
-      
-      // 更新飞机姿态（使用专用函数）
-      updateAircraftAttitude()
-    }
-  } catch (error) {
-    console.error('[DEBUG] 更新Cesium飞机模型失败:', error)
-  }
-}
-
-// 补全缺失的clearCesiumAircraft方法
-const clearCesiumAircraft = () => {
-  const viewer = window.viewer
-  if (viewer && planeEntity.value) {
-    viewer.entities.remove(planeEntity.value)
-    planeEntity.value = null
-  }
-}
-
-// 监听simData变化更新飞机模型
-watch(simData, (newVal) => {
-  if (newVal && isWebSocketConnected.value) {
-    updateCesiumAircraft()
-  }
-}, { deep: true })
-
 // 初始化
 onMounted(async () => {
-  // 初始化Cesium飞机模型
+  // 初始化PlaneModel
   await initCesiumPlane()
 })
 

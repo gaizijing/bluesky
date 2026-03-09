@@ -27,18 +27,18 @@ apiClient.interceptors.response.use(
 
 // 获取重点关注区域列表
 export const fetchAreaList = async () => {
- 
-    const data = await apiClient.get('/monitoring-points');
-    return data;
- 
+
+  const data = await apiClient.get('/monitoring-points');
+  return data;
+
 }
 
 // 获取当前选中的重点关注区域
 export const fetchCurrentSelectedArea = async () => {
 
-    const data = await apiClient.get('/monitoring-points/selected');
-    return data;
- 
+  const data = await apiClient.get('/monitoring-points/selected');
+  return data;
+
 }
 
 // 更新选中的重点关注区域
@@ -66,33 +66,33 @@ export const addNewArea = async (areaData) => {
 // 获取单点适飞指数分析数据
 export const getWeatherSuitability = async (params = {}) => {
 
-    const { 
-      currentPoint, 
-      timestamp = new Date(),
-      timeRange = '3h',
-      includeThresholds = true 
-    } = params;
-    
-    // 获取点ID
-    let pointId = null;
-    if (currentPoint) {
-      pointId = currentPoint.id || currentPoint.pointId;
-    }
-    
-    // 构建API请求参数
-    const queryParams = new URLSearchParams();
-    if (pointId) queryParams.append('pointId', pointId);
-    queryParams.append('timestamp', timestamp.toISOString());
-    queryParams.append('timeRange', timeRange);
-    if (includeThresholds) queryParams.append('includeThresholds', 'true');
-    
-    // 尝试调用真实API - 注意：后端路径是 /api/suitability/status
-    // 使用提取的pointId，而不是currentPoint对象
-    const url = `/suitability/status?pointId=${encodeURIComponent(pointId || 'area-1')}&totalHours=3`;
-    
-      const response = await apiClient.get(url);
-    return response
-    
+  const {
+    currentPoint,
+    timestamp = new Date(),
+    timeRange = '3h',
+    includeThresholds = true
+  } = params;
+
+  // 获取点ID
+  let pointId = null;
+  if (currentPoint) {
+    pointId = currentPoint.id || currentPoint.pointId;
+  }
+
+  // 构建API请求参数
+  const queryParams = new URLSearchParams();
+  if (pointId) queryParams.append('pointId', pointId);
+  queryParams.append('timestamp', timestamp.toISOString());
+  queryParams.append('timeRange', timeRange);
+  if (includeThresholds) queryParams.append('includeThresholds', 'true');
+
+  // 尝试调用真实API - 注意：后端路径是 /api/suitability/status
+  // 使用提取的pointId，而不是currentPoint对象
+  const url = `/suitability/status?pointId=${encodeURIComponent(pointId || 'area-1')}&totalHours=3`;
+
+  const response = await apiClient.get(url);
+  return response
+
 
 }
 
@@ -102,17 +102,17 @@ export const getCurrentSuitabilityIndex = async (currentPoint) => {
   if (!currentPoint) {
     throw new Error('未选择重点关注区域');
   }
-  
+
   const pointId = currentPoint.id || currentPoint.pointId;
-  
+
   // 调用真实API - 使用现有的/suitability/status接口
   const url = `/suitability/status?pointId=${encodeURIComponent(pointId)}&totalHours=1`;
   const response = await apiClient.get(url);
-  
+
   if (response && response.data) {
     return response.data;
   }
-  
+
   throw new Error('实时适飞指数API返回数据为空');
 }
 
@@ -165,11 +165,11 @@ export const getWeatherForecastTrend = async (params) => {
  * @returns {Promise<Object>} 格式化后的天气数据
  */
 export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
-  try {
+
     if (!currentPoint) {
       throw new Error('未选择重点关注区域');
     }
-    
+
     // 适配后端返回的数据格式：可能是 coordinates 数组，也可能是 longitude/latitude 分开
     let longitude, latitude;
     if (currentPoint.coordinates && Array.isArray(currentPoint.coordinates)) {
@@ -180,13 +180,13 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
     } else {
       throw new Error('坐标信息缺失');
     }
-    
+
     // 2. API核心配置（使用代理避免跨域）
     const API_KEY = import.meta.env.VITE_QWEATHER_API_KEY;
-    
+
     // 使用代理路径（vite.config.js中配置）
     const proxyUrl = `/api/weather/now?location=${longitude},${latitude}&key=${API_KEY}`;
-    
+
     try {
       const response = await axios.get(proxyUrl, {
         timeout: 10000,
@@ -194,7 +194,7 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
           'Accept': 'application/json'
         }
       });
-      
+
       if (response.data && response.data.now) {
         console.log('[Weather] API调用成功:', response.data.now);
         return response.data.now;
@@ -202,39 +202,12 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
     } catch (apiError) {
       console.warn('[Weather] API调用失败:', apiError.message);
     }
-    
-    // 降级：返回模拟数据
-    console.log('[Weather] 使用模拟数据');
-    return getMockWeatherData();
 
-  } catch (error) {
-    console.error('获取天气数据失败：', error.message);
-    // 返回模拟数据，保证前端不崩溃
-    return getMockWeatherData();
-  }
+
+ 
 };
 
-// 模拟天气数据（降级使用）
-function getMockWeatherData() {
-  return {
-    temp: '25',
-    feelsLike: '24',
-    icon: '100',
-    text: '晴',
-    wind360: '45',
-    windDir: '东北风',
-    windScale: '3',
-    windSpeed: '12',
-    humidity: '68',
-    precip: '0.0',
-    pressure: '1013',
-    vis: '10',
-    cloud: '25',
-    dew: '18',
-    windShearLevel: 'low',
-    stabilityIndex: 'C'
-  };
-}
+
 
 
 // 主函数：获取当前监测点天气数据（调用后端接口）
@@ -246,10 +219,10 @@ export const fetchCurrentPointWeather = async (currentPoint) => {
 
     // 获取监测点ID
     const pointId = currentPoint.id || currentPoint.pointId || 'point-1';
-    
+
     // 调用后端实时天气接口
     const data = await apiClient.get(`/weather/realtime?pointId=${pointId}`);
-    
+
     // 后端返回的数据格式：{ updateTime, data: { ... } }
     // 适配前端期望的格式
     if (data && data.data) {
@@ -274,10 +247,10 @@ export const fetchCurrentPointWeather = async (currentPoint) => {
         obsTime: weatherData.obsTime || new Date().toISOString()
       };
     }
-    
+
     // 如果后端没有数据，抛出错误
     throw new Error('后端返回数据为空');
-    
+
   } catch (error) {
     console.error('获取当前重点关注区域天气数据失败:', error);
     throw error; // 不返回模拟数据，直接抛出错误
@@ -305,7 +278,7 @@ const formatBoundsForApi = (bounds) => {
         return formatBoundsForApi(bounds.bounds);
       }
     }
-    
+
     // 无法识别的格式
     console.warn('无法识别的边界框格式:', bounds);
     return null;
@@ -315,20 +288,116 @@ const formatBoundsForApi = (bounds) => {
   }
 };
 
+// 获取全市范围热力图数据
+export const getCitywideHeatmap = async (params = {}) => {
+  const {
+    timestamp,
+    timeRange = '3h',
+    resolution = 'medium'
+  } = params;
+
+  console.log('[全市热力图] 获取全市热力图数据');
+
+  try {
+    // 尝试调用后端API获取全市热力图
+    // 这里假设后端有一个/citywide/heatmap接口
+    const totalHours = parseInt(timeRange.replace('h', '')) || 3;
+    const url = `/weather/heatmap/citywide?totalHours=${totalHours}&resolution=${resolution}`;
+
+    const response = await apiClient.get(url);
+
+    if (response && response.data) {
+      console.log('[全市热力图] API调用成功');
+      return response.data;
+    }
+
+    console.warn('[全市热力图] API返回数据为空，使用模拟数据');
+    return generateMockCitywideHeatmapData(totalHours, resolution);
+
+  } catch (error) {
+    console.error('[全市热力图] API调用失败:', error);
+    // 返回模拟数据作为降级方案
+    return generateMockCitywideHeatmapData(totalHours, resolution);
+  }
+};
+
+// 生成模拟全市热力图数据
+const generateMockCitywideHeatmapData = (totalHours, resolution) => {
+  console.log(`[全市热力图] 生成模拟全市热力图数据，hours: ${totalHours}, resolution: ${resolution}`);
+
+  // 青岛市的大致边界范围
+  const qingdaoBounds = {
+    minLon: 120.0,
+    maxLon: 121.0,
+    minLat: 36.0,
+    maxLat: 37.0
+  };
+
+  // 根据分辨率确定网格密度
+  const gridDensity = resolution === 'high' ? 20 : resolution === 'medium' ? 15 : 10;
+  const gridSize = gridDensity;
+
+  // 生成网格点数据
+  const points = [];
+  const lonStep = (qingdaoBounds.maxLon - qingdaoBounds.minLon) / gridSize;
+  const latStep = (qingdaoBounds.maxLat - qingdaoBounds.minLat) / gridSize;
+
+  for (let i = 0; i < gridSize; i++) {
+    for (let j = 0; j < gridSize; j++) {
+      const lon = qingdaoBounds.minLon + i * lonStep + (Math.random() * lonStep * 0.3);
+      const lat = qingdaoBounds.minLat + j * latStep + (Math.random() * latStep * 0.3);
+
+      // 模拟风险值：0-100，模拟一些高风险区域
+      let value = 30 + Math.random() * 40; // 基础值 30-70
+
+      // 在特定区域模拟高风险
+      const inHighRiskArea1 = lon > 120.3 && lon < 120.6 && lat > 36.1 && lat < 36.3;
+      const inHighRiskArea2 = lon > 120.7 && lon < 120.9 && lat > 36.4 && lat < 36.6;
+
+      if (inHighRiskArea1 || inHighRiskArea2) {
+        value = 70 + Math.random() * 30; // 高风险区域 70-100
+      }
+
+      // 模拟一些低风险区域
+      const inLowRiskArea = lon > 120.1 && lon < 120.4 && lat > 36.6 && lat < 36.9;
+      if (inLowRiskArea) {
+        value = 20 + Math.random() * 20; // 低风险区域 20-40
+      }
+
+      points.push({
+        lon: parseFloat(lon.toFixed(6)),
+        lat: parseFloat(lat.toFixed(6)),
+        value: parseFloat(value.toFixed(1))
+      });
+    }
+  }
+
+  return {
+    success: true,
+    data: {
+      points: points,
+      bounds: qingdaoBounds,
+      timestamp: new Date().toISOString(),
+      resolution: resolution,
+      totalPoints: points.length
+    }
+  };
+};
+
 export const getWeatherForecastHeatmap = async (params = {}) => {
-  const { 
-    currentPoint, 
-    timestamp, 
+  const {
+    currentPoint,
+    timestamp,
     timeRange = '3h'
   } = params;
-  
+
   // 如果没有传入区域，尝试从store获取当前选中区域
   let pointId = null;
-  
+
   if (currentPoint) {
     pointId = currentPoint.id || currentPoint.pointId;
   }
-  
+
   // 如果没有pointId，使用默认值
   if (!pointId) {
     // 尝试从store获取当前选中的监测点
@@ -343,30 +412,30 @@ export const getWeatherForecastHeatmap = async (params = {}) => {
       console.warn('无法获取当前选中区域，使用默认值');
     }
   }
-  
+
   // 最终fallback
   if (!pointId) {
     pointId = 'area-1';
   }
-  
+
   // 修正：调用正确的适飞分析API
   const totalHours = parseInt(timeRange.replace('h', '')) || 3;
   const url = `/suitability/status?pointId=${encodeURIComponent(pointId)}&totalHours=${totalHours}`;
-  
+
   try {
     console.log('[适飞分析] 调用API:', url);
     const response = await apiClient.get(url);
-    
+
     if (response && response.data) {
       console.log('[适飞分析] API调用成功');
-      
+
       // 格式化数据供前端使用
       return formatSuitabilityDataForChart(response.data, pointId, totalHours);
     }
-    
+
     console.warn('[适飞分析] API返回数据为空，使用模拟数据');
     return generateMockSuitabilityData(pointId, totalHours);
-    
+
   } catch (error) {
     console.error('[适飞分析] API调用失败:', error);
     // 返回模拟数据作为降级方案
@@ -380,13 +449,13 @@ const formatSuitabilityDataForChart = (apiData, pointId, totalHours) => {
     console.warn('[适飞分析] 格式化数据：API数据为空');
     return generateMockSuitabilityData(pointId, totalHours);
   }
-  
+
   // 检查数据格式
   if (apiData.success !== undefined && apiData.data !== undefined) {
     // 已经是正确的格式
     return apiData;
   }
-  
+
   // 尝试从旧格式中提取数据
   if (apiData.suitabilityList && apiData.suitabilityList.length > 0) {
     // 提取第一个因素的数据作为热力图数据（通常是"综合"因素）
@@ -395,7 +464,7 @@ const formatSuitabilityDataForChart = (apiData, pointId, totalHours) => {
       console.warn('[适飞分析] 格式化数据：没有有效的detail数据');
       return generateMockSuitabilityData(pointId, totalHours);
     }
-    
+
     // 构建热力图数据矩阵
     const times = firstFactor.detail.map(d => {
       try {
@@ -405,17 +474,17 @@ const formatSuitabilityDataForChart = (apiData, pointId, totalHours) => {
         return '12:00'; // 默认值
       }
     });
-    
+
     // 假设有6个高度层（0-500m，每100m一层）
     const heights = ['0m', '100m', '200m', '300m', '400m', '500m'];
     const profileData = [];
-    
+
     // 为每个高度层创建数据
     for (let h = 0; h < heights.length; h++) {
       const row = [];
       for (let t = 0; t < times.length; t++) {
         // 模拟高度衰减：高度越高，适飞指数可能越低
-        const baseValue = firstFactor.detail[t]?.valueData ? 
+        const baseValue = firstFactor.detail[t]?.valueData ?
           parseFloat(firstFactor.detail[t].valueData) : 70;
         const heightFactor = 1.0 - (h * 0.1); // 每100m降低10%
         const randomVariation = 0.9 + Math.random() * 0.2;
@@ -424,7 +493,7 @@ const formatSuitabilityDataForChart = (apiData, pointId, totalHours) => {
       }
       profileData.push(row);
     }
-    
+
     return {
       success: true,
       data: {
@@ -435,7 +504,7 @@ const formatSuitabilityDataForChart = (apiData, pointId, totalHours) => {
       }
     };
   }
-  
+
   console.warn('[适飞分析] 格式化数据：无法识别的数据格式，使用模拟数据');
   return generateMockSuitabilityData(pointId, totalHours);
 };
@@ -443,20 +512,20 @@ const formatSuitabilityDataForChart = (apiData, pointId, totalHours) => {
 // 模拟适飞数据（降级方案）
 const generateMockSuitabilityData = (pointId, totalHours) => {
   console.log(`[适飞分析] 生成模拟数据，pointId: ${pointId}, hours: ${totalHours}`);
-  
+
   const hours = totalHours || 3;
   const timeLabels = [];
   const now = new Date();
-  
+
   // 每10分钟一个点
   for (let i = 0; i <= hours * 6; i++) {
     const time = new Date(now.getTime() + i * 10 * 60000);
     timeLabels.push(`${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`);
   }
-  
+
   const heightLabels = ['0m', '100m', '200m', '300m', '400m', '500m'];
   const profileData = [];
-  
+
   // 生成模拟数据
   for (let h = 0; h < heightLabels.length; h++) {
     const row = [];
@@ -467,13 +536,13 @@ const generateMockSuitabilityData = (pointId, totalHours) => {
       const heightFactor = 1.0 - (h * 0.15);
       // 随机波动
       const randomFactor = 0.85 + Math.random() * 0.3;
-      
+
       const value = Math.min(100, Math.max(20, 70 * hourFactor * heightFactor * randomFactor));
       row.push(Number(value.toFixed(1)));
     }
     profileData.push(row);
   }
-  
+
   // 计算综合评分
   const overallScores = [];
   if (profileData.length > 0 && profileData[0].length > 0) {
@@ -485,7 +554,7 @@ const generateMockSuitabilityData = (pointId, totalHours) => {
       overallScores.push(Number((sum / profileData.length).toFixed(1)));
     }
   }
-  
+
   return {
     success: true,
     data: {
@@ -519,27 +588,27 @@ export const getRiskWarnings = async (params = {}) => {
 // 获取地理空间热力图数据（用于Cesium地图）
 export const getWeatherHeatmapGeo = async (params = {}) => {
   try {
-    const { 
-      time, 
+    const {
+      time,
       resolution = 'medium',
-      pointId 
+      pointId
     } = params;
-    
+
     if (!pointId) {
       throw new Error('监测点ID参数(pointId)是必需的');
     }
-    
+
     // 构建API请求参数
     const queryParams = new URLSearchParams();
     queryParams.append('pointId', pointId);
     if (time) queryParams.append('time', time.toISOString ? time.toISOString() : time);
     if (resolution) queryParams.append('resolution', resolution);
-    
+
     const url = `/weather/heatmap/geo?${queryParams.toString()}`;
     console.log('调用地理空间热力图API:', url);
-    
+
     const response = await apiClient.get(url);
-    
+
     if (response && response.data) {
       console.log('地理空间热力图API调用成功');
       return response.data;
@@ -559,11 +628,11 @@ export const getWindData = async () => {
   //   return data;
   // } catch (error) {
   //   console.error('获取风场数据失败，使用模拟数据：', error.message);
-    
-    // 导入并返回mock风场数据
-    const mockWindData = await import('../mock/windData.js');
-    return mockWindData.default;
-//  }
+
+  // 导入并返回mock风场数据
+  const mockWindData = await import('../mock/windData.js');
+  return mockWindData.default;
+  //  }
 }
 
 
@@ -590,11 +659,11 @@ export const getHeatmapData = async (params = {}) => {
 // 生成模拟微尺度热力图数据（用于getHeatmapData）
 function generateMockMicroscaleHeatmapData(params = {}) {
   const { region = 'default', timeRange = '24h' } = params;
-  
+
   // 生成网格数据 (10x10 网格)
   const gridSize = 10;
   const data = [];
-  
+
   for (let x = 0; x < gridSize; x++) {
     for (let y = 0; y < gridSize; y++) {
       // 风险等级: 1-5 (1=低风险, 5=高风险)
@@ -605,7 +674,7 @@ function generateMockMicroscaleHeatmapData(params = {}) {
       const windShear = Math.random() * 1.5;
       // 湍流: 0-1.0
       const turbulence = Math.random();
-      
+
       data.push({
         id: `${region}_${x}_${y}`,
         region,
@@ -621,7 +690,7 @@ function generateMockMicroscaleHeatmapData(params = {}) {
       });
     }
   }
-  
+
   return {
     code: 200,
     message: '成功',
@@ -785,7 +854,7 @@ function generateMockRoutesData() {
       riskLevel: '高'
     }
   ];
-  
+
   return {
     code: 200,
     message: '成功',
@@ -879,7 +948,7 @@ function generateMockRouteDetailData(routeId) {
       ]
     }
   };
-  
+
   const detail = routeDetails[routeId] || {
     routeId,
     routeName: `航路${routeId.split('-')[1] || '未知'}`,
@@ -888,10 +957,87 @@ function generateMockRouteDetailData(routeId) {
     riskAssessment: { overallRisk: '未知', factors: [] },
     recommendations: ['暂无建议']
   };
-  
+
   return {
     code: 200,
     message: '成功',
     data: detail
   };
+}
+
+// 创建新航线
+export const createRoute = async (routeData) => {
+  try {
+    const data = await apiClient.post('/routes', routeData);
+    return data;
+  } catch (error) {
+    console.error('创建航线失败:', error);
+    // 临时返回成功结果，避免前端崩溃
+    return {
+      code: 200,
+      message: '成功',
+      data: {
+        success: true,
+        routeId: `route-${Date.now()}`,
+        message: '航线创建成功（模拟）'
+      }
+    };
+  }
+}
+
+// 分析航线风险
+export const analyzeRouteRisk = async (routeId, params = {}) => {
+  try {
+    const data = await apiClient.post(`/routes/${routeId}/analyze`, params);
+    return data;
+  } catch (error) {
+    console.error('分析航线风险失败:', error);
+    // 临时返回模拟分析数据
+    return {
+      code: 200,
+      message: '成功',
+      data: {
+        success: true,
+        routeId,
+        routeName: `航线${routeId}`,
+        analysisTime: new Date().toISOString(),
+        riskDimensions: [
+          {
+            dimension: '风速风险',
+            level: 'medium',
+            score: 6.5,
+            description: '航线中存在3个航段风速超过8m/s'
+          },
+          {
+            dimension: '能见度风险',
+            level: 'low',
+            score: 3.2,
+            description: '能见度良好，平均大于10km'
+          }
+        ],
+        overallAssessment: {
+          overallRisk: 'medium',
+          overallScore: 6.0,
+          safetyLevel: '可飞行',
+          recommendation: '建议调整飞行高度'
+        },
+        measures: [
+          {
+            title: '调整飞行高度',
+            description: '将飞行高度提升至500米以上',
+            priority: 'high'
+          }
+        ],
+        alternativeRoutes: [
+          {
+            name: '北部绕行航线',
+            riskLevel: 'low',
+            distance: 22.3,
+            description: '避开所有高风险区域',
+            estimatedTime: '18分钟'
+          }
+        ]
+      }
+    };
+  }
 }

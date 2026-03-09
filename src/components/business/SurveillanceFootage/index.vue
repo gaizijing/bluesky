@@ -2,26 +2,17 @@
 <template>
   <div class="surveillance-footage">
     <div class="camera-grid">
-      <div 
-        class="camera-item"
-        v-for="(camera, index) in cameras"
-        :key="camera.id"
-        @click="selectCamera(index)"
-        :class="{ active: selectedCameraIndex === index }"
-      >
+      <div class="camera-item" v-for="(camera, index) in cameras" :key="camera.id" @click="selectCamera(index)"
+        :class="{ active: selectedCameraIndex === index }">
         <div class="camera-view">
           <div v-if="camera.status === 'online'" class="video-container">
-            <img 
-              :src="camera.previewImage || defaultImage" 
-              :alt="camera.name" 
-              class="camera-preview"
-              @error="handleImageError"
-            />
+            <img :src="camera.previewImage || defaultImage" :alt="camera.name" class="camera-preview"
+              @error="handleImageError" />
             <div class="camera-overlay">
               <div class="camera-name">{{ camera.name }}</div>
             </div>
           </div>
-          
+
           <div v-else class="offline-placeholder">
             <div class="offline-icon">📷</div>
             <div class="offline-text">摄像头离线</div>
@@ -47,27 +38,16 @@ const loading = ref(false);
 // 加载摄像头数据
 const loadCameras = async () => {
   loading.value = true;
-  try {
-    const data = await getCameras();
-    if (data && Array.isArray(data)) {
-      cameras.value = data.map((camera, index) => ({
-        ...camera,
-        // 如果没有预览图，使用默认图片
-        previewImage: camera.previewImage || getDefaultImage(index)
-      }));
-    }
-  } catch (error) {
-    console.error('加载摄像头数据失败:', error);
-    // 降级使用默认数据
-    cameras.value = [
-      { id: 'camera-001', name: '气象站监控01', location: 'A区气象站', status: 'online', previewImage: getDefaultImage(0) },
-      { id: 'camera-002', name: '雷达站监控01', location: 'B区雷达站', status: 'online', previewImage: getDefaultImage(1) },
-      { id: 'camera-003', name: '观测塔监控01', location: 'C区观测塔', status: 'offline', previewImage: getDefaultImage(2) },
-      { id: 'camera-004', name: '指挥中心监控01', location: 'D区指挥中心', status: 'online', previewImage: getDefaultImage(3) }
-    ];
-  } finally {
-    loading.value = false;
+
+  const data = await getCameras();
+  if (data && Array.isArray(data)) {
+    cameras.value = data.map((camera, index) => ({
+      ...camera,
+      // 如果没有预览图，使用默认图片
+      previewImage: camera.previewImage || getDefaultImage(index)
+    }));
   }
+  loading.value = false;
 };
 
 // 获取默认图片
@@ -111,7 +91,7 @@ onMounted(() => {
   grid-template-rows: repeat(2, 1fr);
   gap: 5px;
   flex: 1;
-  margin-left:10px
+  margin-left: 10px
 }
 
 .camera-item {
@@ -120,13 +100,13 @@ onMounted(() => {
   overflow: hidden;
   transition: all 0.3s ease;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  
+
   &:hover {
     transform: translateY(-3px);
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     border-color: rgba(64, 158, 255, 0.5);
   }
-  
+
   &.active {
     border-color: #409EFF;
     box-shadow: 0 0 15px rgba(64, 158, 255, 0.5);
@@ -190,7 +170,7 @@ onMounted(() => {
   .camera-grid {
     gap: 10px;
   }
-  
+
   .camera-view {
     height: 120px;
   }
