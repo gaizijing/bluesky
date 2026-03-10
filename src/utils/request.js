@@ -27,6 +27,8 @@ service.interceptors.request.use(
 
     // 添加token
     const token = getToken()
+    console.log('token:', token);
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -72,8 +74,7 @@ service.interceptors.response.use(
     if (res.code === 304) {
       return res
     }
-    // 未登录
-    if (res.code === 401) {
+    if (res.code === 401 && !requestUrl.includes('/auth/login')) {
       ElMessageBox.confirm('登录已过期，请重新登录', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',

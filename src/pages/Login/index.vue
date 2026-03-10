@@ -8,50 +8,29 @@
         <h1 class="title">气象服务系统</h1>
         <p class="subtitle">专业的低空气象监测与分析平台</p>
       </div>
-      
+
       <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" class="login-form">
         <el-form-item prop="username">
-          <el-input
-            v-model="loginForm.username"
-            placeholder="请输入用户名"
-            prefix-icon="el-icon-user"
-            size="large"
-            autocomplete="off"
-            @keyup.enter="handleLogin"
-            autofocus
-          />
+          <el-input v-model="loginForm.username" placeholder="请输入用户名" prefix-icon="el-icon-user" size="large"
+            autocomplete="off" @keyup.enter="handleLogin" autofocus />
         </el-form-item>
-        
+
         <el-form-item prop="password">
-          <el-input
-            v-model="loginForm.password"
-            type="password"
-            placeholder="请输入密码"
-            prefix-icon="el-icon-lock"
-            size="large"
-            show-password
-            autocomplete="off"
-            @keyup.enter="handleLogin"
-          />
+          <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" prefix-icon="el-icon-lock"
+            size="large" show-password autocomplete="off" @keyup.enter="handleLogin" />
         </el-form-item>
-        
+
         <el-form-item>
           <el-checkbox v-model="loginForm.remember">记住密码</el-checkbox>
         </el-form-item>
-        
+
         <el-form-item>
-          <el-button
-            type="primary"
-            :loading="loading"
-            @click="handleLogin"
-            size="large"
-            class="login-btn"
-          >
+          <el-button type="primary" :loading="loading" @click="handleLogin" size="large" class="login-btn">
             登录
           </el-button>
         </el-form-item>
       </el-form>
-      
+
       <div class="login-footer">
         <p>© 2024 气象服务系统</p>
       </div>
@@ -64,6 +43,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { userLogin } from '@/api/auth'
+import { setToken } from '@/utils/storageUtils'
 
 const router = useRouter()
 const loginFormRef = ref(null)
@@ -91,27 +71,32 @@ const loginRules = {
 // 处理登录
 const handleLogin = async () => {
   if (!loginFormRef.value) return
-  
+
   try {
     await loginFormRef.value.validate()
     loading.value = true
-    
     // 调用登录API
     const response = await userLogin(loginForm)
     
-    // 登录成功，保存token
-    localStorage.setItem('token', response.token)
-    
-    // 记住密码（实际项目中应加密存储）
-    if (loginForm.remember) {
-      localStorage.setItem('username', loginForm.username)
+    // 检查登录是否成功
+    if (response.success) {
+      // 登录成功，保存token
+      setToken(response.token)      
+      
+      // 记住密码（实际项目中应加密存储）
+      if (loginForm.remember) {
+        localStorage.setItem('username', loginForm.username)
+      } else {
+        localStorage.removeItem('username')
+      }
+      
+      ElMessage.success('登录成功')
+      router.push('/dashboard')
     } else {
-      localStorage.removeItem('username')
+      // 登录失败
+      ElMessage.error(response.message || '登录失败，请检查用户名和密码')
     }
-    
-    ElMessage.success('登录成功')
-    router.push('/dashboard')
-    
+
   } catch (error) {
     console.error('登录失败:', error)
     ElMessage.error(error.message || '登录失败，请重试')

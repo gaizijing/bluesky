@@ -472,8 +472,6 @@ const closeAddRouteModal = () => {
     startTime: todayMin.value,
     endTime: todayMax.value,
   };
-  console.log('guanbi ');
-
 };
 
 // 添加途经点

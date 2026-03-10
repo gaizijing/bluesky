@@ -112,6 +112,7 @@ import { useAreaStore } from '@/store/modules/area'
 import { ElMessage } from 'element-plus'
 import DialogContainer from '@/components/common/DialogContainer.vue'
 import { InitializationService } from '@/services/initialization'
+import { userLogout } from '@/api/auth'
 
 // 创建初始化服务实例
 const initializationService = new InitializationService();
@@ -252,9 +253,15 @@ const mapSetting = () => {
 };
 
 // 退出登录
-const handleLogout = () => {
-  // 实际项目中添加退出登录逻辑（清除token、状态等）
-  router.push("/login");
+const handleLogout = async () => {
+  try {
+    await userLogout();
+    // 导航到登录页
+    router.push("/login");
+  } catch (error) {
+    console.error('登出失败:', error);
+    ElMessage.error('登出失败，请稍后重试');
+  }
 };
 
 

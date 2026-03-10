@@ -1,4 +1,5 @@
 import request from '../utils/request';
+import { setToken, getToken,removeToken } from '../utils/storageUtils';
 
 /**
  * 用户登录
@@ -9,33 +10,35 @@ import request from '../utils/request';
  */
 export const userLogin = async (loginData) => {
   try {
-    // 在实际项目中，这里会是真实的API调用:
-    // const response = await request.post('/api/auth/login', loginData);
-    
-    // 模拟登录请求
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // 模拟登录成功
-        if (loginData.username === 'admin' && loginData.password === 'admin123') {
-          resolve({
-            token: 'fake-token-' + Date.now(),
-            userInfo: {
-              id: 'user-1',
-              username: 'admin',
-              name: '系统管理员',
-              role: 'admin',
-              permissions: ['dashboard', 'setting', 'map']
-            }
-          });
-        } else {
-          // 模拟登录失败
-          reject(new Error('用户名或密码错误'));
-        }
-      }, 1000);
-    });
+    const response = await request.post('/auth/login', loginData);
+
+    // 后端成功登录时返回 token 和 userInfo，没有 success 字段
+    // 检查是否有 token 和 userInfo 来判断登录是否成功
+    if (response && response.token && response.userInfo) {
+      // 使用工具函数存储token
+      setToken(response.token);
+
+      // 返回登录结果
+      return {
+        success: true,
+        token: response.token,
+        userInfo: response.userInfo
+      };
+    } else {
+      // 响应格式不正确（没有 token 或 userInfo）
+      console.error('登录响应格式错误:', response);
+      return {
+        success: false,
+        message: '登录响应格式错误'
+      };
+    }
   } catch (error) {
     console.error('登录失败:', error);
-    throw error;
+    // 处理网络错误等异常情况
+    return {
+      success: false,
+      message: error.message || '用户名或密码错误'
+    };
   }
 };
 
@@ -45,17 +48,22 @@ export const userLogin = async (loginData) => {
  */
 export const userLogout = async () => {
   try {
-    // 在实际项目中，这里会是真实的API调用:
-    // const response = await request.post('/api/auth/logout');
+    // 调用真实的登出API
+    const response = await request.post('/auth/logout');
     
-    // 模拟登出请求
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 500);
-    });
+    // 清除本地存储的token
+    removeToken();
+    console.log(111111111111,getToken());
+    
+    // 返回登出结果
+    return {
+      success: true,
+      message: '登出成功'
+    };
   } catch (error) {
     console.error('登出失败:', error);
+    // 即使API调用失败，也清除本地token
+    removeToken();
     throw error;
   }
 };
@@ -66,22 +74,16 @@ export const userLogout = async () => {
  */
 export const getUserInfo = async () => {
   try {
-    // 在实际项目中，这里会是真实的API调用:
-    // const response = await request.get('/api/auth/userInfo');
+    // 调用真实的获取用户信息API
+    const response = await request.get('/api/auth/userInfo');
     
-    // 模拟获取用户信息
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          id: 'user-1',
-          username: 'admin',
-          name: '系统管理员',
-          role: 'admin',
-          permissions: ['dashboard', 'setting', 'map'],
-          lastLoginTime: new Date().toISOString()
-        });
-      }, 500);
-    });
+    // 检查响应格式
+    if (response && (response.userInfo || response.id)) {
+      return response.userInfo || response;
+    } else {
+      console.error('获取用户信息响应格式错误:', response);
+      throw new Error('获取用户信息失败');
+    }
   } catch (error) {
     console.error('获取用户信息失败:', error);
     throw error;

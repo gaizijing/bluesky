@@ -1,34 +1,12 @@
-import axios from 'axios';
+import request from '../utils/request';
 import { fetchWeatherApi } from "openmeteo";
 
-// 创建axios实例
-const apiClient = axios.create({
-  baseURL: '/api',
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json;charset=utf-8'
-  }
-});
 
-// 响应拦截器 - 统一处理返回数据
-apiClient.interceptors.response.use(
-  (response) => {
-    const res = response.data;
-    if (res.code === 200) {
-      return res.data;
-    }
-    return Promise.reject(new Error(res.message || '请求失败'));
-  },
-  (error) => {
-    console.error('API请求错误:', error.message);
-    return Promise.reject(error);
-  }
-);
 
 // 获取重点关注区域列表
 export const fetchAreaList = async () => {
 
-  const data = await apiClient.get('/monitoring-points');
+  const data = await request.get('/monitoring-points');
   return data;
 
 }
@@ -36,7 +14,7 @@ export const fetchAreaList = async () => {
 // 获取当前选中的重点关注区域
 export const fetchCurrentSelectedArea = async () => {
 
-  const data = await apiClient.get('/monitoring-points/selected');
+  const data = await request.get('/monitoring-points/selected');
   return data;
 
 }
@@ -44,7 +22,7 @@ export const fetchCurrentSelectedArea = async () => {
 // 更新选中的重点关注区域
 export const updateSelectedArea = async (area) => {
   try {
-    const data = await apiClient.post('/monitoring-points/selected', { pointId: area.id });
+    const data = await request.post('/monitoring-points/selected', { pointId: area.id });
     return data;
   } catch (error) {
     console.error('保存重点关注区域切换信息失败:', error);
@@ -55,7 +33,7 @@ export const updateSelectedArea = async (area) => {
 // 添加新的重点关注区域
 export const addNewArea = async (areaData) => {
   try {
-    const data = await apiClient.post('/monitoring-points', areaData);
+    const data = await request.post('/monitoring-points', areaData);
     return data;
   } catch (error) {
     console.error('添加重点关注区域失败:', error);
@@ -90,7 +68,7 @@ export const getWeatherSuitability = async (params = {}) => {
   // 使用提取的pointId，而不是currentPoint对象
   const url = `/suitability/status?pointId=${encodeURIComponent(pointId || 'area-1')}&totalHours=3`;
 
-  const response = await apiClient.get(url);
+  const response = await request.get(url);
   return response
 
 
@@ -107,7 +85,7 @@ export const getCurrentSuitabilityIndex = async (currentPoint) => {
 
   // 调用真实API - 使用现有的/suitability/status接口
   const url = `/suitability/status?pointId=${encodeURIComponent(pointId)}&totalHours=1`;
-  const response = await apiClient.get(url);
+  const response = await request.get(url);
 
   if (response && response.data) {
     return response.data;
@@ -221,7 +199,7 @@ export const fetchCurrentPointWeather = async (currentPoint) => {
     const pointId = currentPoint.id || currentPoint.pointId || 'point-1';
 
     // 调用后端实时天气接口
-    const data = await apiClient.get(`/weather/realtime?pointId=${pointId}`);
+    const data = await request.get(`/weather/realtime?pointId=${pointId}`);
 
     // 后端返回的数据格式：{ updateTime, data: { ... } }
     // 适配前端期望的格式
@@ -304,7 +282,7 @@ export const getCitywideHeatmap = async (params = {}) => {
     const totalHours = parseInt(timeRange.replace('h', '')) || 3;
     const url = `/weather/heatmap/citywide?totalHours=${totalHours}&resolution=${resolution}`;
 
-    const response = await apiClient.get(url);
+    const response = await request.get(url);
 
     if (response && response.data) {
       console.log('[全市热力图] API调用成功');
@@ -424,7 +402,7 @@ export const getWeatherForecastHeatmap = async (params = {}) => {
 
   try {
     console.log('[适飞分析] 调用API:', url);
-    const response = await apiClient.get(url);
+    const response = await request.get(url);
 
     if (response && response.data) {
       console.log('[适飞分析] API调用成功');
@@ -577,7 +555,7 @@ export const getRiskWarnings = async (params = {}) => {
     if (queryParams.length > 0) {
       url += '?' + queryParams.join('&');
     }
-    const data = await apiClient.get(url);
+    const data = await request.get(url);
     return data;
   } catch (error) {
     console.error('获取风险预警数据失败：', error);
@@ -607,7 +585,7 @@ export const getWeatherHeatmapGeo = async (params = {}) => {
     const url = `/weather/heatmap/geo?${queryParams.toString()}`;
     console.log('调用地理空间热力图API:', url);
 
-    const response = await apiClient.get(url);
+    const response = await request.get(url);
 
     if (response && response.data) {
       console.log('地理空间热力图API调用成功');
@@ -623,16 +601,8 @@ export const getWeatherHeatmapGeo = async (params = {}) => {
 
 // 获取风场数据
 export const getWindData = async () => {
-  // try {
-  //   const data = await apiClient.get('/weather/wind');
-  //   return data;
-  // } catch (error) {
-  //   console.error('获取风场数据失败，使用模拟数据：', error.message);
-
-  // 导入并返回mock风场数据
-  const mockWindData = await import('../mock/windData.js');
-  return mockWindData.default;
-  //  }
+     const data = await request.get('/wind-field?time=2025-01-01T10:00:00');
+     return data;
 }
 
 
@@ -648,7 +618,7 @@ export const getHeatmapData = async (params = {}) => {
     if (queryParams.length > 0) {
       url += '?' + queryParams.join('&');
     }
-    const data = await apiClient.get(url);
+    const data = await request.get(url);
     return data;
   } catch (error) {
     console.error('获取热力图数据失败：', error.message);
@@ -708,7 +678,7 @@ function generateMockMicroscaleHeatmapData(params = {}) {
 // 获取设备统计
 export const getDeviceCount = async () => {
   try {
-    const data = await apiClient.get('/devices/count');
+    const data = await request.get('/devices/count');
     return data;
   } catch (error) {
     console.error('获取设备统计失败:', error);
@@ -728,7 +698,7 @@ export const getDeviceAlarms = async (params = {}) => {
     if (queryParams.length > 0) {
       url += '?' + queryParams.join('&');
     }
-    const data = await apiClient.get(url);
+    const data = await request.get(url);
     return data;
   } catch (error) {
     console.error('获取设备告警失败:', error);
@@ -739,7 +709,7 @@ export const getDeviceAlarms = async (params = {}) => {
 // 获取设备历史数据
 export const getDeviceHistory = async () => {
   try {
-    const data = await apiClient.get('/devices/history');
+    const data = await request.get('/devices/history');
     return data;
   } catch (error) {
     console.error('获取设备历史数据失败:', error);
@@ -754,7 +724,7 @@ export const getCameras = async (status) => {
   try {
     let url = '/cameras';
     if (status) url += `?status=${status}`;
-    const data = await apiClient.get(url);
+    const data = await request.get(url);
     return data;
   } catch (error) {
     console.error('获取摄像头列表失败:', error);
@@ -767,7 +737,7 @@ export const getCameras = async (status) => {
 // 获取航路列表
 export const getRoutes = async () => {
   try {
-    const data = await apiClient.get('/routes');
+    const data = await request.get('/routes');
     return data;
   } catch (error) {
     console.error('获取航路列表失败（后端RouteService有IndexOutOfBoundsException）:', error);
@@ -787,7 +757,7 @@ export const getRoutes = async () => {
 // 获取航路详情
 export const getRouteDetail = async (routeId) => {
   try {
-    const data = await apiClient.get(`/routes/${routeId}`);
+    const data = await request.get(`/routes/${routeId}`);
     return data;
   } catch (error) {
     console.error('获取航路详情失败（后端RouteService有IndexOutOfBoundsException）:', error);
@@ -968,7 +938,7 @@ function generateMockRouteDetailData(routeId) {
 // 创建新航线
 export const createRoute = async (routeData) => {
   try {
-    const data = await apiClient.post('/routes', routeData);
+    const data = await request.post('/routes', routeData);
     return data;
   } catch (error) {
     console.error('创建航线失败:', error);
@@ -988,7 +958,7 @@ export const createRoute = async (routeData) => {
 // 分析航线风险
 export const analyzeRouteRisk = async (routeId, params = {}) => {
   try {
-    const data = await apiClient.post(`/routes/${routeId}/analyze`, params);
+    const data = await request.post(`/routes/${routeId}/analyze`, params);
     return data;
   } catch (error) {
     console.error('分析航线风险失败:', error);

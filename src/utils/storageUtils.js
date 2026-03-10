@@ -22,6 +22,7 @@ export const setStorage = (key, value, type = STORAGE_TYPE.LOCAL) => {
     // 序列化值（处理对象/数组等类型）
     const storedValue = JSON.stringify(value)
     storage.setItem(key, storedValue)
+    console.log(`成功设置 ${type} 存储项 ${key}:`, value)
   } catch (error) {
     console.error(`设置存储项 ${key} 失败:`, error)
   }
@@ -40,7 +41,11 @@ export const getStorage = (key, defaultValue = null, type = STORAGE_TYPE.LOCAL) 
     if (!storage) throw new Error(`不支持 ${type} 存储`)
     const storedValue = storage.getItem(key)
     if (storedValue === null) return defaultValue
-    // 反序列化值（还原对象/数组等类型）
+    // 尝试反序列化值（还原对象/数组等类型）
+    // 如果是 "undefined" 或 "null" 字符串，直接返回默认值
+    if (storedValue === 'undefined' || storedValue === 'null') {
+      return defaultValue
+    }
     return JSON.parse(storedValue)
   } catch (error) {
     console.error(`获取存储项 ${key} 失败:`, error)
