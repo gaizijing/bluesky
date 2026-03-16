@@ -72,9 +72,9 @@
             </div>
           </label>
           <div class="range-inputs">
-            <input type="number" min="0" max="0.1" step="0.001" v-model.number="localOptions.lineWidth.min"
+            <input type="number" min="0" max="1" step="0.01" v-model.number="localOptions.lineWidth.min"
               class="num-input" />
-            <input type="number" min="0" max="0.1" step="0.001" v-model.number="localOptions.lineWidth.max"
+            <input type="number" min="0" max="5" step="0.01" v-model.number="localOptions.lineWidth.max"
               class="num-input" />
           </div>
         </div>
@@ -89,9 +89,9 @@
             </div>
           </label>
           <div class="range-inputs">
-            <input type="number" min="0" max="10" step="0.01" v-model.number="localOptions.lineLength.min"
+            <input type="number" min="0" max="1" step="0.1" v-model.number="localOptions.lineLength.min"
               class="num-input" />
-            <input type="number" min="0" max="10" step="0.01" v-model.number="localOptions.lineLength.max"
+            <input type="number" min="0" max="20" step="0.1" v-model.number="localOptions.lineLength.max"
               class="num-input" />
           </div>
         </div>

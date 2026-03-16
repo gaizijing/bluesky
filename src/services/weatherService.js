@@ -44,7 +44,7 @@ class WeatherService {
       
       this.getWindStore().setWindData(windData);
     } catch (error) {
-      console.error('加载区域天气数据失败:', error);
+      console.error('加载风场数据失败:', error);
       throw error;
     }
   }

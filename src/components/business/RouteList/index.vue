@@ -230,7 +230,6 @@ import DialogContainer from "@/components/common/DialogContainer.vue";
 import { useRouteStore } from "@/store/modules/routeStore"; // 引入store
 import { useHeatmapStore } from "@/store/modules/heatmap"; // 引入热力图store
 import routeManager from "@/cesium/entities/routes"; // 导入航线管理器
-import { useWindStore } from '@/store/modules/wind'
 const routeStore = useRouteStore();
 const heatmapStore = useHeatmapStore();
 

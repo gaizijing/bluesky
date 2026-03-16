@@ -1,6 +1,5 @@
 import { WindLayer } from 'cesium-wind-layer';
 import { watch } from 'vue';
-import { getWindData } from '@/api';
 import { useWindStore } from '@/store/modules/wind';
 /**
  * 初始化风场图层

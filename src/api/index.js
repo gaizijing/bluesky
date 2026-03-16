@@ -601,7 +601,7 @@ export const getWeatherHeatmapGeo = async (params = {}) => {
 
 // 获取风场数据
 export const getWindData = async () => {
-     const data = await request.get('/wind-field?time=2025-01-01T10:00:00');
+     const data = await request.get('/wind-field?bounds=119,35,122,37');
      return data;
 }
 
