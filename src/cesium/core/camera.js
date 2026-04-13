@@ -1,14 +1,24 @@
 import * as Cesium from 'cesium'
+import { useRegionStore } from '@/store/modules/region'
 
-// 重定义青岛视觉中心和范围（城市主体视觉框）
-export const QINGDAO_VIEW = {
-  rectangle: Cesium.Rectangle.fromDegrees(
-    119.8, 35.95,  // 西南角
-    120.6, 36.35   // 东北角
-  ),
-  center: [120.38, 36.10],  // 视觉中心点
-  defaultHeight: 18000       // 默认概览高度
+// 获取地区配置
+export const getRegionConfig = () => {
+  const regionStore = useRegionStore();
+  const bounds = regionStore.getRegionBounds;
+  return {
+    name: regionStore.getRegionName,
+    center: regionStore.getRegionCenter,
+    rectangle: Cesium.Rectangle.fromDegrees(
+      bounds.west,
+      bounds.south,
+      bounds.east,
+      bounds.north
+    ),
+    defaultHeight: 18000
+  };
 };
+
+
 
 // 相机高度限制
 export const CAMERA_HEIGHT_LIMITS = {
@@ -83,14 +93,16 @@ export const getFlyToOptions = (options) => ({
 })
 
 /**
- * 青岛概览飞行
+ * 地区概览飞行
  * @param {Cesium.Viewer} viewer - Cesium viewer实例
  */
-export const flyToQingdaoOverview = (viewer) => {
+export const flyToRegionOverview = (viewer) => {
   if (!viewer) return;
   
+  const regionConfig = getRegionConfig();
+  
   viewer.camera.flyTo({
-    destination: QINGDAO_VIEW.rectangle,
+    destination: regionConfig.rectangle,
     orientation: {
       heading: 0,
      // pitch: Cesium.Math.toRadians(-45),
@@ -176,17 +188,20 @@ export const limitCameraRange = (viewer) => {
       CAMERA_HEIGHT_LIMITS.max
     );
 
+    // 获取最新的地区配置
+    const regionConfig = getRegionConfig();
+    
     // 范围限制
     const clampedLongitude = Cesium.Math.clamp(
       carto.longitude,
-      QINGDAO_VIEW.rectangle.west,
-      QINGDAO_VIEW.rectangle.east
+      regionConfig.rectangle.west,
+      regionConfig.rectangle.east
     );
 
     const clampedLatitude = Cesium.Math.clamp(
       carto.latitude,
-      QINGDAO_VIEW.rectangle.south,
-      QINGDAO_VIEW.rectangle.north
+      regionConfig.rectangle.south,
+      regionConfig.rectangle.north
     );
 
     // 只有当相机位置超出限制时才更新
@@ -221,19 +236,22 @@ export const switchToOverviewMode = (viewer) => {
   if (!viewer) return;
   
   // 使用新的概览飞行函数
-  flyToQingdaoOverview(viewer);
+  flyToRegionOverview(viewer);
 };
 
 /**
  * 切换到重点关注模式（视角拉近）
  * @param {Cesium.Viewer} viewer - Cesium viewer实例
- * @param {Object} region - 重点关注区域信息（可选，默认使用青岛中心点）
+ * @param {Object} region - 重点关注区域信息（可选，默认使用地区中心点）
  */
 export const switchToFocusMode = (viewer, region = null) => {
   if (!viewer) return;
 
-  // 默认使用青岛视觉中心点
-  const center = region?.coordinates || QINGDAO_VIEW.center;
+  // 获取最新的地区配置
+  const regionConfig = getRegionConfig();
+  
+  // 默认使用地区视觉中心点
+  const center = region?.coordinates || regionConfig.center;
   
   // 创建边界球，用于重点关注模式
   const boundingSphere = new Cesium.BoundingSphere(

@@ -29,7 +29,7 @@ export const useAreaStore = defineStore('areaList', {
 
   actions: {
     setSelectedArea(area) {
-      this.selectedArea = area;
+      this.selectedArea = area;      
     },
 
     setAreaList(areas) {

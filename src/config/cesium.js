@@ -1,17 +1,25 @@
 import { BASE_LAYER_TYPES } from './constants'
 import * as Cesium from 'cesium'
 
+// 从region store获取地区配置
+import { useRegionStore } from '@/store/modules/region';
+
 // Cesium全局配置
-export const CESIUM_CONFIG = {
-  // 1. 初始视角（中国区域）
-  initialView: {
-        destination: Cesium.Cartesian3.fromDegrees(120.3729295481860, 35.98452399457502, 10000), // 崂山默认视角
-        orientation: {
-         heading: Cesium.Math.toRadians(3.003064151986261),
-          pitch: Cesium.Math.toRadians(-19.956092932734972),
-          roll: Cesium.Math.toRadians(0.000034138867324716554)
-        }
-      },
+export const getCesiumConfig = () => {
+  const regionStore = useRegionStore();
+  const [centerLng, centerLat] = regionStore.getRegionCenter;
+  const defaultHeight = 18000;
+  
+  return {
+    // 1. 初始视角（地区中心）
+    initialView: {
+          destination: Cesium.Cartesian3.fromDegrees(centerLng, centerLat, defaultHeight * 0.5), // 地区默认视角
+          orientation: {
+           heading: Cesium.Math.toRadians(3.003064151986261),
+            pitch: Cesium.Math.toRadians(-19.956092932734972),
+            roll: Cesium.Math.toRadians(0.000034138867324716554)
+          }
+        },
 
   // 2. 基础图层配置（与BASE_LAYER_TYPES对应）
   layers: {
@@ -81,4 +89,6 @@ export const CESIUM_CONFIG = {
 
 
   }
-}
+  };
+};
+

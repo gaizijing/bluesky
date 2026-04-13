@@ -83,6 +83,12 @@ const handleLogin = async () => {
       // 登录成功，保存token
       setToken(response.token)      
       
+      // 保存用户角色信息
+      const userRole = response.userInfo?.role || 'user'
+      console.log(userRole);
+      
+      localStorage.setItem('userRole', userRole)
+      
       // 记住密码（实际项目中应加密存储）
       if (loginForm.remember) {
         localStorage.setItem('username', loginForm.username)
@@ -91,7 +97,12 @@ const handleLogin = async () => {
       }
       
       ElMessage.success('登录成功')
-      router.push('/dashboard')
+      // 根据角色跳转不同页面
+      if (userRole === 'admin') {
+        router.push('/admin')
+      } else {
+        router.push('/dashboard')
+      }
     } else {
       // 登录失败
       ElMessage.error(response.message || '登录失败，请检查用户名和密码')

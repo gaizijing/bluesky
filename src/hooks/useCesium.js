@@ -3,8 +3,9 @@ import * as Cesium from 'cesium'
 import { useWindStore } from '@/store/modules/wind'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import { useAreaStore } from '@/store/modules/area'
+import { useRegionStore } from '@/store/modules/region'
 import { createViewer, destroyViewer } from '@/cesium/core/viewer'
-import { handleCameraMove, getCurrentCameraParams, flyToRegion, flyToRectangle, limitCameraRange, switchToOverviewMode, switchToFocusMode, flyToQingdaoOverview, setupCameraPrintKeydown, watchCameraHeight } from '@/cesium/core/camera'
+import { handleCameraMove, getCurrentCameraParams, flyToRegion, flyToRectangle, limitCameraRange, switchToOverviewMode, switchToFocusMode, flyToRegionOverview, setupCameraPrintKeydown, watchCameraHeight } from '@/cesium/core/camera'
 import { addTiandituLayer, addTiandituWithGaodeOverlay } from '@/cesium/layers/tianditu'
 import { loadTerrain } from '@/cesium/layers/terrain'
 import { addWhiteModel } from '@/cesium/layers/model3d'
@@ -27,6 +28,7 @@ export function useCesium(containerId) {
   const areaStore = useAreaStore()
   const layerSettingsStore = useLayerSettingsStore()
   const routeStore = useRouteStore()
+  const regionStore = useRegionStore()
 
   // 响应式状态
   const viewer = ref(null)
@@ -529,6 +531,11 @@ export function useCesium(containerId) {
     try {
       isLoading.value = true
       console.log('[Cesium] 开始初始化...')
+
+      // 首先获取地区配置
+      console.log('[Cesium] 0. 获取地区配置...')
+      await regionStore.fetchRegionConfig()
+      console.log('[Cesium] 地区配置获取成功')
 
       // 执行初始化步骤
       console.log('[Cesium] 1. 初始化Viewer...')

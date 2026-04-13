@@ -59,7 +59,7 @@ class AreaManager {
     // 配置聚合参数
     this._configureClustering(dataSource)
 
-    // 创建并添加重点关注区域实体
+    // 创建并添加重点关注区域实体    
     areas.forEach(area => {
       const entity = this._createAreaEntity(dataSource, area)
         dataSource.entities.add(entity)
@@ -78,10 +78,10 @@ class AreaManager {
     const entity = this.areaEntities.get(entityId)
 
     this.selectedEntity = this._setEntityAsSelected(entity)
-
     const areaData = entity.properties.areaData
     const area = areaData && areaData.getValue ? areaData.getValue() : areaData
     if (area?.bbox) {
+      
       flyToRegion(this.viewer, { bbox: area.bbox, duration: 1.5 })
       this._showSelectedAreaPolygon(area.bbox)
     }
@@ -253,7 +253,6 @@ class AreaManager {
 
   // 私有方法：创建重点关注区域实体
   _createAreaEntity(dataSource, area) {
-    if (!dataSource || !area?.coordinates) return
     const entityId = `area_${area.id}`
     // 移除旧实体
     if (this.areaEntities.has(entityId)) {
@@ -266,7 +265,8 @@ class AreaManager {
     const serializableArea = {
       id: area.id,
       name: area.name,
-      coordinates: area.coordinates,
+      longitude: area.longitude,
+      latitude: area.latitude,
       bbox: area.bbox,
       type: area.type,
       status: area.status,
@@ -275,7 +275,7 @@ class AreaManager {
 
     const entity = new Cesium.Entity({
       id: entityId,
-      position: Cesium.Cartesian3.fromDegrees(area.coordinates[0], area.coordinates[1], 50),
+      position: Cesium.Cartesian3.fromDegrees(area.longitude, area.latitude, 50),
       billboard: new Cesium.BillboardGraphics({
         image: '/image/ic_point.png',
         width: 60,

@@ -41,6 +41,28 @@ export const addNewArea = async (areaData) => {
   }
 };
 
+// 更新指定的监测点
+export const updateMonitoringPoint = async (id, areaData) => {
+  try {
+    const data = await request.put(`/monitoring-points/${id}`, areaData);
+    return data;
+  } catch (error) {
+    console.error('更新监测点失败:', error);
+    throw error;
+  }
+};
+
+// 删除指定的监测点
+export const deleteMonitoringPoint = async (id) => {
+  try {
+    const data = await request.delete(`/monitoring-points/${id}`);
+    return data;
+  } catch (error) {
+    console.error('删除监测点失败:', error);
+    throw error;
+  }
+};
+
 // 获取单点适飞指数分析数据
 export const getWeatherSuitability = async (params = {}) => {
 
@@ -64,7 +86,7 @@ export const getWeatherSuitability = async (params = {}) => {
   queryParams.append('timeRange', timeRange);
   if (includeThresholds) queryParams.append('includeThresholds', 'true');
 
-  // 尝试调用真实API - 注意：后端路径是 /api/suitability/status
+  // 尝试调用真实API - 注意：后端路径是 /suitability/status
   // 使用提取的pointId，而不是currentPoint对象
   const url = `/suitability/status?pointId=${encodeURIComponent(pointId || 'area-1')}&totalHours=3`;
 
@@ -163,7 +185,7 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
     const API_KEY = import.meta.env.VITE_QWEATHER_API_KEY;
 
     // 使用代理路径（vite.config.js中配置）
-    const proxyUrl = `/api/weather/now?location=${longitude},${latitude}&key=${API_KEY}`;
+    const proxyUrl = `/weather/now?location=${longitude},${latitude}&key=${API_KEY}`;
 
     try {
       const response = await axios.get(proxyUrl, {
@@ -303,12 +325,15 @@ export const getCitywideHeatmap = async (params = {}) => {
 const generateMockCitywideHeatmapData = (totalHours, resolution) => {
   console.log(`[全市热力图] 生成模拟全市热力图数据，hours: ${totalHours}, resolution: ${resolution}`);
 
-  // 青岛市的大致边界范围
-  const qingdaoBounds = {
-    minLon: 120.0,
-    maxLon: 121.0,
-    minLat: 36.0,
-    maxLat: 37.0
+  // 从region store获取地区边界范围
+  const { useRegionStore } = require('@/store/modules/region');
+  const regionStore = useRegionStore();
+  const bounds = regionStore.getRegionBounds;
+  const regionBounds = {
+    minLon: bounds.west,
+    maxLon: bounds.east,
+    minLat: bounds.south,
+    maxLat: bounds.north
   };
 
   // 根据分辨率确定网格密度
@@ -317,13 +342,13 @@ const generateMockCitywideHeatmapData = (totalHours, resolution) => {
 
   // 生成网格点数据
   const points = [];
-  const lonStep = (qingdaoBounds.maxLon - qingdaoBounds.minLon) / gridSize;
-  const latStep = (qingdaoBounds.maxLat - qingdaoBounds.minLat) / gridSize;
+  const lonStep = (regionBounds.maxLon - regionBounds.minLon) / gridSize;
+  const latStep = (regionBounds.maxLat - regionBounds.minLat) / gridSize;
 
   for (let i = 0; i < gridSize; i++) {
     for (let j = 0; j < gridSize; j++) {
-      const lon = qingdaoBounds.minLon + i * lonStep + (Math.random() * lonStep * 0.3);
-      const lat = qingdaoBounds.minLat + j * latStep + (Math.random() * latStep * 0.3);
+      const lon = regionBounds.minLon + i * lonStep + (Math.random() * lonStep * 0.3);
+      const lat = regionBounds.minLat + j * latStep + (Math.random() * latStep * 0.3);
 
       // 模拟风险值：0-100，模拟一些高风险区域
       let value = 30 + Math.random() * 40; // 基础值 30-70
@@ -354,7 +379,7 @@ const generateMockCitywideHeatmapData = (totalHours, resolution) => {
     success: true,
     data: {
       points: points,
-      bounds: qingdaoBounds,
+      bounds: regionBounds,
       timestamp: new Date().toISOString(),
       resolution: resolution,
       totalPoints: points.length
@@ -605,6 +630,88 @@ export const getWindData = async () => {
      return data;
 }
 
+// ==================== 地区配置管理接口 ====================
+
+// 获取地区配置信息（兼容旧接口）
+export const getRegionConfig = async () => {
+  try {
+    const response = await request.get('/weather/region-config');
+    if (response) {
+      return response;
+    }
+    throw new Error('API返回数据为空');
+  } catch (error) {
+    console.error('获取地区配置信息失败:', error);
+    throw error;
+  }
+};
+
+// 获取所有地区配置
+export const getAllRegionConfigs = async () => {
+  try {
+    const response = await request.get('/region-config/list');
+    return response;
+  } catch (error) {
+    console.error('获取地区配置列表失败:', error);
+    throw error;
+  }
+};
+
+// 获取默认地区配置
+export const getDefaultRegionConfig = async () => {
+  try {
+    const response = await request.get('/region-config/default');
+    return response;
+  } catch (error) {
+    console.error('获取默认地区配置失败:', error);
+    throw error;
+  }
+};
+
+// 根据ID获取地区配置
+export const getRegionConfigById = async (id) => {
+  try {
+    const response = await request.get(`/region-config/${id}`);
+    return response;
+  } catch (error) {
+    console.error('获取地区配置详情失败:', error);
+    throw error;
+  }
+};
+
+// 添加地区配置
+export const addRegionConfig = async (data) => {
+  try {
+    const response = await request.post('/region-config', data);
+    return response;
+  } catch (error) {
+    console.error('添加地区配置失败:', error);
+    throw error;
+  }
+};
+
+// 更新地区配置
+export const updateRegionConfig = async (data) => {
+  try {
+    const response = await request.put('/region-config', data);
+    return response;
+  } catch (error) {
+    console.error('更新地区配置失败:', error);
+    throw error;
+  }
+};
+
+// 删除地区配置
+export const deleteRegionConfig = async (id) => {
+  try {
+    const response = await request.delete(`/region-config/${id}`);
+    return response;
+  } catch (error) {
+    console.error('删除地区配置失败:', error);
+    throw error;
+  }
+};
+
 
 
 // 获取热力图数据（微尺度天气）
@@ -713,6 +820,83 @@ export const getDeviceHistory = async () => {
     return data;
   } catch (error) {
     console.error('获取设备历史数据失败:', error);
+    throw error;
+  }
+}
+
+// 获取所有设备列表
+export const getDeviceList = async () => {
+  try {
+    const data = await request.get('/devices/list');
+    return data;
+  } catch (error) {
+    console.error('获取设备列表失败:', error);
+    throw error;
+  }
+}
+
+// 获取在线设备列表
+export const getOnlineDevices = async () => {
+  try {
+    const data = await request.get('/devices/online');
+    return data;
+  } catch (error) {
+    console.error('获取在线设备列表失败:', error);
+    throw error;
+  }
+}
+
+// 根据设备类型获取设备列表
+export const getDevicesByType = async (type) => {
+  try {
+    const data = await request.get(`/devices/by-type/${encodeURIComponent(type)}`);
+    return data;
+  } catch (error) {
+    console.error('按类型获取设备列表失败:', error);
+    throw error;
+  }
+}
+
+// 根据ID获取指定设备
+export const getDeviceById = async (id) => {
+  try {
+    const data = await request.get(`/devices/${id}`);
+    return data;
+  } catch (error) {
+    console.error('获取设备详情失败:', error);
+    throw error;
+  }
+}
+
+// 添加设备
+export const createDevice = async (data) => {
+  try {
+    const response = await request.post('/devices', data);
+    return response;
+  } catch (error) {
+    console.error('新增设备失败:', error);
+    throw error;
+  }
+}
+
+// 更新设备
+export const updateDevice = async (id, data) => {
+  try {
+    const response = await request.put(`/devices/${id}`, data);
+    return response;
+  } catch (error) {
+    console.error('更新设备失败:', error);
+    throw error;
+  }
+}
+
+// 删除设备
+export const deleteDevice = async (id) => {
+  try {
+    const response = await request.delete(`/devices/${id}`);
+    return response;
+  } catch (error) {
+    console.error('删除设备失败:', error);
     throw error;
   }
 }
@@ -1011,3 +1195,161 @@ export const analyzeRouteRisk = async (routeId, params = {}) => {
     };
   }
 }
+
+// ==================== 阈值管理接口 ====================
+
+// 获取所有阈值配置
+export const getAllThresholds = async () => {
+  try {
+    const data = await request.get('/aircraft-limits/list');
+    return data;
+  } catch (error) {
+    console.error('获取阈值配置失败:', error);
+    throw error;
+  }
+};
+
+// 根据ID获取阈值配置
+export const getThresholdById = async (id) => {
+  try {
+    const data = await request.get(`/aircraft-limits/${id}`);
+    return data;
+  } catch (error) {
+    console.error('获取阈值配置失败:', error);
+    throw error;
+  }
+};
+
+// 根据飞行器ID获取阈值配置
+export const getThresholdByAircraftId = async (aircraftId) => {
+  try {
+    const data = await request.get(`/aircraft-limits/aircraft/${aircraftId}`);
+    return data;
+  } catch (error) {
+    console.error('获取飞行器阈值配置失败:', error);
+    throw error;
+  }
+};
+
+// 获取默认阈值配置
+export const getDefaultThreshold = async () => {
+  try {
+    const data = await request.get('/aircraft-limits/default');
+    return data;
+  } catch (error) {
+    console.error('获取默认阈值配置失败:', error);
+    throw error;
+  }
+};
+
+// 更新默认阈值配置
+export const updateDefaultThreshold = async (data) => {
+  try {
+    const response = await request.put('/aircraft-limits/default', data);
+    return response;
+  } catch (error) {
+    console.error('更新默认阈值配置失败:', error);
+    throw error;
+  }
+};
+
+// 添加阈值配置
+export const addThreshold = async (data) => {
+  try {
+    const response = await request.post('/aircraft-limits', data);
+    return response;
+  } catch (error) {
+    console.error('添加阈值配置失败:', error);
+    throw error;
+  }
+};
+
+// 更新阈值配置
+export const updateThreshold = async (data) => {
+  try {
+    const response = await request.put('/aircraft-limits', data);
+    return response;
+  } catch (error) {
+    console.error('更新阈值配置失败:', error);
+    throw error;
+  }
+};
+
+// 删除阈值配置
+export const deleteThreshold = async (id) => {
+  try {
+    const response = await request.delete(`/aircraft-limits/${id}`);
+    return response;
+  } catch (error) {
+    console.error('删除阈值配置失败:', error);
+    throw error;
+  }
+};
+
+// ==================== 飞行器管理接口 ====================
+
+// 获取所有飞行器模型
+export const getAllAircraftModels = async () => {
+  try {
+    const data = await request.get('/aircraft-models/list');
+    return data;
+  } catch (error) {
+    console.error('获取飞行器模型列表失败:', error);
+    throw error;
+  }
+};
+
+// 获取启用的飞行器模型
+export const getActiveAircraftModels = async () => {
+  try {
+    const data = await request.get('/aircraft-models/active');
+    return data;
+  } catch (error) {
+    console.error('获取启用的飞行器模型失败:', error);
+    throw error;
+  }
+};
+
+// 根据ID获取飞行器模型
+export const getAircraftModelById = async (id) => {
+  try {
+    const data = await request.get(`/aircraft-models/${id}`);
+    return data;
+  } catch (error) {
+    console.error('获取飞行器模型失败:', error);
+    throw error;
+  }
+};
+
+// 添加飞行器模型
+export const addAircraftModel = async (data) => {
+  try {
+    const response = await request.post('/aircraft-models', data);
+    return response;
+  } catch (error) {
+    console.error('添加飞行器模型失败:', error);
+    throw error;
+  }
+};
+
+// 更新飞行器模型
+export const updateAircraftModel = async (data) => {
+  try {
+    const response = await request.put('/aircraft-models', data);
+    return response;
+  } catch (error) {
+    console.error('更新飞行器模型失败:', error);
+    throw error;
+  }
+};
+
+// 删除飞行器模型
+export const deleteAircraftModel = async (id) => {
+  try {
+    const response = await request.delete(`/aircraft-models/${id}`);
+    return response;
+  } catch (error) {
+    console.error('删除飞行器模型失败:', error);
+    throw error;
+  }
+};

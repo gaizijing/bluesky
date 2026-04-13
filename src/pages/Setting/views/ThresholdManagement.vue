@@ -1,18 +1,98 @@
 <template>
-  <!-- 通用阈值配置容器 -->
-  <div class="common-threshold-container">
-    <div class="threshold-card">
-    
+  <!-- 阈值管理容器 -->
+  <div class="threshold-management-container">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2>阈值管理</h2>
+      <button class="add-btn" @click="handleAddThreshold">添加阈值配置</button>
+    </div>
 
-      <!-- 阈值配置表单 -->
+    <!-- 阈值列表 -->
+    <div class="threshold-list">
+      <div class="list-header">
+        <h3>阈值配置列表</h3>
+        <div class="list-actions">
+          <input 
+            type="text" 
+            v-model="searchAircraftId" 
+            placeholder="输入飞行器ID搜索" 
+            class="search-input"
+          >
+          <button class="search-btn" @click="handleSearchByAircraftId">搜索</button>
+          <button class="default-btn" @click="handleGetDefaultThreshold">获取默认配置</button>
+        </div>
+      </div>
+      
+      <div class="list-content">
+        <table class="threshold-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>飞行器ID</th>
+              <th>最大风速(m/s)</th>
+              <th>最大风切变(m/s)</th>
+              <th>最小能见度(km)</th>
+              <th>最大降水量(mm)</th>
+              <th>最小云底高度(米)</th>
+              <th>最低温度(℃)</th>
+              <th>最高温度(℃)</th>
+              <th>最大湿度(%)</th>
+              <th>最大湍流等级</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="threshold in thresholds" :key="threshold.id">
+              <td>{{ threshold.id }}</td>
+              <td>{{ threshold.aircraftId || '默认' }}</td>
+              <td>{{ threshold.maxWindSpeed }}</td>
+              <td>{{ threshold.maxWindShear }}</td>
+              <td>{{ threshold.minVisibility }}</td>
+              <td>{{ threshold.maxPrecipitation }}</td>
+              <td>{{ threshold.minCloudBase }}</td>
+              <td>{{ threshold.tempMin }}</td>
+              <td>{{ threshold.tempMax }}</td>
+              <td>{{ threshold.maxHumidity }}</td>
+              <td>{{ threshold.maxTurbulenceLevel }}</td>
+              <td>
+                <button class="edit-btn" @click="handleEditThreshold(threshold)">编辑</button>
+                <button class="delete-btn" @click="handleDeleteThreshold(threshold.id)">删除</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="thresholds.length === 0" class="empty-state">
+          <p>暂无阈值配置</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 阈值配置表单 -->
+    <div class="threshold-form-card" v-if="showForm">
+      <div class="form-header">
+        <h3>{{ isEditing ? '编辑阈值配置' : '添加阈值配置' }}</h3>
+        <button class="close-btn" @click="showForm = false">&times;</button>
+      </div>
+      
       <form class="threshold-form" @submit.prevent="handleSave">
         <!-- 阈值参数区 -->
         <div class="form-section">
-     
           <div class="form-grid">
+            <!-- 飞行器ID -->
+            <div class="form-item">
+              <label>飞行器ID</label>
+              <input
+                type="text"
+                v-model="thresholdData.aircraftId"
+                placeholder="如：AC1001"
+                class="form-control"
+              >
+              <div class="form-hint">留空表示默认配置</div>
+            </div>
+
             <!-- 风速阈值 -->
             <div class="form-item">
-              <label>最大耐受风速(m/s) <span class="required">*</span></label>
+              <label>最大风速(m/s) <span class="required">*</span></label>
               <input
                 type="number"
                 v-model="thresholdData.maxWindSpeed"
@@ -22,12 +102,27 @@
                 required
                 class="form-control"
               >
-              <div class="form-hint">飞行器安全飞行的最大持续风速</div>
+              <div class="form-hint">飞行器能承受的最大风速</div>
+            </div>
+
+            <!-- 风切变阈值 -->
+            <div class="form-item">
+              <label>最大风切变(m/s) <span class="required">*</span></label>
+              <input
+                type="number"
+                v-model="thresholdData.maxWindShear"
+                placeholder="如：5"
+                min="0"
+                step="0.1"
+                required
+                class="form-control"
+              >
+              <div class="form-hint">飞行器能承受的最大风切变</div>
             </div>
 
             <!-- 能见度阈值 -->
             <div class="form-item">
-              <label>最小要求能见度(km) <span class="required">*</span></label>
+              <label>最小能见度(km) <span class="required">*</span></label>
               <input
                 type="number"
                 v-model="thresholdData.minVisibility"
@@ -37,12 +132,86 @@
                 required
                 class="form-control"
               >
-              <div class="form-hint">正常起降、巡航需满足的最低能见度</div>
+              <div class="form-hint">飞行器能安全飞行的最小能见度</div>
+            </div>
+
+            <!-- 降水量阈值 -->
+            <div class="form-item">
+              <label>最大降水量(mm) <span class="required">*</span></label>
+              <input
+                type="number"
+                v-model="thresholdData.maxPrecipitation"
+                placeholder="如：5"
+                min="0"
+                step="0.1"
+                required
+                class="form-control"
+              >
+              <div class="form-hint">飞行器能承受的最大降水量</div>
+            </div>
+
+            <!-- 云底高度阈值 -->
+            <div class="form-item">
+              <label>最小云底高度(米) <span class="required">*</span></label>
+              <input
+                type="number"
+                v-model="thresholdData.minCloudBase"
+                placeholder="如：100"
+                min="0"
+                step="1"
+                required
+                class="form-control"
+              >
+              <div class="form-hint">飞行器能安全飞行的最小云底高度</div>
+            </div>
+
+            <!-- 最低温度阈值 -->
+            <div class="form-item">
+              <label>最低温度(℃) <span class="required">*</span></label>
+              <input
+                type="number"
+                v-model="thresholdData.tempMin"
+                placeholder="如：-15"
+                step="1"
+                required
+                class="form-control"
+              >
+              <div class="form-hint">飞行器能正常运行的最低温度</div>
+            </div>
+
+            <!-- 最高温度阈值 -->
+            <div class="form-item">
+              <label>最高温度(℃) <span class="required">*</span></label>
+              <input
+                type="number"
+                v-model="thresholdData.tempMax"
+                placeholder="如：50"
+                step="1"
+                required
+                class="form-control"
+              >
+              <div class="form-hint">飞行器能正常运行的最高温度</div>
+            </div>
+
+            <!-- 湿度阈值 -->
+            <div class="form-item">
+              <label>最大湿度(%) <span class="required">*</span></label>
+              <input
+                type="number"
+                v-model="thresholdData.maxHumidity"
+                placeholder="如：90"
+                min="0"
+                max="100"
+                step="1"
+                required
+                class="form-control"
+              >
+              <div class="form-hint">飞行器能承受的最大湿度</div>
             </div>
 
             <!-- 湍流等级阈值 -->
             <div class="form-item">
-              <label>最大耐受湍流等级 <span class="required">*</span></label>
+              <label>最大湍流等级 <span class="required">*</span></label>
               <select 
                 v-model="thresholdData.maxTurbulenceLevel"
                 required
@@ -53,53 +222,14 @@
                 <option value="中度">中度</option>
                 <option value="重度">重度</option>
               </select>
-              <div class="form-hint">飞行器可承受的最大湍流强度</div>
-            </div>
-
-            <!-- 温度阈值 -->
-            <div class="form-item">
-              <label>最低耐受温度(℃)</label>
-              <input
-                type="number"
-                v-model="thresholdData.minTemperature"
-                placeholder="如：-15"
-                step="1"
-                class="form-control"
-              >
-              <div class="form-hint">电子设备、动力系统正常工作的最低温度</div>
-            </div>
-
-            <!-- 最高耐受温度(℃) -->
-            <div class="form-item">
-              <label>最高耐受温度(℃)</label>
-              <input
-                type="number"
-                v-model="thresholdData.maxTemperature"
-                placeholder="如：50"
-                step="1"
-                class="form-control"
-              >
-              <div class="form-hint">电子设备、动力系统正常工作的最高温度</div>
-            </div>
-
-            <!-- 降水阈值 -->
-            <div class="form-item">
-              <label>最大允许降水量(mm/h)</label>
-              <input
-                type="number"
-                v-model="thresholdData.maxPrecipitation"
-                placeholder="如：5"
-                min="0"
-                step="0.1"
-                class="form-control"
-              >
-              <div class="form-hint">允许飞行的最大小时降水量</div>
+              <div class="form-hint">飞行器能承受的最大湍流等级</div>
             </div>
           </div>
         </div>
 
         <!-- 保存操作区 -->
         <div class="form-actions">
+          <button type="button" class="reset-btn" @click="handleReset">重置</button>
           <button type="submit" class="save-btn">保存配置</button>
         </div>
       </form>
@@ -108,60 +238,132 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useThresholdsStore } from '@/store/modules/thresholds'
 
-// 通用阈值数据
+// 阈值管理Store
+const thresholdsStore = useThresholdsStore()
+
+// 搜索飞行器ID
+const searchAircraftId = ref('')
+// 显示表单
+const showForm = ref(false)
+// 是否编辑模式
+const isEditing = ref(false)
+// 阈值数据
 const thresholdData = ref({
-  maxWindSpeed: 8,           // 最大耐受风速(m/s)
-  minVisibility: 4,          // 最小要求能见度(km)
-  maxTurbulenceLevel: '中度', // 最大耐受湍流等级
-  minTemperature: -15,       // 最低耐受温度(℃)
-  maxTemperature: 50,        // 最高耐受温度(℃)
-  maxPrecipitation: 5        // 最大允许降水量(mm/h)
+  id: null,
+  aircraftId: '',
+  maxWindSpeed: 8,
+  maxWindShear: 5,
+  minVisibility: 4,
+  maxPrecipitation: 5,
+  minCloudBase: 100,
+  tempMin: -15,
+  tempMax: 50,
+  maxHumidity: 90,
+  maxTurbulenceLevel: '中度'
 })
 
 // 原始数据备份（用于重置）
 const originalData = ref({})
 
-// 组件挂载时备份初始数据
-onMounted(() => {
-  originalData.value = { ...thresholdData.value }
-  // 实际项目中可在此处从后端获取当前配置：
-  // fetchThresholdConfig()
+// 从Store获取阈值列表
+const thresholds = computed(() => thresholdsStore.thresholdList)
+// 加载状态
+const loading = computed(() => thresholdsStore.loading)
+
+// 组件挂载时初始化阈值数据
+onMounted(async () => {
+  await thresholdsStore.initializeThresholds()
 })
 
+// 按飞行器ID搜索阈值配置
+const handleSearchByAircraftId = async () => {
+  if (!searchAircraftId.value) {
+    await thresholdsStore.fetchAllThresholds()
+    return
+  }
+  
+  try {
+    await thresholdsStore.fetchThresholdByAircraftId(searchAircraftId.value)
+  } catch (error) {
+    console.error('搜索阈值配置失败:', error)
+    alert('搜索阈值配置失败，请重试')
+  }
+}
+
+// 获取默认阈值配置
+const handleGetDefaultThreshold = async () => {
+  try {
+    await thresholdsStore.fetchDefaultThreshold()
+  } catch (error) {
+    console.error('获取默认阈值配置失败:', error)
+    alert('获取默认阈值配置失败，请重试')
+  }
+}
+
+// 显示添加阈值配置表单
+const handleAddThreshold = () => {
+  isEditing.value = false
+  thresholdData.value = {
+    id: null,
+    aircraftId: '',
+    maxWindSpeed: 8,
+    maxWindShear: 5,
+    minVisibility: 4,
+    maxPrecipitation: 5,
+    minCloudBase: 100,
+    tempMin: -15,
+    tempMax: 50,
+    maxHumidity: 90,
+    maxTurbulenceLevel: '中度'
+  }
+  originalData.value = { ...thresholdData.value }
+  showForm.value = true
+}
+
+// 显示编辑阈值配置表单
+const handleEditThreshold = (threshold) => {
+  isEditing.value = true
+  thresholdData.value = { ...threshold }
+  originalData.value = { ...threshold }
+  showForm.value = true
+}
+
 // 保存配置
-const handleSave = () => {
-  // 模拟保存到后端
-  console.log('保存通用阈值配置:', thresholdData.value)
-  
-  // 实际项目中替换为API请求
-  // axios.post('/api/threshold/config', thresholdData.value)
-  //   .then(res => {
-  //     alert('配置保存成功！')
-  //   })
-  //   .catch(err => {
-  //     alert('配置保存失败，请重试')
-  //   })
-  
-  alert('通用阈值配置已保存！')
+const handleSave = async () => {
+  try {
+    if (isEditing.value) {
+      await thresholdsStore.updateThreshold(thresholdData.value)
+      alert('阈值配置更新成功！')
+    } else {
+      await thresholdsStore.addThreshold(thresholdData.value)
+      alert('阈值配置添加成功！')
+    }
+    showForm.value = false
+  } catch (error) {
+    console.error('保存阈值配置失败:', error)
+    alert('保存阈值配置失败，请重试')
+  }
 }
 
 // 重置配置
 const handleReset = () => {
-  if (confirm('确定要重置为初始配置吗？')) {
-    thresholdData.value = { ...originalData.value }
-  }
+  thresholdData.value = { ...originalData.value }
 }
 
-// 从后端获取配置（示例函数）
-const fetchThresholdConfig = () => {
-  // 模拟API请求
-  // axios.get('/api/threshold/config')
-  //   .then(res => {
-  //     thresholdData.value = res.data
-  //     originalData.value = { ...res.data }
-  //   })
+// 删除阈值配置
+const handleDeleteThreshold = async (id) => {
+  if (confirm('确定要删除该阈值配置吗？')) {
+    try {
+      await thresholdsStore.deleteThreshold(id)
+      alert('阈值配置删除成功！')
+    } catch (error) {
+      console.error('删除阈值配置失败:', error)
+      alert('删除阈值配置失败，请重试')
+    }
+  }
 }
 </script>
 
@@ -188,39 +390,222 @@ const fetchThresholdConfig = () => {
 }
 
 /* 容器样式 */
-.common-threshold-container {
+.threshold-management-container {
   background-color: var(--bg-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 20px;
+  min-height: 100vh;
 }
 
-/* 卡片样式 */
-.threshold-card {
-  background-color: var(--card-bg);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  width: 100%;
-  overflow: hidden;
+/* 页面标题 */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.page-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.add-btn {
+  padding: 10px 20px;
+  background-color: var(--primary-color);
+  color: var(--text-light);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
   transition: var(--transition);
 }
 
+.add-btn:hover {
+  background-color: var(--primary-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 82, 186, 0.2);
+}
+
+/* 阈值列表 */
+.threshold-list {
+  background-color: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.list-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.list-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.list-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.search-input {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 14px;
+  width: 200px;
+}
+
+.search-btn, .default-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--transition);
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.search-btn:hover, .default-btn:hover {
+  border-color: var(--secondary-color);
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* 列表内容 */
+.list-content {
+  padding: 20px;
+  overflow-x: auto;
+}
+
+.threshold-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.threshold-table th, .threshold-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.threshold-table th {
+  background-color: var(--bg-color);
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.threshold-table td {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.threshold-table tr:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* 操作按钮 */
+.edit-btn, .delete-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-right: 8px;
+}
+
+.edit-btn {
+  background-color: var(--secondary-color);
+  color: var(--text-light);
+}
+
+.edit-btn:hover {
+  background-color: var(--primary-light);
+  transform: translateY(-1px);
+}
+
+.delete-btn {
+  background-color: var(--danger-color);
+  color: var(--text-light);
+}
+
+.delete-btn:hover {
+  background-color: #dc2626;
+  transform: translateY(-1px);
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+
+/* 表单卡片 */
+.threshold-form-card {
+  background-color: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  margin-top: 24px;
+}
+
+.form-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--bg-color);
+}
+
+.form-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: var(--transition);
+}
+
+.close-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+}
 
 /* 表单区块 */
 .form-section {
-  padding: 20px;
+  padding: 24px;
   background-color: var(--bg-color);
-  border-radius: 10px;
-  border: 1px solid var(--border-color);
-}
-
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--primary-color);
-  margin: 0 0 20px 0;
-  padding-bottom: 10px;
-  border-bottom: 2px solid var(--accent-color);
 }
 
 /* 表单网格布局 */
@@ -280,7 +665,9 @@ const fetchThresholdConfig = () => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  padding: 20px 24px;
   border-top: 1px solid var(--border-color);
+  background-color: var(--card-bg);
 }
 
 /* 按钮样式 */
@@ -297,9 +684,19 @@ const fetchThresholdConfig = () => {
   gap: 8px;
 }
 
+.reset-btn {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.reset-btn:hover {
+  border-color: var(--secondary-color);
+  background-color: rgba(59, 130, 246, 0.05);
+}
 
 .save-btn {
-  background-color: #0f52ba;
+  background-color: var(--primary-color);
   color: var(--text-light);
 }
 
@@ -315,28 +712,29 @@ const fetchThresholdConfig = () => {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .common-threshold-container {
+  .threshold-management-container {
     padding: 10px;
   }
   
-  .threshold-card {
-    margin: 0;
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
   }
   
-  .card-header {
-    padding: 20px 24px;
+  .list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
   }
   
-  .card-header h3 {
-    font-size: 20px;
+  .list-actions {
+    width: 100%;
+    flex-wrap: wrap;
   }
   
-  .threshold-form {
-    padding: 20px;
-  }
-  
-  .form-section {
-    padding: 16px;
+  .search-input {
+    width: 100%;
   }
   
   .form-grid {
@@ -352,6 +750,14 @@ const fetchThresholdConfig = () => {
     width: 100%;
     justify-content: center;
   }
+  
+  .threshold-table {
+    font-size: 12px;
+  }
+  
+  .threshold-table th, .threshold-table td {
+    padding: 8px 12px;
+  }
 }
 
 /* 动画效果 */
@@ -366,7 +772,7 @@ const fetchThresholdConfig = () => {
   }
 }
 
-.threshold-card {
+.threshold-list, .threshold-form-card {
   animation: fadeInUp 0.4s ease-out forwards;
 }
 

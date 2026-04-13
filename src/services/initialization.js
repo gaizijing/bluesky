@@ -4,6 +4,7 @@ import { AreaService } from './areaService';
 import { useAreaStore } from '@/store/modules/area';
 import { useModuleStore } from '@/store/modules/module';
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
+import { useRegionStore } from '@/store/modules/region';
 export class InitializationService {
   constructor() {
     this.weatherService = new WeatherService();
@@ -27,22 +28,34 @@ export class InitializationService {
   getLayerSettingsStore() {
     return useLayerSettingsStore();
   }
+
+  getRegionStore() {
+    return useRegionStore();
+  }
   /**
    * 应用初始化，区域列表、当前区域、区域气象数据、地图模拟气象数据
    */
   async initialize() {
     try {
-      //先加载页面在异步初始化 区域列表--当前区域--当前区域基础气象数据-当前区域的可视化数据
-      // 并行初始化基础数据
-      const [areasInitialized, weatherInitialized] = await Promise.all([
+      // 1. 首先初始化地区配置（最基本的配置）
+      const regionStore = this.getRegionStore();
+      try {
+        await regionStore.fetchRegionConfig();
+        console.log('地区配置初始化成功');
+      } catch (error) {
+        console.warn('地区配置初始化失败，使用默认配置:', error);
+      }
+
+      // 2. 并行初始化其他基础数据
+      const [areasInitialized] = await Promise.all([
         this.areaService.loadAreaList(),
         this.areaService.loadCurrentSelectedArea(),
-
       ]);
 
-        await this.initializeAreaWeatherData();
+      // 3. 初始化区域天气数据
+      await this.initializeAreaWeatherData();
 
-        // 加载地图天气图层
+      // 4. 加载地图天气图层
       await this.initializeMapWeatherLayer()
 
       return true;

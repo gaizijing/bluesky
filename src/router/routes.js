@@ -53,6 +53,59 @@ export const routes = [
       title: '地图',
       icon: 'map'
     }
+  },
+  {
+    path: '/admin',
+    name: 'Admin',
+    component: () => import('@/layout/AdminLayout.vue'),
+    redirect: '/admin/threshold',
+    meta: {
+      title: '后台管理',
+      icon: 'admin',
+      hidden: false
+    },
+    children: [
+      {
+        path: '/admin/threshold',
+        name: 'AdminThresholdManagement',
+        component: () => import('@/pages/Admin/ThresholdManagement.vue'),
+        meta: {
+          title: '阈值管理'
+        }
+      },
+      {
+        path: '/admin/aircraft',
+        name: 'AircraftManagement',
+        component: () => import('@/pages/Admin/AircraftManagement.vue'),
+        meta: {
+          title: '飞行器管理'
+        }
+      },
+      {
+        path: '/admin/monitoring-point',
+        name: 'MonitoringPointManagement',
+        component: () => import('@/pages/Admin/MonitoringPointManagement.vue'),
+        meta: {
+          title: '监测点管理'
+        }
+      },
+      {
+        path: '/admin/device',
+        name: 'DeviceManagement',
+        component: () => import('@/pages/Admin/DeviceManagement.vue'),
+        meta: {
+          title: '设备管理'
+        }
+      },
+      {
+        path: '/admin/region-config',
+        name: 'RegionConfigManagement',
+        component: () => import('@/pages/Admin/RegionConfigManagement.vue'),
+        meta: {
+          title: '地区配置管理'
+        }
+      }
+    ]
   }
 //   {
 //     path: '/error',

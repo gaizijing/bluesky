@@ -61,14 +61,14 @@
         </div>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item @click="handleSetting">
-              <img src="@/assets/icons/ic_setting.png" class="custom-icon" />
-              <span>阈值设置</span>
-            </el-dropdown-item>
             <el-dropdown-item @click="mapSetting">
               <img src="@/assets/icons/ic_layer.png" class="custom-icon" />
               <span v-if="!showLayerDialog">显示控制</span>
               <span v-else>隐藏控制</span>
+            </el-dropdown-item>
+            <el-dropdown-item v-if="isAdmin" @click="handleAdmin">
+              <el-icon class="custom-icon"><Management /></el-icon>
+              <span>后台管理</span>
             </el-dropdown-item>
             <el-dropdown-item @click="handleLogout">
               <img src="@/assets/icons/ic_exit.png" class="custom-icon" />
@@ -110,6 +110,7 @@ import { useWeatherStore } from "@/store/modules/weather";
 import { useLayerSettingsStore } from "@/store/modules/layerSettings";
 import { useAreaStore } from '@/store/modules/area'
 import { ElMessage } from 'element-plus'
+import { Management } from '@element-plus/icons-vue'
 import DialogContainer from '@/components/common/DialogContainer.vue'
 import { InitializationService } from '@/services/initialization'
 import { userLogout } from '@/api/auth'
@@ -150,6 +151,9 @@ const areaStore = useAreaStore();
 // 模式切换状态
 const currentMode = ref('overview'); // 默认概览模式
 
+// 检查用户是否为管理员
+const isAdmin = ref(localStorage.getItem('userRole') === 'admin');
+
 // 切换模式函数
 const toggleMode = () => {
   const newMode = currentMode.value === 'overview' ? 'focus' : 'overview';
@@ -168,7 +172,12 @@ const toggleMode = () => {
   currentMode.value = newMode;
   // 触发模式切换事件，让地图组件响应
   eventManager.emit('modeChange', newMode);
-}
+};
+
+// 跳转到后台管理页面
+const handleAdmin = () => {
+  router.push('/admin');
+};
 // 切换区域列表弹窗显示
 const toggleAreaSelector = () => {
   showAreaSelector.value = !showAreaSelector.value;
