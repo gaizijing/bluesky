@@ -351,9 +351,19 @@ const loadRoutes = async () => {
 
 
 // 清空历史分析记录
-const clearHistory = () => {
+const clearHistory = async () => {
   if (confirm('确定要清空所有历史记录吗？')) {
-    routes.value = [];
+    try {
+      const { clearRoutes } = await import('@/api');
+      const response = await clearRoutes();
+      if (response && (response.success || response.data?.success)) {
+        routes.value = [];
+        alert('历史记录已清空！');
+      }
+    } catch (error) {
+      console.error('清空历史记录失败:', error);
+      alert('清空历史记录失败，请稍后重试');
+    }
   }
 };
 

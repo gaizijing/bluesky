@@ -532,11 +532,6 @@ export function useCesium(containerId) {
       isLoading.value = true
       console.log('[Cesium] 开始初始化...')
 
-      // 首先获取地区配置
-      console.log('[Cesium] 0. 获取地区配置...')
-      await regionStore.fetchRegionConfig()
-      console.log('[Cesium] 地区配置获取成功')
-
       // 执行初始化步骤
       console.log('[Cesium] 1. 初始化Viewer...')
       initViewer()
@@ -1131,42 +1126,27 @@ export function useCesium(containerId) {
       // 调用后端API获取地理空间热力图数据（用于Cesium地图）
       const { getWeatherHeatmapGeo } = await import('@/api')
       
-      console.log('调用API参数:', {
+      const apiParams = {
         time: time,
         resolution: 'medium',
         pointId: currentArea.id || currentArea.pointId
-      })
+      }
       
-      const heatmapData = await getWeatherHeatmapGeo({
-        time: time,
-        resolution: 'medium',
-        pointId: currentArea.id || currentArea.pointId
-      })
-      
-      console.log('API返回数据:', heatmapData)
+      const heatmapData = await getWeatherHeatmapGeo(apiParams)
       
       // 处理数据格式：可能points在heatmapData.data中，也可能在顶层
       let heatmapDataToConvert = heatmapData
       if (heatmapData.data && (heatmapData.data.points || heatmapData.data.dataType)) {
-        // 数据在data属性中
         heatmapDataToConvert = heatmapData.data
-        console.log('使用data属性中的数据')
       }
       
       if (!heatmapDataToConvert || !heatmapDataToConvert.points) {
-        console.error('获取热力图数据失败，缺少points属性', {
-          heatmapData: heatmapData,
-          heatmapDataToConvert: heatmapDataToConvert
-        })
+        console.error('获取热力图数据失败，缺少points属性')
         return
       }
 
       // 转换后端数据为Cesium热力图需要的格式
       const convertedData = convertHeatmapDataForCesium(heatmapDataToConvert, currentArea)
-      console.log('转换后的原始数据数量:', convertedData.length)
-      if (convertedData.length > 0) {
-        console.log('原始数据示例:', convertedData.slice(0, 3))
-      }
       
       // 转换为heatmap.js期望的格式：{lnglat: [lon, lat], value: number}
       const dataPoints = convertedData.map(point => ({
@@ -1174,7 +1154,6 @@ export function useCesium(containerId) {
         value: point.value
       }))
       
-      console.log('转换后的热力图数据:', dataPoints.slice(0, 3));
       console.log('数据点范围:', {
         minLng: Math.min(...dataPoints.map(p => p.lnglat[0])),
         maxLng: Math.max(...dataPoints.map(p => p.lnglat[0])),

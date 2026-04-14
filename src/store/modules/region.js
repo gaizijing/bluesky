@@ -33,11 +33,6 @@ export const useRegionStore = defineStore('region', {
 
   actions: {
     async fetchRegionConfig() {
-      // 如果已经有配置且不是正在加载中，直接返回缓存的配置
-      if (this.regionConfig && !this.isLoading) {
-        return this.regionConfig;
-      }
-      
       this.isLoading = true;
       this.error = null;
       try {
