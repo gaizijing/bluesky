@@ -310,6 +310,7 @@ const initChart = () => {
 
     // 5. 提示框优化：更直观的信息展示
     tooltip: {
+      appendToBody: true,
       trigger: "axis",
       axisPointer: { type: "shadow" },
       backgroundColor: "rgba(15, 23, 51, 0.95)",

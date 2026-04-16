@@ -84,7 +84,9 @@ const initTrendChart = (data) => {
       splitLine: { lineStyle: { color: "rgba(255,255,255,0.05)" } },
       axisLabel: { color: "#94a3b8", fontSize: 10 },
     },
-    tooltip: { trigger: "axis" },
+    tooltip: {
+      appendToBody: true,
+      trigger: "axis" },
     legend: {
       data: ["温度", "湿度", "风速"],
       top: 0,
@@ -134,7 +136,9 @@ const initTimelineChart = (data) => {
       splitLine: { lineStyle: { color: "rgba(255,255,255,0.05)" } },
       axisLabel: { color: "#94a3b8", fontSize: 10 },
     },
-    tooltip: { trigger: "axis" },
+    tooltip: {
+      appendToBody: true,
+      trigger: "axis" },
     legend: {
       data: ["径向风速", "风速标准差", "信噪比"],
       top: 0,
@@ -211,7 +215,9 @@ const initWeatherRadarChart = (data) => {
   weatherRadar.setOption({
     backgroundColor: "transparent",
     grid: { left: "5%", right: "5%", top: "10%", bottom: "15%" },
-    tooltip: { trigger: "item" },
+    tooltip: {
+      appendToBody: true,
+      trigger: "item" },
     legend: {
       data: ["弱回波", "中回波", "强回波"],
       bottom: 0,

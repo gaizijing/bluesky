@@ -60,6 +60,7 @@ const initChart = () => {
   // 图表配置
   const option = {
     tooltip: {
+      appendToBody: true,
       trigger: "axis",
       backgroundColor: "rgba(15, 23, 51, 0.95)",
       borderColor: "#3b82f6",

@@ -138,6 +138,7 @@ let activeRawStore;
 const baseOption = () => {
   return {
     tooltip: {
+      appendToBody: true,
       position: "top",
       backgroundColor: "rgba(0,0,0,0.75)",
       textStyle: { color: "#fff" },

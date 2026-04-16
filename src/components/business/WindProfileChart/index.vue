@@ -171,6 +171,7 @@ const initChart = () => {
   const option = {
     backgroundColor: "transparent",
     tooltip: {
+      appendToBody: true,
       trigger: "item", // 改为 item 触发
       formatter: (params) => {
         const { dataIndex } = params;

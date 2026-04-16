@@ -340,6 +340,7 @@ onMounted(() => {
       containLabel: true,
     },
     tooltip: {
+      appendToBody: true,
       trigger: "axis",
       backgroundColor: "rgba(0, 0, 0, 0.7)",
       borderColor: "#ff6b6b",
