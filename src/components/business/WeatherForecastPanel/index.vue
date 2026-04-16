@@ -4,6 +4,10 @@
 
     <!-- 图表区域 -->
     <div class="charts-container">
+      <!-- 3小时天气预报 -->
+      <div class="chart-section">
+        <ThreeHourForecast />
+      </div>
       <!-- 气象要素折线图 -->
       <div class="chart-section">
         <div class="chart-wrapper">
@@ -15,16 +19,7 @@
         </div>
       </div>
 
-      <!-- 适飞指数图表 -->
-      <div class="chart-section">
-        <div class="chart-wrapper">
-          <div v-if="isLoading" class="loading-state">
-            <div class="spinner"></div>
-            <p>加载数据中...</p>
-          </div>
-          <div ref="profileChartRef" class="profile-chart"></div>
-        </div>
-      </div>
+      
     </div>
   </div>
 </template>
@@ -32,9 +27,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import * as echarts from "echarts";
-import { useAreaStore } from "@/store/modules/area";
 import { useModuleStore } from "@/store/modules/module";
 import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
+import ThreeHourForecast from "@/components/business/ThreeHourForecast/index.vue";
 
 const moduleStore = useModuleStore();
 const dashboardWeatherStore = useDashboardWeatherStore();
@@ -42,11 +37,9 @@ const dashboardWeatherStore = useDashboardWeatherStore();
 
 // 图表实例
 let trendChartInstance = null;
-let profileChartInstance = null;
 
 // 图表引用
 const trendChartRef = ref(null);
-const profileChartRef = ref(null);
 
 
 // 气象要素配置 - 固定选择能见度、风速、降水
@@ -80,15 +73,8 @@ const updateTrendChart = (data) => {
     return;
   }
 
-  // 提取时间标签（只显示小时）
-  const timeLabels = data.time.map(item => {
-    const date = new Date(item);
-    return `${date.getHours().toString().padStart(2, '0')}`;
-  });
-  // 当前时间索引（根据当前小时数定位）
-  const currentHour = new Date().getHours();
-  const currentHourStr = currentHour.toString().padStart(2, '0');
-  const currentIndex = timeLabels.indexOf(currentHourStr);
+  // 提取时间标签
+  const timeLabels = data.time;
 
   // 自定义tooltip格式化器
   const tooltipFormatter = (params) => {
@@ -159,13 +145,11 @@ const updateTrendChart = (data) => {
       },
       splitLine: { show: false },
       axisPointer: {
-        value: timeLabels[currentIndex],
-        snap: true,
+        type: 'line',
         lineStyle: {
           color: '#7581BD',
           width: 1
         },
-        
         handle: {
           show: true,
           color: '#7581BD'
@@ -317,206 +301,6 @@ const updateTrendChart = (data) => {
   trendChartInstance.setOption(option, true);
 };
 
-// 更新适飞指数图表
-const updateProfileChart = (data) => {
-  if (!profileChartInstance || !data) {
-    return;
-  }
-
-  // 处理API返回的数据格式
-  const chartData = data.success ? data.data : data;
-
-  if (!chartData || (!chartData.data && !chartData.profile)) {
-    return;
-  }
-
-  // 兼容不同的数据格式
-  const timeLabels = chartData.times || chartData.timeLabels || ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00'];
-  const flightSuitabilityData = chartData.data || chartData.profile;
-
-  // 处理高度标签
-  let heightLabels;
-  if (chartData.heights) {
-    heightLabels = chartData.heights;
-  } else if (chartData.heightLabels) {
-    heightLabels = chartData.heightLabels;
-  } else {
-    heightLabels = ['0m', '100m', '200m', '300m', '400m', '500m'];
-  }
-
-  // 准备热力图数据
-  const heatmapData = [];
-  for (let h = 0; h < flightSuitabilityData.length; h++) {
-    for (let t = 0; t < flightSuitabilityData[h].length; t++) {
-      heatmapData.push([t, h, flightSuitabilityData[h][t]]);
-    }
-  }
-
-  // 修正的适飞等级判断函数
-  const getFlightSuitabilityInfo = (value) => {
-    if (value >= 90) {
-      return {
-        level: '优',
-        color: '#10b981', // 绿色
-        recommendation: '气象条件优秀，适合所有类型飞行任务。',
-        details: ['风速适宜', '能见度良好', '无降水影响', '湍流轻微']
-      };
-    } else if (value >= 70) {
-      return {
-        level: '良',
-        color: '#a3e635', // 亮绿色
-        recommendation: '气象条件良好，适合大部分飞行任务。',
-        details: ['风速可接受', '能见度较好', '降水影响小', '湍流中等']
-      };
-    } else if (value >= 50) {
-      return {
-        level: '中',
-        color: '#fbbf24', // 黄色
-        recommendation: '气象条件一般，需谨慎飞行，建议限制飞行高度。',
-        details: ['风速偏大', '能见度一般', '可能有降水', '湍流明显']
-      };
-    } else if (value >= 30) {
-      return {
-        level: '差',
-        color: '#f97316', // 橙色
-        recommendation: '气象条件较差，不建议飞行，如需飞行需严格限制条件。',
-        details: ['风速较大', '能见度较差', '降水明显', '湍流较强']
-      };
-    } else {
-      return {
-        level: '极差',
-        color: '#ef4444', // 红色
-        recommendation: '气象条件恶劣，禁止飞行。',
-        details: ['风速过大', '能见度极差', '强降水', '强湍流']
-      };
-    }
-  };
-
-  // 配置图表
-  const option = {
-    backgroundColor: 'transparent',
-    tooltip: {
-      trigger: 'item',
-      formatter: (params) => {
-        const { dataIndex } = params;
-        const timeIdx = dataIndex % timeLabels.length;
-        const heightIdx = Math.floor(dataIndex / timeLabels.length);
-        const value = flightSuitabilityData[heightIdx][timeIdx];
-        
-        // 获取适飞信息
-        const suitabilityInfo = getFlightSuitabilityInfo(value);
-        
-        // 构建详细的建议HTML
-        let detailsHtml = '';
-        if (suitabilityInfo.details && suitabilityInfo.details.length > 0) {
-          detailsHtml = suitabilityInfo.details.map(detail => 
-            `<div style="margin: 2px 0; font-size: 12px; color: #94a3b8">• ${detail}</div>`
-          ).join('');
-        }
-        
-        return `
-          <div style="max-width: 280px">
-            <div style="font-weight: bold; margin-bottom: 8px; color: #3b82f6">
-              ${timeLabels[timeIdx]} | ${heightLabels[heightIdx]}
-            </div>
-            <div style="margin-bottom: 6px">
-              <span style="color: #94a3b8">适飞指数：</span>
-              <span style="font-weight: bold; color: ${suitabilityInfo.color}">${value.toFixed(1)}</span>
-            </div>
-            <div style="margin-bottom: 6px">
-              <span style="color: #94a3b8">适飞等级：</span>
-              <span style="font-weight: bold; color: ${suitabilityInfo.color}">${suitabilityInfo.level}</span>
-            </div>
-            <div style="margin-bottom: 8px; padding: 6px; background: rgba(0,0,0,0.1); border-radius: 4px">
-              <div style="font-size: 12px; color: #e2e8f0">${suitabilityInfo.recommendation}</div>
-            </div>
-            ${detailsHtml}
-            <div style="margin-top: 8px; font-size: 11px; color: #64748b">
-              <i>数据更新时间：${new Date().toLocaleTimeString('zh-CN')}</i>
-            </div>
-          </div>
-        `;
-      },
-      backgroundColor: 'rgba(15, 23, 51, 0.98)',
-      borderColor: '#3b82f6',
-      borderWidth: 1,
-      textStyle: {
-        color: '#e2e8f0',
-        fontSize: 13
-      },
-      padding: [10, 12],
-      extraCssText: 'z-index: 9999 !important; max-width: 280px;'
-    },
-    grid: {
-      left: '1%',
-      right: '5%',
-      top: '1%',
-      bottom: '1%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      data: timeLabels,
-      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } },
-      axisLabel: {
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 11,
-        interval: 0
-      },
-      splitLine: { show: false }
-    },
-    yAxis: {
-      type: 'category',
-      data: heightLabels,
-      inverse: false,
-      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } },
-      axisLabel: {
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 11
-      },
-      splitLine: {
-        lineStyle: { color: 'rgba(255, 255, 255, 0.05)' }
-      }
-    },
-    visualMap: {
-      show: false,  // 隐藏右侧色阶
-      min: 0,
-      max: 100,
-      calculable: true,
-      dimension: 2,
-      inRange: {
-        color: ['#ef4444', '#f97316', '#fbbf24', '#a3e635', '#10b981']
-      }
-    },
-    series: [
-      {
-        type: 'heatmap',
-        data: heatmapData,
-        label: {
-          show: true,
-          formatter: (params) => {
-            const value = params.data[2];
-            return value >= 70 ? '✓' : value >= 30 ? '~' : '✗';
-          },
-          color: '#fff',
-          fontSize: 12,
-          fontWeight: 'bold'
-        },
-        emphasis: {
-          itemStyle: {
-            borderColor: '#fff',
-            borderWidth: 2,
-            shadowBlur: 15,
-            shadowColor: 'rgba(0, 0, 0, 0.7)'
-          }
-        }
-      }
-    ]
-  };
-
-  profileChartInstance.setOption(option, true);
-};
-
 // 窗口大小变化处理
 const handleResize = () => {
   if (trendChartInstance) {
@@ -526,19 +310,12 @@ const handleResize = () => {
       console.error('调整趋势图表尺寸失败:', error);
     }
   }
-  if (profileChartInstance) {
-    try {
-      profileChartInstance.resize();
-    } catch (error) {
-      console.error('调整廓线图表尺寸失败:', error);
-    }
-  }
 };
 
 // 初始化图表
 const initCharts = () => {
   // 确保容器存在
-  if (!trendChartRef.value || !profileChartRef.value) {
+  if (!trendChartRef.value) {
     console.error('图表容器不存在，无法初始化图表');
     return;
   }
@@ -548,15 +325,10 @@ const initCharts = () => {
     trendChartInstance.dispose();
     trendChartInstance = null;
   }
-  if (profileChartInstance) {
-    profileChartInstance.dispose();
-    profileChartInstance = null;
-  }
 
   try {
     // 创建新的图表实例
     trendChartInstance = echarts.init(trendChartRef.value);
-    profileChartInstance = echarts.init(profileChartRef.value);
    
   } catch (error) {
     console.error('创建图表实例失败:', error);
@@ -566,8 +338,7 @@ const initCharts = () => {
 // 监听模块数据变化
 watch(weatherForecastPanelData, (newData) => {
   if (newData) {
-    updateTrendChart(newData.trendData);
-    updateProfileChart(newData.heatmapData);
+    updateTrendChart(newData);
   }
 }, { deep: true });
 
@@ -586,10 +357,6 @@ onUnmounted(() => {
   if (trendChartInstance) {
     trendChartInstance.dispose();
     trendChartInstance = null;
-  }
-  if (profileChartInstance) {
-    profileChartInstance.dispose();
-    profileChartInstance = null;
   }
 
   // 移除事件监听

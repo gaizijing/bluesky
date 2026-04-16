@@ -29,7 +29,8 @@ class DashboardService {
       case DASHBOARD_MODULES.LANDING_MONITOR:
         const areaStore = this.getAreaStore();
         const currentArea = areaStore.selectedArea;
-        const pointId = currentArea?.id || 'point-1';
+        const pointId = currentArea?.id ;
+        debugger
         this.dashboardWeatherService.getRealTimeWeatherPanelData(pointId);
         this.dashboardWeatherService.getweatherForecastPanelData(currentArea);
         this.dashboardWeatherService.loadFlightSuitableAnalysisPanel(currentArea);

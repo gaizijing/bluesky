@@ -86,7 +86,6 @@
 import { ref, computed } from 'vue';
 import { useWeatherStore } from '@/store/modules/weather';
 import { useAreaStore } from '@/store/modules/area';
-import { useCurrentTime } from '@/hooks/useTime';
 
 const weatherStore = useWeatherStore();
 const areaStore = useAreaStore();

@@ -97,64 +97,31 @@ export const getWeatherSuitability = async (params = {}) => {
 }
 
 
-// 获取实时适飞指数（单时间点）
-export const getCurrentSuitabilityIndex = async (currentPoint) => {
-  if (!currentPoint) {
-    throw new Error('未选择重点关注区域');
+export const getWeatherForecastTrend = async (pointId) => {
+  try {
+  
+    
+    if (!pointId) {
+      throw new Error('未提供重点关注区域ID');
+    }
+    
+    // 构建API请求参数
+    const url = `/weather/forecast-trend?pointId=${pointId}`;
+    
+    // 调用后端接口
+    const response = await request.get(url);
+    
+    // 检查返回数据格式
+    if (response && response.data) {
+      console.log("\nMinutely15 data:\n", response.data);
+      return response.data;
+    }
+    
+    throw new Error('API返回数据格式错误');
+  } catch (error) {
+    console.error('获取天气趋势数据失败:', error);
+    throw error;
   }
-
-  const pointId = currentPoint.id || currentPoint.pointId;
-
-  // 调用真实API - 使用现有的/suitability/status接口
-  const url = `/suitability/status?pointId=${encodeURIComponent(pointId)}&totalHours=1`;
-  const response = await request.get(url);
-
-  if (response && response.data) {
-    return response.data;
-  }
-
-  throw new Error('实时适飞指数API返回数据为空');
-}
-
-export const getWeatherForecastTrend = async (params) => {
-  const params1 = {
-    latitude: 52.52,
-    longitude: 13.41,
-    minutely_15: ["precipitation", "wind_speed_10m", "visibility"],
-    forecast_days: 1,
-  };
-  const url = "https://api.open-meteo.com/v1/forecast";
-  const responses = await fetchWeatherApi(url, params1);
-  // Process first location. Add a for-loop for multiple locations or weather models
-  const response = responses[0];
-  // Attributes for timezone and location
-  const latitude = response.latitude();
-  const longitude = response.longitude();
-  const elevation = response.elevation();
-  const utcOffsetSeconds = response.utcOffsetSeconds();
-
-  const minutely15 = response.minutely15();
-
-  // Note: The order of weather variables in the URL query and the indices below need to match!
-  const weatherData = {
-    minutely15: {
-      time: Array.from(
-        { length: (Number(minutely15.timeEnd()) - Number(minutely15.time())) / minutely15.interval() },
-        (_, i) => new Date((Number(minutely15.time()) + i * minutely15.interval() + utcOffsetSeconds) * 1000)
-      ),
-      // 将TypedArray转换为普通JavaScript数组，解决ECharts的"dimensions must be given if data is TypedArray"错误
-      precipitation: Array.from(minutely15.variables(0).valuesArray()).map(value => Number(value.toFixed(2))),
-      // 风速：保留两位小数
-      wind_speed_10m: Array.from(minutely15.variables(1).valuesArray()).map(value => Number(value.toFixed(2))),
-      // 能见度：从米转换为公里并取整
-      visibility: Array.from(minutely15.variables(2).valuesArray()).map(value => Math.round(value / 1000)),
-    },
-
-  };
-
-  // The 'weatherData' object now contains a simple structure, with arrays of datetimes and weather information
-  console.log("\nMinutely15 data:\n", weatherData.minutely15)
-  return weatherData.minutely15
 }
 /**
  * 遵循和风天气API规范，获取实时天气数据
@@ -211,22 +178,14 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
 
 
 // 主函数：获取当前监测点天气数据（调用后端接口）
-export const fetchCurrentPointWeather = async (currentPoint) => {
+export const fetchCurrentPointWeather = async (pointId) => {
   try {
-    if (!currentPoint) {
-      throw new Error('未选择重点关注区域')
-    }
-
-    // 获取监测点ID
-    const pointId = currentPoint.id || currentPoint.pointId || 'point-1';
 
     // 调用后端实时天气接口
     const data = await request.get(`/weather/realtime?pointId=${pointId}`);
-
-    // 后端返回的数据格式：{ updateTime, data: { ... } }
     // 适配前端期望的格式
     if (data && data.data) {
-      const weatherData = data.data;
+      const weatherData = data;
       return {
         temp: weatherData.temp?.toString() || '25',
         feelsLike: weatherData.feelsLike?.toString() || '24',
@@ -298,132 +257,6 @@ export const getCitywideHeatmap = async () => {
   if (response && response.data) {
     return response.data;
   }
-};
-
-
-
-export const getWeatherForecastHeatmap = async (params = {}) => {
-  const {
-    currentPoint,
-    timestamp,
-    timeRange = '3h'
-  } = params;
-
-  // 如果没有传入区域，尝试从store获取当前选中区域
-  let pointId = null;
-
-  if (currentPoint) {
-    pointId = currentPoint.id || currentPoint.pointId;
-  }
-
-  // 如果没有pointId，使用默认值
-  if (!pointId) {
-    // 尝试从store获取当前选中的监测点
-    try {
-      const { useAreaStore } = await import('@/store/modules/area');
-      const areaStore = useAreaStore();
-      const selectedArea = areaStore.selectedArea;
-      if (selectedArea && selectedArea.id) {
-        pointId = selectedArea.id;
-      }
-    } catch (error) {
-      console.warn('无法获取当前选中区域，使用默认值');
-    }
-  }
-
-  // 最终fallback
-  if (!pointId) {
-    pointId = 'area-1';
-  }
-
-  // 修正：调用正确的适飞分析API
-  const totalHours = parseInt(timeRange.replace('h', '')) || 3;
-  const url = `/suitability/status?pointId=${encodeURIComponent(pointId)}&totalHours=${totalHours}`;
-
-  try {
-    console.log('[适飞分析] 调用API:', url);
-    const response = await request.get(url);
-
-    if (response && response.data) {
-      console.log('[适飞分析] API调用成功');
-
-      // 格式化数据供前端使用
-      return formatSuitabilityDataForChart(response.data, pointId, totalHours);
-    }
-
-    console.warn('[适飞分析] API返回数据为空');
-    throw new Error('API返回数据为空');
-
-  } catch (error) {
-    console.error('[适飞分析] API调用失败:', error);
-    throw error;
-  }
-};
-
-// 格式化后端数据为前端图表需要格式
-const formatSuitabilityDataForChart = (apiData, pointId, totalHours) => {
-  if (!apiData) {
-    console.warn('[适飞分析] 格式化数据：API数据为空');
-    throw new Error('API数据为空');
-  }
-
-  // 检查数据格式
-  if (apiData.success !== undefined && apiData.data !== undefined) {
-    // 已经是正确的格式
-    return apiData;
-  }
-
-  // 尝试从旧格式中提取数据
-  if (apiData.suitabilityList && apiData.suitabilityList.length > 0) {
-    // 提取第一个因素的数据作为热力图数据（通常是"综合"因素）
-    const firstFactor = apiData.suitabilityList[0];
-    if (!firstFactor || !firstFactor.detail) {
-      console.warn('[适飞分析] 格式化数据：没有有效的detail数据');
-      throw new Error('没有有效的detail数据');
-    }
-
-    // 构建热力图数据矩阵
-    const times = firstFactor.detail.map(d => {
-      try {
-        const date = new Date(d.timePoint);
-        return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-      } catch (error) {
-        return '12:00'; // 默认值
-      }
-    });
-
-    // 假设有6个高度层（0-500m，每100m一层）
-    const heights = ['0m', '100m', '200m', '300m', '400m', '500m'];
-    const profileData = [];
-
-    // 为每个高度层创建数据
-    for (let h = 0; h < heights.length; h++) {
-      const row = [];
-      for (let t = 0; t < times.length; t++) {
-        // 模拟高度衰减：高度越高，适飞指数可能越低
-        const baseValue = firstFactor.detail[t]?.valueData ?
-          parseFloat(firstFactor.detail[t].valueData) : 70;
-        const heightFactor = 1.0 - (h * 0.1); // 每100m降低10%
-        const randomVariation = 0.9 + Math.random() * 0.2;
-        const value = Math.min(100, Math.max(0, baseValue * heightFactor * randomVariation));
-        row.push(Number(value.toFixed(1)));
-      }
-      profileData.push(row);
-    }
-
-    return {
-      success: true,
-      data: {
-        times: times,
-        heights: heights,
-        profile: profileData,
-        overallScores: apiData.overallScores || []
-      }
-    };
-  }
-
-  console.warn('[适飞分析] 格式化数据：无法识别的数据格式');
-  throw new Error('无法识别的数据格式');
 };
 
 

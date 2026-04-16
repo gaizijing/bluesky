@@ -26,19 +26,11 @@ class DashboardWeatherService {
     async getweatherForecastPanelData(currentPoint) {
         try {
             // 导入天气预测数据
-            const { getWeatherForecastTrend, getWeatherForecastHeatmap } = await import('@/api');
+            const { getWeatherForecastTrend } = await import('@/api');
 
             // 并行获取趋势和热力图数据
-            const [trendData, heatmapData] = await Promise.all([
-                getWeatherForecastTrend({}),
-                getWeatherForecastHeatmap({ currentPoint })
-            ]);
-
-            const data = {
-                trendData,
-                heatmapData,
-            };
-            this.getDashboardWeatherStore().setWeatherForecastPanelData(data);
+            const trendData = await getWeatherForecastTrend(currentPoint.id);
+            this.getDashboardWeatherStore().setWeatherForecastPanelData(trendData);
         } catch (error) {
             console.error('加载天气预测数据失败:', error);
             throw error;

@@ -37,9 +37,7 @@ export const useRegionStore = defineStore('region', {
       this.error = null;
       try {
         const data = await getRegionConfig();
-        this.regionConfig = data;
-        console.log(11111111111111, data);
-        
+        this.regionConfig = data;        
         return data;
       } catch (error) {
         this.error = error.message;

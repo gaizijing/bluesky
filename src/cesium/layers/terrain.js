@@ -1,5 +1,4 @@
 import * as Cesium from 'cesium'
-import { useWeatherStore } from '@/store/modules/weather'
 
 export const loadTerrain = async (viewerInstance) => {
   try {
@@ -17,7 +16,6 @@ export const loadTerrain = async (viewerInstance) => {
 
     // 确保相机考虑地形高度
      viewerInstance.scene.globe.depthTestAgainstTerrain = false
-     const weatherStore = useWeatherStore()
 
     // ==================== 添加高度雾效果 ====================
     // 关闭Cesium内置雾

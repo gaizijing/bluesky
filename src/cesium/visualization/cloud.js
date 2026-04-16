@@ -38,7 +38,6 @@ export default class Cloud {
       return
     }
 
-    const scene = this.viewer.scene;
     const weatherStore = useWeatherStore();
 
     ///////////////////////////

@@ -32,9 +32,9 @@ const getTimeLabels = () => {
   // 获取当前整点时间
   const currentHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0, 0);
 
-  // 生成从当前整点开始的19个时间点（每10分钟一个，3小时=18个间隔+1个起始点）
-  for (let i = 0; i < 19; i++) {
-    const time = new Date(currentHour.getTime() + i * 10 * 60000); // 每10分钟增加
+  // 生成从当前整点开始的12个时间点（每15分钟一个，3小时=11个间隔+1个起始点） 
+  for (let i = 0; i < 11; i++) {
+    const time = new Date(currentHour.getTime() + i * 15 * 60000); // 每15分钟增加
     labels.push(time.toLocaleTimeString('zh-CN', {
       hour: '2-digit',
       minute: '2-digit',
@@ -110,15 +110,15 @@ const initChart = () => {
         color: '#94a3b8',
         fontSize: 10,
         rotate: 45,    // 旋转45度防止文字重叠
-        interval: (index) => {
-          // 只显示整点和半点（即分钟为00, 30）的文字
-          const timeStr = timeLabels[index];
-          if (timeStr) {
-            const minute = timeStr.split(':')[1];
-            return (minute === '00' || minute === '30') ? -1 : 0;
-          }
-          return -1;
-        }
+        // interval: (index) => {
+        //   // 只显示整点和半点（即分钟为00, 30）的文字
+        //   const timeStr = timeLabels[index];
+        //   if (timeStr) {
+        //     const minute = timeStr.split(':')[1];
+        //     return (minute === '00' || minute === '30') ? -1 : 0;
+        //   }
+        //   return -1;
+        // }
       }
     },
     yAxis: {
@@ -165,18 +165,9 @@ const updateChartData = () => {
   // 使用从store获取的实际数据
   if (flightSuitableAnalysisPanelData.value) {
     adaptedData = flightSuitableAnalysisPanelData.value;
-  } else {
-    // 没有数据时使用默认数据，确保组件能正常渲染
-    adaptedData = {
-      timeInterval: '10min',
-      totalHours: 3,
-      factors: ['风速', '能见度', '降水量', '温度', '湿度', '气压', '云量'],
-      statusData: Array(7).fill().map(() => Array(19).fill(true)),
-      valueData: Array(7).fill().map(() => Array(19).fill().map(() => (Math.random() * 10).toFixed(1)))
-    };
-  }
-
+  } 
   chartData.value = adaptedData;
+  console.log('gzj', chartData.value);
   initChart();
 };
 

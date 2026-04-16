@@ -104,7 +104,7 @@
           </div>
           <div class="main-panel left_bg">
             <div class="panel-header">
-              <span class="panel-title">气象预报</span>
+              <span class="panel-title">3H气象预报</span>
             </div>
             <div class="panel-content">
               <div class="dashboard-content">
@@ -116,7 +116,7 @@
           </div>
           <div class="main-panel left_bg">
             <div class="panel-header">
-              <span class="panel-title">未来3h适飞分析</span>
+              <span class="panel-title">3H适飞分析</span>
             </div>
 
             <div class="panel-content">

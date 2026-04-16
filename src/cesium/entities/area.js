@@ -78,6 +78,7 @@ class AreaManager {
     const entity = this.areaEntities.get(entityId)
 
     this.selectedEntity = this._setEntityAsSelected(entity)
+
     const areaData = entity.properties.areaData
     const area = areaData && areaData.getValue ? areaData.getValue() : areaData
     if (area?.bbox) {

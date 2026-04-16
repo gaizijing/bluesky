@@ -89,9 +89,7 @@ export class InitializationService {
    // if (this.getLayerSettingsStore().layers.wind.visible) {
       await this.weatherService.loadWindData()
    // }
-   // if (this.getLayerSettingsStore().layers.temperature.visible) {
-      await this.weatherService.loadHeatMapData()
-  //  }
+  
   }
 
   async initializeModuleData() {

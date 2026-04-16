@@ -1,4 +1,4 @@
-import { getWeatherSuitability, getCurrentSuitabilityIndex } from '@/api';
+import { getWeatherSuitability } from '@/api';
 import { useAreaStore } from '@/store/modules/area';
 import { useThresholdsStore } from '@/store/modules/thresholds';
 import { useDashboardWeatherStore } from '@/store/modules/dashboardWeather';
@@ -122,32 +122,11 @@ class SuitabilityService {
     }
   }
 
-  // 获取实时适飞指数
-  async getCurrentSuitabilityIndex() {
-    try {
-      const currentArea = this.getCurrentArea();
-      
-      if (!currentArea) {
-        throw new Error('未选择重点关注区域');
-      }
-
-      const response = await getCurrentSuitabilityIndex(currentArea);
-      const indexData = response.data; // 从响应中提取数据
-      const thresholds = this.getThresholds();
-
-      // 集成阈值分析
-      return this.enhanceCurrentIndexWithThresholds(indexData, thresholds);
-
-    } catch (error) {
-      console.error('获取实时适飞指数失败:', error);
-      throw error;
-    }
-  }
 
   // 加载适飞分析面板数据
   async loadFlightSuitableAnalysisPanel(currentPoint) {
     try {
-      const data = await this.getSuitabilityData({ timestamp: new Date() });
+      const data = await this.getSuitabilityData({ pointId: currentPoint.id });
 
       const adaptedData = {
         timeInterval: data.timeInterval,
@@ -163,7 +142,7 @@ class SuitabilityService {
         overallScores: data.overallScores
       };
 
-      this.getDashboardWeatherStore().setFlightSuitableAnalysisPanelData(adaptedData);
+      this.getDashboardWeatherStore().setFlightSuitableAnalysisPanelData(data);
     } catch (error) {
       console.error('加载适飞分析数据失败:', error);
     }
