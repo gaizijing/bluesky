@@ -25,10 +25,7 @@
       <div class="admin-panel__header">
         <div>
           <h2 class="admin-panel__title">阈值配置清单</h2>
-          <p class="admin-panel__desc">
-            当前显示 {{ visibleThresholds.length }} / {{ thresholds.length }} 条记录，数据源：
-            {{ dataSourceLabel }}
-          </p>
+          <p class="admin-panel__desc">当前显示 {{ visibleThresholds.length }} / {{ thresholdCount }} 条记录</p>
         </div>
         <div class="admin-toolbar">
 
@@ -50,7 +47,7 @@
           <el-button class="admin-secondary-button" @click="handleSearchByAircraftId">
             查询
           </el-button>
-          <el-button v-if="searchAircraftId || showDefaultOnly" class="admin-ghost-button" @click="clearFilters">
+          <el-button v-if="searchAircraftId" class="admin-ghost-button" @click="clearFilters">
             清空筛选
           </el-button>
         </div>
@@ -233,7 +230,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addThreshold,
@@ -248,18 +245,15 @@ import { useThresholdsStore } from '@/store/modules/thresholds'
 import {
   extractList,
   extractRecord,
-  normalizeBoolean,
   normalizeNumber
 } from '@/utils/admin'
 const thresholdsStore = useThresholdsStore()
 
 const searchAircraftId = ref('')
-const showDefaultOnly = ref(false)
 const drawerVisible = ref(false)
 const isEditing = ref(false)
 const loading = ref(false)
 const saving = ref(false)
-const dataSource = ref('remote')
 const formRef = ref(null)
 
 const thresholds = ref([])
@@ -281,7 +275,7 @@ const turbulenceOptions = ['轻度', '中度', '重度']
 const aircraftList = ref([])
 
 const loadAircrafts = async () => {
-  
+  try {
     const response = await getAllAircraftModels()
     const aircrafts = extractList(response)
     aircraftList.value = aircrafts
@@ -290,16 +284,12 @@ const loadAircrafts = async () => {
         id: item.id || item.aircraftId || item.modelId,
         name: item.name || item.model || item.aircraftId
       }))
- 
+  } catch (error) {
+    aircraftList.value = []
+    console.error('加载飞行器列表失败:', error)
+    ElMessage.error(error.message || '加载飞行器列表失败，请稍后重试')
+  }
 }
-
-const tableMaxHeight = computed(() => {
-  // 计算表格最大高度，考虑页面其他元素的高度
-  const windowHeight = window.innerHeight
-  // 预留顶部栏、工具栏等高度
-  const reservedHeight = 200
-  return windowHeight - reservedHeight
-})
 
 const createThresholdForm = () => ({
   id: null,
@@ -346,7 +336,7 @@ const normalizeThreshold = (item, index = 0) => ({
 const serializeThreshold = (item) => {
   const payload = {
     ...item,
-    aircraftId: item.aircraftId?.trim() || 'default',
+    aircraftId: item.aircraftId?.trim() || '',
     maxWindSpeed: normalizeNumber(item.maxWindSpeed, 8),
     maxWindShear: normalizeNumber(item.maxWindShear, 5),
     minVisibility: normalizeNumber(item.minVisibility, 4),
@@ -365,19 +355,12 @@ const serializeThreshold = (item) => {
   return payload
 }
 
+const isDefaultThreshold = (item) => !String(item?.aircraftId || '').trim()
 
-
-const dataSourceLabel = computed(() => '接口数据')
+const thresholdCount = computed(() => thresholds.value.filter((item) => !isDefaultThreshold(item)).length)
 
 const visibleThresholds = computed(() => {
-  let list = [...thresholds.value]
-
-  // 过滤掉默认配置（aircraftId 为空或 'default'）
-  list = list.filter((item) => item.aircraftId && item.aircraftId !== 'default')
-
-  if (showDefaultOnly.value) {
-    list = defaultConfig.value ? [defaultConfig.value] : list.filter((item) => !item.aircraftId)
-  }
+  let list = thresholds.value.filter((item) => !isDefaultThreshold(item))
 
   const keyword = searchAircraftId.value.trim().toLowerCase()
   if (!keyword) {
@@ -389,27 +372,6 @@ const visibleThresholds = computed(() => {
     const configId = String(item.id || '').toLowerCase()
     return aircraftId.includes(keyword) || configId.includes(keyword)
   })
-})
-
-const stats = computed(() => {
-  const total = thresholds.value.length
-  const defaultIds = new Set(thresholds.value.filter((item) => !item.aircraftId).map((item) => item.id))
-  if (defaultConfig.value?.id) {
-    defaultIds.add(defaultConfig.value.id)
-  }
-
-  const averageWindSpeed = total
-    ? (thresholds.value.reduce((sum, item) => sum + item.maxWindSpeed, 0) / total).toFixed(1)
-    : '0.0'
-
-  const strictCount = thresholds.value.filter((item) => getThresholdProfile(item) === '严格').length
-
-  return {
-    total,
-    defaultCount: defaultIds.size,
-    averageWindSpeed,
-    strictCount
-  }
 })
 
 const syncStore = (list, defaultItem) => {
@@ -429,21 +391,16 @@ const loadThresholds = async () => {
   try {
     const [listPayload, defaultPayload] = await Promise.all([
       getAllThresholds(),
-      getDefaultThreshold().catch(() => null)
+      getDefaultThreshold()
     ])
 
     const remoteList = extractList(listPayload).map((item, index) => normalizeThreshold(item, index))
-    const defaultItem = normalizeThreshold(
-      extractRecord(defaultPayload) || remoteList.find((item) => !item.aircraftId) || {}
-    )
+    const defaultRecord = extractRecord(defaultPayload)
+    const defaultItem = defaultRecord ? normalizeThreshold(defaultRecord) : null
 
     thresholds.value = remoteList
     defaultConfig.value = defaultItem
-    dataSource.value = 'remote'
-
-    if (remoteList.length) {
-      syncStore(remoteList, defaultItem)
-    }
+    syncStore(remoteList, defaultItem)
 
     if (!remoteList.length) {
       ElMessage.warning('当前没有阈值配置数据。')
@@ -451,7 +408,7 @@ const loadThresholds = async () => {
   } catch (error) {
     thresholds.value = []
     defaultConfig.value = null
-    dataSource.value = 'remote'
+    syncStore([], null)
     ElMessage.error('加载阈值配置失败，请稍后重试。')
     console.error('加载阈值配置失败:', error)
   } finally {
@@ -465,7 +422,6 @@ const applyFormModel = (payload) => {
 
 const openCreate = async () => {
   isEditing.value = false
-  isDefaultConfig.value=true
   formSnapshot.value = createThresholdForm()
   applyFormModel(formSnapshot.value)
   drawerVisible.value = true
@@ -486,23 +442,6 @@ const handleReset = () => {
   applyFormModel(formSnapshot.value || createThresholdForm())
 }
 
-const upsertLocalThreshold = (payload) => {
-  const normalized = normalizeThreshold({
-    ...payload,
-    id: payload.id || `LIMIT-${Date.now()}`
-  })
-
-  if (isEditing.value) {
-    thresholds.value = thresholds.value.map((item) => (item.id === normalized.id ? normalized : item))
-  } else {
-    thresholds.value = [normalized, ...thresholds.value]
-  }
-
-  if (!normalized.aircraftId) {
-    defaultConfig.value = normalized
-  }
-}
-
 const handleSave = async () => {
   await formRef.value?.validate()
   saving.value = true
@@ -510,16 +449,20 @@ const handleSave = async () => {
   const payload = serializeThreshold(formModel)
 
   try {
-    let response
-    if (isEditing.value && !payload.aircraftId) {
-      // 更新默认阈值配置
-      response = await updateDefaultThreshold(payload)
+    if (isEditing.value) {
+      if (isDefaultThreshold(payload)) {
+        await updateDefaultThreshold(payload)
+      } else {
+        await updateThreshold(payload)
+      }
     } else {
-      // 更新或新增普通阈值配置
-      response = isEditing.value ? await updateThreshold(payload) : await addThreshold(payload)
+      if (!payload.aircraftId) {
+        ElMessage.warning('新增阈值时请选择飞行器。')
+        return
+      }
+
+      await addThreshold(payload)
     }
-
-
 
     ElMessage.success(isEditing.value ? '阈值配置已更新' : '阈值配置已新增')
     drawerVisible.value = false
@@ -554,58 +497,11 @@ const handleDelete = async (row) => {
 }
 
 const handleSearchByAircraftId = () => {
-  showDefaultOnly.value = false
-}
-
-const toggleDefaultOnly = () => {
-  searchAircraftId.value = ''
-  showDefaultOnly.value = !showDefaultOnly.value
+  searchAircraftId.value = searchAircraftId.value.trim()
 }
 
 const clearFilters = () => {
   searchAircraftId.value = ''
-  showDefaultOnly.value = false
-}
-
-const getThresholdProfile = (row) => {
-  if (!row.aircraftId) {
-    return '默认策略'
-  }
-
-  const strictSignals = [
-    row.maxWindSpeed <= 6,
-    row.minVisibility >= 8,
-    row.maxHumidity <= 85,
-    row.maxPrecipitation <= 4
-  ].filter(Boolean).length
-
-  if (strictSignals >= 2) {
-    return '严格'
-  }
-
-  if (strictSignals === 1) {
-    return '平衡'
-  }
-
-  return '宽松'
-}
-
-const getThresholdProfileClass = (row) => {
-  const profile = getThresholdProfile(row)
-
-  if (profile === '默认策略') {
-    return 'admin-pill--accent'
-  }
-
-  if (profile === '严格') {
-    return 'admin-pill--good'
-  }
-
-  if (profile === '平衡') {
-    return 'admin-pill--warn'
-  }
-
-  return 'admin-pill--danger'
 }
 
 onMounted(() => {

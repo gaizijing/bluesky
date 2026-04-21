@@ -184,7 +184,7 @@ export const fetchCurrentPointWeather = async (pointId) => {
     // 调用后端实时天气接口
     const data = await request.get(`/weather/realtime?pointId=${pointId}`);
     // 适配前端期望的格式
-    if (data && data.data) {
+    if (data) {
       const weatherData = data;
       return {
         temp: weatherData.temp?.toString() || '25',
@@ -267,7 +267,14 @@ export const getRiskWarnings = async (params = {}) => {
     let url = '/weather/risk/report';
     const queryParams = [];
     if (pointId) queryParams.push(`pointId=${pointId}`);
-    if (timeRange) queryParams.push(`timeRange=${timeRange}`);
+    if (timeRange) {
+      queryParams.push(`timeRange=${timeRange}`);
+    } else {
+      // 如果未提供timeRange，使用2026年3月份整个范围作为默认值
+      const defaultTimeRange = `2026-03-01 00:00:00,2026-03-31 23:59:59`;
+      queryParams.push(`timeRange=${encodeURIComponent(defaultTimeRange)}`);
+    }
+    
     if (queryParams.length > 0) {
       url += '?' + queryParams.join('&');
     }
@@ -294,7 +301,7 @@ export const getWeatherHeatmapGeo = async (params = {}) => {
     // 构建API请求参数
     const queryParams = new URLSearchParams();
     queryParams.append('pointId', pointId);
-    if (time) queryParams.append('time', time.toISOString ? time.toISOString() : time);
+    // if (time) queryParams.append('time', time.toISOString ? time.toISOString() : time);
 
     const url = `/weather/heatmap/geo?${queryParams.toString()}`;
     console.log('调用地理空间热力图API:', url);
@@ -314,7 +321,7 @@ export const getWeatherHeatmapGeo = async (params = {}) => {
 
 // 获取风场数据
 export const getWindData = async () => {
-  const data = await request.get('/wind-field?bounds=119,35,122,37');
+  const data = await request.get('/wind-field');
   return data;
 }
 
@@ -526,14 +533,93 @@ export const deleteDevice = async (id) => {
 // ==================== 摄像头接口 ====================
 
 // 获取摄像头列表
-export const getCameras = async (status) => {
+export const getCameras = async (params = {}) => {
   try {
-    let url = '/cameras';
-    if (status) url += `?status=${status}`;
-    const data = await request.get(url);
+    const data = await request.get('/cameras', params);
     return data;
   } catch (error) {
     console.error('获取摄像头列表失败:', error);
+    throw error;
+  }
+}
+
+// 创建摄像头
+export const createCamera = async (data) => {
+  try {
+    const response = await request.post('/cameras', data);
+    return response;
+  } catch (error) {
+    console.error('创建摄像头失败:', error);
+    throw error;
+  }
+}
+
+// 根据 ID 获取摄像头详情
+export const getCameraById = async (id) => {
+  try {
+    const data = await request.get(`/cameras/${id}`);
+    return data;
+  } catch (error) {
+    console.error('获取摄像头详情失败:', error);
+    throw error;
+  }
+}
+
+// 更新摄像头
+export const updateCamera = async (id, data) => {
+  try {
+    const response = await request.put(`/cameras/${id}`, data);
+    return response;
+  } catch (error) {
+    console.error('更新摄像头失败:', error);
+    throw error;
+  }
+}
+
+// 删除摄像头
+export const deleteCamera = async (id) => {
+  try {
+    const response = await request.delete(`/cameras/${id}`);
+    return response;
+  } catch (error) {
+    console.error('删除摄像头失败:', error);
+    throw error;
+  }
+}
+
+// 获取摄像头预览图地址
+export const getCameraPreview = async (id) => {
+  try {
+    const data = await request.get(`/cameras/${id}/preview`);
+    return data;
+  } catch (error) {
+    console.error('获取摄像头预览地址失败:', error);
+    throw error;
+  }
+}
+
+// 获取摄像头流地址
+export const getCameraStream = async (id) => {
+  try {
+    const data = await request.get(`/cameras/${id}/stream`);
+    return data;
+  } catch (error) {
+    console.error('获取摄像头流地址失败:', error);
+    throw error;
+  }
+}
+
+// 更新摄像头启用状态
+export const updateCameraActive = async (id, active) => {
+  try {
+    const response = await request.put(`/cameras/${id}/active`, null, {
+      params: {
+        active
+      }
+    });
+    return response;
+  } catch (error) {
+    console.error('更新摄像头启用状态失败:', error);
     throw error;
   }
 }
@@ -546,17 +632,8 @@ export const getRoutes = async () => {
     const data = await request.get('/routes');
     return data;
   } catch (error) {
-    console.error('获取航路列表失败（后端RouteService有IndexOutOfBoundsException）:', error);
-    // 临时返回空数组，避免前端崩溃
-    return {
-      code: 200,
-      message: '成功',
-      data: {
-        routes: [],
-        total: 0,
-        available: 0
-      }
-    };
+    console.error('获取航路列表失败:', error);
+    throw error;
   }
 }
 
@@ -566,179 +643,9 @@ export const getRouteDetail = async (routeId) => {
     const data = await request.get(`/routes/${routeId}`);
     return data;
   } catch (error) {
-    console.error('获取航路详情失败（后端RouteService有IndexOutOfBoundsException）:', error);
-    // 临时返回空数据，避免前端崩溃
-    return {
-      code: 200,
-      message: '成功',
-      data: {
-        routeId,
-        routeName: `航路${routeId}`,
-        weatherAlongRoute: [],
-        riskAssessment: { overallRisk: '未知', factors: [] },
-        recommendations: ['后端服务暂时不可用']
-      }
-    };
+    console.error('获取航路详情失败:', error);
+    throw error;
   }
-}
-
-// 生成模拟航路列表数据
-function generateMockRoutesData() {
-  const routes = [
-    {
-      id: 'ROUTE-001',
-      name: '航路一',
-      start: '起飞点A',
-      end: '降落点B',
-      distance: '120km',
-      estimatedTime: '15min',
-      weatherCondition: '良好',
-      status: '可用',
-      riskLevel: '低'
-    },
-    {
-      id: 'ROUTE-002',
-      name: '航路二',
-      start: '起飞点A',
-      end: '降落点C',
-      distance: '180km',
-      estimatedTime: '22min',
-      weatherCondition: '一般',
-      status: '可用',
-      riskLevel: '中'
-    },
-    {
-      id: 'ROUTE-003',
-      name: '航路三',
-      start: '起飞点B',
-      end: '降落点C',
-      distance: '90km',
-      estimatedTime: '12min',
-      weatherCondition: '良好',
-      status: '可用',
-      riskLevel: '低'
-    },
-    {
-      id: 'ROUTE-004',
-      name: '训练航路',
-      start: '训练场A',
-      end: '训练场B',
-      distance: '60km',
-      estimatedTime: '8min',
-      weatherCondition: '较差',
-      status: '限制',
-      riskLevel: '高'
-    }
-  ];
-
-  return {
-    code: 200,
-    message: '成功',
-    data: {
-      routes,
-      total: routes.length,
-      available: routes.filter(r => r.status === '可用').length
-    }
-  };
-}
-
-// 生成模拟航路详情数据
-function generateMockRouteDetailData(routeId) {
-  const routeDetails = {
-    'ROUTE-001': {
-      routeId: 'ROUTE-001',
-      routeName: '航路一',
-      description: '主要商业航路，连接A-B两个主要机场',
-      weatherAlongRoute: [
-        { segment: '起点', wind: '3-4级', visibility: '10km', precipitation: '无', temperature: '25°C' },
-        { segment: '中段', wind: '4-5级', visibility: '8km', precipitation: '无', temperature: '23°C' },
-        { segment: '终点', wind: '3级', visibility: '12km', precipitation: '无', temperature: '26°C' }
-      ],
-      riskAssessment: {
-        overallRisk: '低',
-        factors: [
-          { factor: '风速', risk: '低', value: '3.5m/s' },
-          { factor: '能见度', risk: '低', value: '9.2km' },
-          { factor: '降水量', risk: '低', value: '0mm' },
-          { factor: '湍流', risk: '中', value: '0.4' },
-          { factor: '风切变', risk: '低', value: '0.2' }
-        ]
-      },
-      recommendations: [
-        '建议飞行高度：300-500米',
-        '建议飞行速度：60-80km/h',
-        '注意中段风力变化',
-        '保持与地面通讯畅通'
-      ]
-    },
-    'ROUTE-002': {
-      routeId: 'ROUTE-002',
-      routeName: '航路二',
-      description: '山区航路，地形复杂',
-      weatherAlongRoute: [
-        { segment: '起点', wind: '4-5级', visibility: '8km', precipitation: '小雨', temperature: '22°C' },
-        { segment: '山区段', wind: '5-6级', visibility: '5km', precipitation: '中雨', temperature: '20°C' },
-        { segment: '终点', wind: '3-4级', visibility: '10km', precipitation: '无', temperature: '24°C' }
-      ],
-      riskAssessment: {
-        overallRisk: '中',
-        factors: [
-          { factor: '风速', risk: '中', value: '5.2m/s' },
-          { factor: '能见度', risk: '中', value: '6.5km' },
-          { factor: '降水量', risk: '中', value: '2.1mm/h' },
-          { factor: '湍流', risk: '高', value: '0.7' },
-          { factor: '地形', risk: '高', value: '复杂' }
-        ]
-      },
-      recommendations: [
-        '建议飞行高度：500-800米',
-        '建议飞行速度：50-70km/h',
-        '山区段注意强风和低能见度',
-        '建议绕行或延迟飞行'
-      ]
-    },
-    'ROUTE-003': {
-      routeId: 'ROUTE-003',
-      routeName: '航路三',
-      description: '短途训练航路',
-      weatherAlongRoute: [
-        { segment: '起点', wind: '2-3级', visibility: '15km', precipitation: '无', temperature: '26°C' },
-        { segment: '训练区', wind: '3-4级', visibility: '12km', precipitation: '无', temperature: '25°C' },
-        { segment: '终点', wind: '2-3级', visibility: '15km', precipitation: '无', temperature: '27°C' }
-      ],
-      riskAssessment: {
-        overallRisk: '低',
-        factors: [
-          { factor: '风速', risk: '低', value: '2.8m/s' },
-          { factor: '能见度', risk: '低', value: '13.2km' },
-          { factor: '降水量', risk: '低', value: '0mm' },
-          { factor: '湍流', risk: '低', value: '0.2' },
-          { factor: '空域', risk: '低', value: '空闲' }
-        ]
-      },
-      recommendations: [
-        '适合训练飞行',
-        '建议飞行高度：200-400米',
-        '注意其他训练飞机',
-        '保持目视飞行规则'
-      ]
-    }
-  };
-
-  const detail = routeDetails[routeId] || {
-    routeId,
-    routeName: `航路${routeId.split('-')[1] || '未知'}`,
-    description: '航路信息',
-    weatherAlongRoute: [],
-    riskAssessment: { overallRisk: '未知', factors: [] },
-    recommendations: ['暂无建议']
-  };
-
-  return {
-    code: 200,
-    message: '成功',
-    data: detail
-  };
 }
 
 // 创建新航线
@@ -748,16 +655,7 @@ export const createRoute = async (routeData) => {
     return data;
   } catch (error) {
     console.error('创建航线失败:', error);
-    // 临时返回成功结果，避免前端崩溃
-    return {
-      code: 200,
-      message: '成功',
-      data: {
-        success: true,
-        routeId: `route-${Date.now()}`,
-        message: '航线创建成功（模拟）'
-      }
-    };
+    throw error;
   }
 }
 
@@ -768,53 +666,7 @@ export const analyzeRouteRisk = async (routeId, params = {}) => {
     return data;
   } catch (error) {
     console.error('分析航线风险失败:', error);
-    // 临时返回模拟分析数据
-    return {
-      code: 200,
-      message: '成功',
-      data: {
-        success: true,
-        routeId,
-        routeName: `航线${routeId}`,
-        analysisTime: new Date().toISOString(),
-        riskDimensions: [
-          {
-            dimension: '风速风险',
-            level: 'medium',
-            score: 6.5,
-            description: '航线中存在3个航段风速超过8m/s'
-          },
-          {
-            dimension: '能见度风险',
-            level: 'low',
-            score: 3.2,
-            description: '能见度良好，平均大于10km'
-          }
-        ],
-        overallAssessment: {
-          overallRisk: 'medium',
-          overallScore: 6.0,
-          safetyLevel: '可飞行',
-          recommendation: '建议调整飞行高度'
-        },
-        measures: [
-          {
-            title: '调整飞行高度',
-            description: '将飞行高度提升至500米以上',
-            priority: 'high'
-          }
-        ],
-        alternativeRoutes: [
-          {
-            name: '北部绕行航线',
-            riskLevel: 'low',
-            distance: 22.3,
-            description: '避开所有高风险区域',
-            estimatedTime: '18分钟'
-          }
-        ]
-      }
-    };
+    throw error;
   }
 };
 
@@ -825,15 +677,7 @@ export const clearRoutes = async () => {
     return data;
   } catch (error) {
     console.error('清空航线失败:', error);
-    // 临时返回成功结果
-    return {
-      code: 200,
-      message: '成功',
-      data: {
-        success: true,
-        message: '航线清空成功（模拟）'
-      }
-    };
+    throw error;
   }
 };
 
@@ -991,6 +835,109 @@ export const deleteAircraftModel = async (id) => {
     return response;
   } catch (error) {
     console.error('删除飞行器模型失败:', error);
+    throw error;
+  }
+};
+
+// ==================== 用户管理接口 ====================
+
+// 获取用户列表
+export const getUserList = async () => {
+  try {
+    const data = await request.get('/api/users/list');
+    return data;
+  } catch (error) {
+    console.error('获取用户列表失败:', error);
+    throw error;
+  }
+};
+
+// 根据 ID 获取用户详情
+export const getUserById = async (id) => {
+  try {
+    const data = await request.get(`/api/users/${id}`);
+    return data;
+  } catch (error) {
+    console.error('获取用户详情失败:', error);
+    throw error;
+  }
+};
+
+// 创建用户
+export const createUser = async (data) => {
+  try {
+    const response = await request.post('/api/users', data);
+    return response;
+  } catch (error) {
+    console.error('创建用户失败:', error);
+    throw error;
+  }
+};
+
+// 注册用户
+export const registerUser = async (data) => {
+  try {
+    const response = await request.post('/api/users/register', data);
+    return response;
+  } catch (error) {
+    console.error('注册用户失败:', error);
+    throw error;
+  }
+};
+
+// 更新用户
+export const updateUser = async (id, data) => {
+  try {
+    const response = await request.put(`/api/users/${id}`, data);
+    return response;
+  } catch (error) {
+    console.error('更新用户失败:', error);
+    throw error;
+  }
+};
+
+// 删除用户
+export const deleteUser = async (id) => {
+  try {
+    const response = await request.delete(`/api/users/${id}`);
+    return response;
+  } catch (error) {
+    console.error('删除用户失败:', error);
+    throw error;
+  }
+};
+
+// 更新用户状态
+export const updateUserStatus = async (id, status) => {
+  try {
+    const response = await request.put(`/api/users/${id}/status`, null, {
+      params: {
+        status
+      }
+    });
+    return response;
+  } catch (error) {
+    console.error('更新用户状态失败:', error);
+    throw error;
+  }
+};
+
+// 修改当前登录用户密码
+export const changeUserPassword = async (oldPassword, newPassword) => {
+  try {
+    const response = await request.put(
+      '/api/users/change-password',
+      {},
+      {
+        params: {
+          oldPassword,
+          newPassword
+        }
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error('修改用户密码失败:', error);
     throw error;
   }
 };

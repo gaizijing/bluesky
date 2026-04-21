@@ -1,81 +1,131 @@
-<!-- src/components/business/SurveillanceFootage/index.vue -->
 <template>
-  <div class="surveillance-footage">
-    <div class="camera-grid">
-      <div class="camera-item" v-for="(camera, index) in cameras" :key="camera.id" @click="selectCamera(index)"
-        :class="{ active: selectedCameraIndex === index }">
+  <div class="surveillance-footage" v-loading="loading">
+    <div v-if="!selectedPointId" class="camera-global-empty">
+      <div class="camera-global-empty__title">未选择监测点</div>
+      <div class="camera-global-empty__text">请先选择监测点，再查看该点位关联的摄像头画面。</div>
+    </div>
+
+    <div v-else-if="cameras.length" class="camera-grid">
+      <div
+        v-for="(camera, index) in cameras"
+        :key="camera.id"
+        class="camera-item"
+        :class="{ active: selectedCameraIndex === index }"
+        @click="selectCamera(index)"
+      >
         <div class="camera-view">
-          <div v-if="camera.status === 'online'" class="video-container">
-            <img :src="camera.previewImage || defaultImage" :alt="camera.name" class="camera-preview"
-              @error="handleImageError" />
-            <div class="camera-overlay">
-              <div class="camera-name">{{ camera.name }}</div>
+          <template v-if="camera.status === 'online'">
+            <div v-if="camera.previewUrl" class="video-container">
+              <img :src="camera.previewUrl" :alt="camera.name" class="camera-preview" />
+              <div class="camera-overlay">
+                <div class="camera-name">{{ camera.name }}</div>
+              </div>
             </div>
-          </div>
+            <div v-else class="camera-empty-state">
+              <div class="camera-empty-state__title">未配置预览地址</div>
+              <div class="camera-empty-state__text">{{ camera.name }}</div>
+            </div>
+          </template>
 
           <div v-else class="offline-placeholder">
-            <div class="offline-icon">📷</div>
+            <div class="offline-icon">CAM</div>
             <div class="offline-text">摄像头离线</div>
           </div>
         </div>
       </div>
     </div>
+
+    <div v-else class="camera-global-empty">
+      <div class="camera-global-empty__title">当前监测点暂无摄像头</div>
+      <div class="camera-global-empty__text">接口未返回该监测点关联的摄像头数据。</div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { getCameras } from '@/api';
-import defaultImage from '@/assets/images/Monitoring1.jpg';
+import { computed, onMounted, ref, watch } from 'vue'
+import { fetchCurrentSelectedArea, getCameras } from '@/api'
+import { useAreaStore } from '@/store/modules/area'
+import { extractList } from '@/utils/admin'
 
-// 当前选中的摄像头索引
-const selectedCameraIndex = ref(0);
+const areaStore = useAreaStore()
+const selectedCameraIndex = ref(0)
+const cameras = ref([])
+const loading = ref(false)
 
-// 摄像头数据
-const cameras = ref([]);
-const loading = ref(false);
-
-// 加载摄像头数据
-const loadCameras = async () => {
-  loading.value = true;
-
-  const data = await getCameras();
-  if (data && Array.isArray(data)) {
-    cameras.value = data.map((camera, index) => ({
-      ...camera,
-      // 如果没有预览图，使用默认图片
-      previewImage: camera.previewImage || getDefaultImage(index)
-    }));
+const selectedPointId = computed(() => {
+  const area = areaStore.selectedArea
+  if (!area) {
+    return ''
   }
-  loading.value = false;
-};
+  return String(area.id || area.pointId || '').trim()
+})
 
-// 获取默认图片
-const getDefaultImage = (index) => {
-  // 动态导入默认图片
-  const images = [
-    new URL('@/assets/images/Monitoring1.jpg', import.meta.url).href,
-    new URL('@/assets/images/Monitoring2.jpg', import.meta.url).href,
-    new URL('@/assets/images/Monitoring3.jpg', import.meta.url).href,
-    new URL('@/assets/images/Monitoring4.jpg', import.meta.url).href
-  ];
-  return images[index % images.length];
-};
+const normalizeStatus = (value) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  return normalized === 'offline' ? 'offline' : 'online'
+}
 
-// 图片加载失败处理
-const handleImageError = (event) => {
-  event.target.src = defaultImage;
-};
+const normalizeCamera = (camera) => ({
+  id: String(camera?.id ?? ''),
+  name: String(camera?.name || '未命名摄像头'),
+  status: normalizeStatus(camera?.status),
+  previewUrl: String(camera?.previewUrl || '').trim()
+})
 
-// 选择摄像头
+const loadSelectedArea = async () => {
+  if (selectedPointId.value) {
+    return
+  }
+
+  try {
+    const currentArea = await fetchCurrentSelectedArea()
+    if (currentArea) {
+      areaStore.setSelectedArea(currentArea)
+    }
+  } catch (error) {
+    console.error('加载当前监测点失败:', error)
+  }
+}
+
+const loadCameras = async () => {
+  const pointId = selectedPointId.value
+  if (!pointId) {
+    cameras.value = []
+    return
+  }
+
+  loading.value = true
+  try {
+    const data = await getCameras({ pointId })
+    cameras.value = extractList(data).map(normalizeCamera)
+    if (selectedCameraIndex.value >= cameras.value.length) {
+      selectedCameraIndex.value = 0
+    }
+  } catch (error) {
+    console.error('加载摄像头数据失败:', error)
+    cameras.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
 const selectCamera = (index) => {
-  selectedCameraIndex.value = index;
-};
+  selectedCameraIndex.value = index
+}
 
-// 组件挂载时加载数据
-onMounted(() => {
-  loadCameras();
-});
+watch(
+  () => selectedPointId.value,
+  async () => {
+    selectedCameraIndex.value = 0
+    await loadCameras()
+  }
+)
+
+onMounted(async () => {
+  await loadSelectedArea()
+  await loadCameras()
+})
 </script>
 
 <style scoped lang="scss">
@@ -91,7 +141,7 @@ onMounted(() => {
   grid-template-rows: repeat(2, 1fr);
   gap: 5px;
   flex: 1;
-  margin-left: 10px
+  margin-left: 10px;
 }
 
 .camera-item {
@@ -108,7 +158,7 @@ onMounted(() => {
   }
 
   &.active {
-    border-color: #409EFF;
+    border-color: #409eff;
     box-shadow: 0 0 15px rgba(64, 158, 255, 0.5);
   }
 }
@@ -146,24 +196,67 @@ onMounted(() => {
   border-radius: 4px;
 }
 
-.offline-placeholder {
+.camera-empty-state,
+.offline-placeholder,
+.camera-global-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
+  text-align: center;
+}
+
+.camera-empty-state {
+  gap: 6px;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(19, 33, 61, 0.95), rgba(11, 18, 35, 0.92));
+}
+
+.camera-empty-state__title,
+.camera-global-empty__title {
+  color: #d9ecff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.camera-empty-state__text,
+.camera-global-empty__text {
+  color: rgba(217, 236, 255, 0.66);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.offline-placeholder {
   background: rgba(0, 0, 0, 0.3);
 }
 
 .offline-icon {
-  font-size: 32px;
-  margin-bottom: 10px;
-  opacity: 0.5;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgba(245, 108, 108, 0.16);
+  color: #f56c6c;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .offline-text {
-  color: #F56C6C;
+  margin-top: 10px;
+  color: #f56c6c;
   font-size: 14px;
+}
+
+.camera-global-empty {
+  flex: 1;
+  min-height: 180px;
+  margin-left: 10px;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  background: rgba(8, 18, 36, 0.6);
 }
 
 @media (max-width: 768px) {

@@ -32,8 +32,8 @@ export const addWhiteModel = async (viewerInstance) => {
     // viewerInstance.extend(Cesium.viewerCesium3DTilesInspectorMixin)
 
     ///////////cesium自带的模型////////////
-     const tileset = await Cesium.createOsmBuildingsAsync();
-      viewerInstance.scene.primitives.add(tileset);
+    //  const tileset = await Cesium.createOsmBuildingsAsync();
+    //   viewerInstance.scene.primitives.add(tileset);
 
   } catch (error) {
     console.error('加载3D模型失败:', error)

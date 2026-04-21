@@ -67,7 +67,9 @@ import {
   DataAnalysis,
   Histogram,
   LocationInformation,
-  SwitchButton
+  SwitchButton,
+  User,
+  VideoCamera
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { userLogout } from '@/api/auth'
@@ -84,6 +86,12 @@ const menuItems = [
     title: '阈值管理',
     description: '适飞阈值、默认策略与机型配置',
     icon: DataAnalysis
+  },
+  {
+    path: '/admin/user',
+    title: '用户管理',
+    description: '账号信息、角色分配与登录状态维护',
+    icon: User
   },
   {
     path: '/admin/aircraft',
@@ -104,6 +112,12 @@ const menuItems = [
     icon: Cpu
   },
   {
+    path: '/admin/camera',
+    title: '摄像头管理',
+    description: '监控画面、流地址与启用状态统一维护',
+    icon: VideoCamera
+  },
+  {
     path: '/admin/region-config',
     title: '地区配置管理',
     description: '区域配置、边界定义与数据同步',
@@ -113,9 +127,11 @@ const menuItems = [
 
 const routeDescriptions = {
   '/admin/threshold': '维护飞行限制基线，让适飞分析和风险预警拥有一致的判断口径。',
+  '/admin/user': '集中维护用户资料、角色权限和账号状态，保证后台访问边界清晰可控。',
   '/admin/aircraft': '统一整理飞行器型号与性能档案，为业务匹配提供可追踪资产台账。',
   '/admin/monitoring-point': '编排业务监测点网络，确保站点坐标、类型与运行状态始终可控。',
-  '/admin/device': '管理设备台账、在线状态和监测点关联关系，保证感知链路稳定可追踪。'
+  '/admin/device': '管理设备台账、在线状态和监测点关联关系，保证感知链路稳定可追踪。',
+  '/admin/camera': '维护摄像头部署、实时预览和启用状态，确保视频监控链路清晰可控。'
 }
 
 let timer = null

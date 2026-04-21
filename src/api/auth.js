@@ -75,7 +75,7 @@ export const userLogout = async () => {
 export const getUserInfo = async () => {
   try {
     // 调用真实的获取用户信息API
-    const response = await request.get('/api/auth/userInfo');
+    const response = await request.get('/auth/userInfo');
     
     // 检查响应格式
     if (response && (response.userInfo || response.id)) {

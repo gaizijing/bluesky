@@ -96,8 +96,8 @@
 
           <el-table-column label="状态" min-width="100">
             <template #default="{ row }">
-              <span :class="['admin-pill', row.status === 'available' ? 'admin-pill--good' : 'admin-pill--danger']">
-                {{ row.status === 'available' ? '活跃' : '停用' }}
+              <span :class="['admin-pill', getStatusClass(row.status)]">
+                {{ getStatusText(row.status) }}
               </span>
             </template>
           </el-table-column>
@@ -285,7 +285,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox, inputNumberEmits } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addNewArea,
   deleteMonitoringPoint,
@@ -306,7 +306,6 @@ const drawerVisible = ref(false)
 const isEditing = ref(false)
 const searchKeyword = ref('')
 const showActiveOnly = ref(false)
-const dataSource = ref('remote')
 const formRef = ref(null)
 const monitoringPoints = ref([])
 const formSnapshot = ref(null)
@@ -348,10 +347,56 @@ const formRules = {
   latitude: [{ required: true, message: '请输入纬度', trigger: 'blur' }]
 }
 
+const normalizeStatus = (value) => {
+  const normalized = String(value || '').trim().toLowerCase()
+
+  if (['available', 'active', '正常', '启用', '在线'].includes(normalized)) {
+    return 'available'
+  }
+
+  if (['warning', 'maintenance', '维护中', '告警'].includes(normalized)) {
+    return 'warning'
+  }
+
+  if (['unavailable', 'inactive', 'disabled', '故障', '停用', '离线'].includes(normalized)) {
+    return 'unavailable'
+  }
+
+  return 'available'
+}
+
+const getStatusText = (status) => {
+  const normalized = normalizeStatus(status)
+
+  if (normalized === 'warning') {
+    return '维护中'
+  }
+
+  if (normalized === 'unavailable') {
+    return '停用'
+  }
+
+  return '活跃'
+}
+
+const getStatusClass = (status) => {
+  const normalized = normalizeStatus(status)
+
+  if (normalized === 'warning') {
+    return 'admin-pill--warn'
+  }
+
+  if (normalized === 'unavailable') {
+    return 'admin-pill--danger'
+  }
+
+  return 'admin-pill--good'
+}
+
 const isActiveSwitch = computed({
   get: () => formModel.status === 'available',
   set: (value) => {
-    formModel.status = value ? 'available' : 'inactive'
+    formModel.status = value ? 'available' : 'unavailable'
   }
 })
 
@@ -382,20 +427,19 @@ const normalizePoint = (item, index = 0) => {
   return {
     id: item?.id ?? item?.pointId ?? item?.code ?? `MP-${String(index + 1).padStart(3, '0')}`,
     name: item?.name ?? item?.pointName ?? `监测点-${index + 1}`,
-    longitude:item.longitude,
-    latitude:item.latitude,
-    altitude: item?.altitude,
+    longitude: normalizeNumber(item?.longitude ?? item?.lng, 120.3895),
+    latitude: normalizeNumber(item?.latitude ?? item?.lat, 36.2747),
+    altitude: normalizeNumber(item?.altitude, 15),
     bboxMinLng,
     bboxMinLat,
     bboxMaxLng,
     bboxMaxLat,
     type: mappedType,
-    status:
-      item?.status ,
+    status: normalizeStatus(item?.status),
     description: item?.description ?? item?.remark ?? '',
-    isSelected: item?.isSelected,
-    code:item.code,
-    location:item.location
+    isSelected: normalizeBoolean(item?.isSelected, false),
+    code: item?.code ?? '',
+    location: item?.location ?? ''
   }
 }
 
@@ -409,7 +453,7 @@ const serializePoint = (item) => {
   const pointType = item.type?.trim()
   const mappedType = reversePointTypeMap[pointType] || pointType
 
-  const longitude =item.longitude
+  const longitude = normalizeNumber(item.longitude, 120.3895)
   const latitude = item.latitude
   
   // 使用用户输入的边界框数据，如果没有则基于经纬度计算默认值
@@ -425,16 +469,15 @@ const serializePoint = (item) => {
     type: mappedType,
     location: item.location?.trim() || '',
     longitude,
-    latitude,
-    bboxMinLng,
-    bboxMinLat,
-    bboxMaxLng,
-    bboxMaxLat,
-    altitude:item.altitude,
-    status: '正常',
-    isActive: item.status === 'available' || item.status === 'active'
+    latitude: normalizeNumber(latitude, 36.2747),
+    bboxMinLng: normalizeNumber(bboxMinLng, longitude - 0.05),
+    bboxMinLat: normalizeNumber(bboxMinLat, latitude - 0.05),
+    bboxMaxLng: normalizeNumber(bboxMaxLng, longitude + 0.05),
+    bboxMaxLat: normalizeNumber(bboxMaxLat, latitude + 0.05),
+    altitude: normalizeNumber(item.altitude, 15),
+    status: normalizeStatus(item.status),
+    isActive: normalizeStatus(item.status) === 'available'
   }
-  console.log(payload);
   
   if (!payload.id) {
     delete payload.id
@@ -458,7 +501,7 @@ const visiblePoints = computed(() => {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(keyword))
 
-    const matchesStatus = !showActiveOnly.value || item.status === 'available'
+    const matchesStatus = !showActiveOnly.value || normalizeStatus(item.status) === 'available'
 
     return matchesKeyword && matchesStatus
   })
@@ -470,16 +513,10 @@ const loadMonitoringPoints = async () => {
   try {
     const payload = await fetchAreaList()
     const remoteList = extractList(payload).map((item, index) => normalizePoint(item, index))
-
-    monitoringPoints.value = remoteList.length ? remoteList : monitoringPoints.value
-    dataSource.value = remoteList.length ? 'remote' : dataSource.value
-
-    if (!remoteList.length) {
-      ElMessage.warning('监测点接口暂不可用，当前展示本地数据。')
-    }
+    monitoringPoints.value = remoteList
   } catch (error) {
-    // 保留当前数据，不使用模拟数据
-    ElMessage.warning('监测点接口暂不可用，当前展示本地数据。')
+    monitoringPoints.value = []
+    ElMessage.error(error.message || '加载监测点列表失败，请稍后重试')
     console.error('加载监测点列表失败:', error)
   } finally {
     loading.value = false
@@ -512,19 +549,6 @@ const handleReset = () => {
   applyFormModel(formSnapshot.value || createPointForm())
 }
 
-const upsertLocalPoint = (payload) => {
-  const normalized = normalizePoint({
-    ...payload,
-    id: payload.id || `MP-${Date.now()}`
-  })
-
-  if (isEditing.value) {
-    monitoringPoints.value = monitoringPoints.value.map((item) => (item.id === normalized.id ? normalized : item))
-  } else {
-    monitoringPoints.value = [normalized, ...monitoringPoints.value]
-  }
-}
-
 const handleSave = async () => {
   await formRef.value?.validate()
   saving.value = true
@@ -532,11 +556,11 @@ const handleSave = async () => {
   const payload = serializePoint(formModel)
 
   try {
- 
-
-    const response = isEditing.value
-      ? await updateMonitoringPoint(payload.id, payload)
-      : await addNewArea(payload)
+    if (isEditing.value) {
+      await updateMonitoringPoint(payload.id, payload)
+    } else {
+      await addNewArea(payload)
+    }
 
     ElMessage.success(isEditing.value ? '监测点已更新' : '监测点已新增')
     drawerVisible.value = false
@@ -552,19 +576,7 @@ const handleSave = async () => {
 
 const handleSelect = async (row) => {
   try {
-    if (dataSource.value === 'mock') {
-      // 模拟选中状态切换
-      const updatedRow = { ...row, isSelected: !row.isSelected }
-      monitoringPoints.value = monitoringPoints.value.map(item => 
-        item.id === row.id ? updatedRow : item
-      )
-      ElMessage.success(updatedRow.isSelected ? '已选中示例监测点' : '已取消选中示例监测点')
-      return
-    }
-
-    // 调用 API 更新选中状态
     await updateSelectedArea(row)
-    // 刷新数据以获取最新的选中状态
     await loadMonitoringPoints()
     ElMessage.success('监测点选中状态已更新')
   } catch (error) {
@@ -585,12 +597,6 @@ const handleDelete = async (row) => {
   }
 
   try {
-    if (dataSource.value === 'mock') {
-      monitoringPoints.value = monitoringPoints.value.filter((item) => item.id !== row.id)
-      ElMessage.success('已删除示例监测点')
-      return
-    }
-
     await deleteMonitoringPoint(row.id)
     ElMessage.success('监测点已删除')
     await loadMonitoringPoints()

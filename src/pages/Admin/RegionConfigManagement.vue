@@ -195,6 +195,11 @@ import {
   updateRegionConfig,
   deleteRegionConfig
 } from '@/api'
+import { useRegionStore } from '@/store/modules/region';
+import { InitializationService } from '@/services/initialization';
+
+const regionStore = useRegionStore();
+const initializationService = new InitializationService();
 
 const loading = ref(false)
 const saving = ref(false)
@@ -336,6 +341,10 @@ const handleSave = async () => {
     ElMessage.success(isEditing.value ? '地区配置已更新' : '地区配置已新增')
     drawerVisible.value = false
     await loadRegionConfigs()
+    // 重新获取地区配置并更新到 store
+    await regionStore.fetchRegionConfig();
+    // 重新初始化项目
+    await initializationService.initialize();
 
   } catch (error) {
     console.error('保存地区配置失败:', error)
@@ -361,9 +370,13 @@ const setAsDefault = async (row) => {
     const response = await updateRegionConfig(payload)
 
   
-      ElMessage.success('默认地区配置已设置')
-      await loadRegionConfigs()
-    
+    ElMessage.success('默认地区配置已设置')
+    await loadRegionConfigs()
+    // 重新获取地区配置并更新到 store
+    await regionStore.fetchRegionConfig();
+    // 重新初始化项目
+    await initializationService.initialize();
+  
   } catch (error) {
     console.error('设置默认地区配置失败:', error)
     ElMessage.error('设置默认地区配置失败，请稍后重试')
@@ -387,6 +400,10 @@ const handleDelete = async (row) => {
 
     ElMessage.success('地区配置已删除')
     await loadRegionConfigs()
+    // 重新获取地区配置并更新到 store
+    await regionStore.fetchRegionConfig();
+    // 重新初始化项目
+    await initializationService.initialize();
 
   } catch (error) {
     console.error('删除地区配置失败:', error)

@@ -11,18 +11,17 @@ import { loadTerrain } from '@/cesium/layers/terrain'
 import { addWhiteModel } from '@/cesium/layers/model3d'
 import { AreaManager } from '@/cesium/entities/area.js'
 import { initWind } from '@/cesium/visualization/wind'
-import { initHeatVolume } from '@/cesium/visualization/heatmap'
-import { routeManager } from '@/cesium/entities/routes' // 引入航线管理器
+import { initHeatVolume, createReactiveHeatmapBridge } from '@/cesium/visualization/heatmap'
+import { routeManager } from '@/cesium/entities/routes' 
 import { useRouteStore } from '@/store/modules/routeStore'
-import { addDistrictInfo, addBoundGeo } from '@/cesium/layers/district'
-import eventManager from '@/cesium/core/eventManager' // 引入事件管理器
-import { SkyBoxManager } from '@/cesium/volumeCloud/SkyBoxManager' // 引入天空盒管理器
+import eventManager from '@/cesium/core/eventManager' 
+import { SkyBoxManager } from '@/cesium/volumeCloud/SkyBoxManager' 
 import { CAMERA_HEIGHT_THRESHOLD } from '../config/windLayerDefaults'
 import Cloud from '@/cesium/visualization/cloud'
-import Atmosphere from '@/cesium/visualization/atmosphere'
 import { useHeatmapStore } from '@/store/modules/heatmap'
+import { getCitywideHeatmap, getWeatherHeatmapGeo } from '@/api'
 export function useCesium(containerId) {
-  // Store实例
+  // 说明
   const windStore = useWindStore()
   const heatmapStore = useHeatmapStore()
   const areaStore = useAreaStore()
@@ -30,18 +29,19 @@ export function useCesium(containerId) {
   const routeStore = useRouteStore()
   const regionStore = useRegionStore()
 
-  // 响应式状态
+  // 说明
   const viewer = ref(null)
   const isLoading = ref(false)
   const errorMsg = ref('')
 
-  // Cesium资源管理（统一使用ref或对象管理）
+  // 说明
   const resources = ref({
     windLayer: null,
     tiandituLayer: null,
     districtPrimitive: null,
     modelTileset: null,
-    heatMapInstance: null,
+    heatMapManager: null,
+    heatMapBridge: null,
     areaManager: null,
     cameraMoveHandler: null,
     cameraHeightWatcher: null,
@@ -50,10 +50,10 @@ export function useCesium(containerId) {
     cloud: null
   })
 
-  // 监测点相关响应式数据
+  // 说明
   const { areaList } = toRefs(areaStore)
 
-  // 监听区域变化
+  // 说明
   watch(
     () => areaStore.selectedArea,
     (newArea, oldArea) => {
@@ -83,53 +83,50 @@ export function useCesium(containerId) {
     { deep: true }
   )
 
-  // ==================== 初始化步骤 ====================
 
   /**
-   * 初始化Cesium Viewer
+   * 功能说明
    */
   const initViewer = () => {
     try {
-      console.log('[Cesium] 创建Viewer...')
+      console.log('[Cesium] 开始创建 Viewer...')
       viewer.value = createViewer(containerId)
       viewer.value.cesiumWidget.creditContainer.style.display = 'none'
       
-      // 设置为全局变量，供其他模块访问（如ISIM动画）
+      // 说明
       window.viewer = viewer.value
-      console.log('[Cesium] Viewer创建成功并设置为全局变量')
+      console.log('[Cesium] Viewer 初始化完成')
       
-      console.log('[Cesium] 初始化天空盒...')
+      console.log('[Cesium] 开始初始化天空盒...')
       try {
         resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
           cameraHeightThreshold: 240000
         })
-        console.log('[Cesium] 天空盒初始化成功')
+        console.log('[Cesium] 天空盒初始化完成')
       } catch (skyError) {
         console.warn('[Cesium] 天空盒初始化失败:', skyError)
       }
       
-      console.log('[Cesium] 初始化云层...')
+      console.log('[Cesium] 开始初始化云层...')
       try {
         resources.value.cloud = new Cloud(viewer.value)
         resources.value.cloud.show()
-        console.log('[Cesium] 云层初始化成功')
+        console.log('[Cesium] 云层初始化完成')
       } catch (cloudError) {
         console.warn('[Cesium] 云层初始化失败:', cloudError)
       }
       
       viewer.value.shadows = true;
       viewer.value.terrainShadows = Cesium.ShadowMode.ENABLED;
-      console.log('[Cesium] Viewer配置完成')
+      console.log('[Cesium] Viewer 基础配置完成')
     } catch (error) {
-      console.error('[Cesium] initViewer失败:', error)
+      console.error('[Cesium] 初始化 Viewer 失败:', error)
       throw error
     }
   }
   
   /**
-   * 设置时钟参数
-   * @param {Date|string} startTime - 起始时间
-   * @param {Date|string} endTime - 终止时间
+   * 功能说明
    */
   const setClockParams = (startTime, endTime) => {
     if (!viewer.value) return;
@@ -149,33 +146,32 @@ export function useCesium(containerId) {
   };
   
   /**
-   * 控制时间线和动画面板显示/隐藏
-   * @param {boolean} visible - 是否显示时间线和动画面板
+   * 功能说明
    */
   const setTimelineVisible = (visible) => {
     if (viewer.value) {
-      // 检查timeline是否存在，避免访问undefined属性
+      // 说明
       if (viewer.value.timeline) {
         viewer.value.timeline.container.style.display = visible ? 'block' : 'none';
         
-        // 当时间轴从隐藏变为显示时，重新设置时间范围并触发更新
+        // 说明
         if (visible) {
           setTimeout(() => {
             try {
-              // 获取当前时钟的时间范围
+              // 说明
               const startTime = viewer.value.clock.startTime;
               const stopTime = viewer.value.clock.stopTime;
               
-              // 验证时间参数有效性
+              // 说明
               if (startTime && stopTime && 
-                  Cesium.JulianDate.isValid(startTime) && 
-                  Cesium.JulianDate.isValid(stopTime)) {
-                // 重新设置时间轴的时间范围
+                  startTime.isValid && 
+                  stopTime.isValid) {
+                // 说明
                 viewer.value.timeline.zoomTo(startTime, stopTime);
-                console.log('时间轴zoomTo成功');
+                console.log('时间轴缩放范围设置成功');
               } else {
-                console.warn('无效的时间参数，跳过zoomTo');
-                // 使用默认时间范围
+                console.warn('时间参数无效，跳过时间轴缩放');
+                // 说明
                 const now = new Date();
                 const nowJulian = Cesium.JulianDate.fromDate(now);
                 const oneHourLater = new Date(now.getTime() + 3600000);
@@ -187,11 +183,11 @@ export function useCesium(containerId) {
                 viewer.value.timeline.zoomTo(nowJulian, oneHourLaterJulian);
               }
               
-              // 触发场景重新渲染
+              // 说明
               viewer.value.scene.requestRender();
             } catch (error) {
               console.error('设置时间轴范围失败:', error);
-              // 使用默认时间范围作为 fallback
+              // 说明
               try {
                 const now = new Date();
                 const nowJulian = Cesium.JulianDate.fromDate(now);
@@ -204,14 +200,14 @@ export function useCesium(containerId) {
                 viewer.value.timeline.zoomTo(nowJulian, oneHourLaterJulian);
                 viewer.value.scene.requestRender();
               } catch (fallbackError) {
-                console.error('fallback也失败:', fallbackError);
+                console.error('回退逻辑执行失败:', fallbackError);
               }
             }
           }, 100);
         }
       }
       
-      // 同时控制animation面板的显示和隐藏
+      // 说明
       if (viewer.value.animation) {
         viewer.value.animation.container.style.display = visible ? 'block' : 'none';
       }
@@ -219,15 +215,14 @@ export function useCesium(containerId) {
   };
 
   /**
-   * 配置按键盘移动相机控制
+   * 功能说明
    */
   const configCamera = () => {
     resources.value.cameraMoveHandler = handleCameraMove(viewer.value)
   };
 
   /**
-   * 设置相机高度监听，控制风场、云朵和监测点的显示/隐藏
-   * 近地的时候显示风场和云朵，远地的时候显示area
+   * 功能说明
    */
   const setupCameraHeightWatcher = () => {
     if (!viewer.value) return;
@@ -285,49 +280,49 @@ export function useCesium(containerId) {
   };
 
   /**
-   * 加载基础图层
+   * 功能说明
    */
   const loadBaseLayers = () => {
     try {
       console.log('[Cesium] 3.1 加载地形...')
       loadTerrain(viewer.value)
-      console.log('[Cesium] 地形加载成功')
+      console.log('[Cesium] 地形加载完成')
     } catch (error) {
       console.warn('[Cesium] 地形加载失败:', error)
     }
     
     try {
-      console.log('[Cesium] 3.2 加载天地图...')
+      console.log('[Cesium] 3.2 加载天地图图层...')
       resources.value.tiandituLayer = addTiandituLayer(viewer.value)
-      console.log('[Cesium] 天地图加载成功')
+      console.log('[Cesium] 底图图层加载完成')
     } catch (error) {
-      console.warn('[Cesium] 天地图加载失败:', error)
+      console.warn('[Cesium] 底图图层加载失败:', error)
     }
 
   }
 
   /**
-   * 加载3D模型
+   * 功能说明
    */
   const load3DModel = async () => {
     try {
       console.log('[Cesium] 4.1 加载白膜模型...')
       resources.value.modelTileset = await addWhiteModel(viewer.value)
-      console.log('[Cesium] 白膜模型加载成功')
+      console.log('[Cesium] 白膜模型加载完成')
     } catch (error) {
       console.warn('[Cesium] 白膜模型加载失败:', error)
-      // 模型加载失败不影响其他功能
+      // 说明
     }
   }
 
   /**
-   * 初始化实体和可视化
+   * 功能说明
    */
   const initEntitiesAndVisualizations = async () => {
     try {
       console.log('[Cesium] 5.1 初始化监测点管理器...')
       resources.value.areaManager = AreaManager.getInstance(viewer.value, areaStore)
-      console.log('[Cesium] 5.2 渲染监测点:', areaList.value?.length || 0, '个')
+      console.log('[Cesium] 5.2 渲染监测点数量:', areaList.value?.length || 0)
       resources.value.areaManager.render(areaList.value)
     } catch (error) {
       console.warn('[Cesium] 监测点管理器初始化失败:', error)
@@ -336,12 +331,12 @@ export function useCesium(containerId) {
     try {
       console.log('[Cesium] 5.3 初始化风场...')
       resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
-      console.log('[Cesium] 风场初始化成功')
+      console.log('[Cesium] 风场初始化完成')
     } catch (error) {
       console.warn('[Cesium] 风场初始化失败:', error)
     }
 
-    // 等待风场数据加载完成后再执行可见性检查
+    // 说明
     if (!windStore.windData) {
       const unwatch = watch(
         () => windStore.windData,
@@ -356,30 +351,33 @@ export function useCesium(containerId) {
       setupCameraHeightWatcher();
     }
 
-    // 设置相机高度监听，控制风场、云朵和监测点的显示/隐藏
+    // 说明
     try {
       setupCameraHeightWatcher()
-      console.log('[Cesium] 相机高度监听设置成功')
+      console.log('[Cesium] 相机高度监听设置完成')
     } catch (error) {
       console.warn('[Cesium] 相机高度监听设置失败:', error)
     }
 
     try {
       console.log('[Cesium] 5.4 初始化热力图...')
-      resources.value.heatMapInstance = await initHeatVolume(viewer.value)
-      heatmapStore.setHeatmapLayer(resources.value.heatMapInstance)
-      console.log('[Cesium] 热力图初始化成功')
-      
-      // 初始化后立即更新一次热力图数据
-      if (resources.value.heatMapInstance) {
-        const currentTime = new Date()
-        console.log('初始化后更新热力图数据:', currentTime)
-        await updateHeatmapTime(currentTime)
-        
-        // 检查是否有选中的区域，如果有，记录信息
-        if (areaStore.selectedArea) {
-          console.log('热力图初始化时已有选中区域:', areaStore.selectedArea.id)
+      resources.value.heatMapManager = await initHeatVolume(viewer.value)
+      resources.value.heatMapBridge = createReactiveHeatmapBridge({
+        heatmapManager: resources.value.heatMapManager,
+        heatmapStore,
+        layerSettingsStore,
+        areaStore,
+        getCurrentTime: () => {
+          if (!viewer.value?.clock?.currentTime) return new Date()
+          return Cesium.JulianDate.toDate(viewer.value.clock.currentTime)
         }
+      })
+      heatmapStore.setHeatmapLayer(resources.value.heatMapManager)
+      console.log('[Cesium] 热力图初始化完成')
+
+      // 由 heatMapBridge 内部 watch(immediate) 触发首刷，避免初始化阶段重复请求
+      if (areaStore.selectedArea) {
+        console.log('当前选中区域:', areaStore.selectedArea.id)
       }
     } catch (error) {
       console.warn('[Cesium] 热力图初始化失败:', error)
@@ -388,29 +386,29 @@ export function useCesium(containerId) {
     try {
       console.log('[Cesium] 5.5 初始化航线管理器...')
       routeManager.init(viewer.value)
-      console.log('[Cesium] 航线管理器初始化成功')
+      console.log('[Cesium] 航线管理器初始化完成')
     } catch (error) {
       console.warn('[Cesium] 航线管理器初始化失败:', error)
     }
     
-    // 配置时间轴显示中国时间
+    // 说明
     if (viewer.value.timeline) {
-      // 调整时间轴容器宽度，确保文字能完全显示
+      // 说明
       const timelineContainer = viewer.value.timeline.container;
       if (timelineContainer) {
-        // timelineContainer.style.width = '100%';
-        // timelineContainer.style.minWidth = '600px';
+        // 说明
+        // 说明
       }
       
-      // 自定义时间轴标签格式器，显示中国标准时间（使用更紧凑的格式）
+      // 说明
       viewer.value.timeline.makeLabel = function(date) {
-        // 创建一个新的Date对象，避免修改原日期
+        // 说明
         const chinaDate = new Date(date);
         
-        // 添加8小时时区偏移，转换为中国标准时间
-        // chinaDate.setHours(chinaDate.getHours() + 8);
+        // 说明
+        // 说明
         
-        // 使用更紧凑的时间格式，避免文字被截断
+        // 说明
         const month = String(chinaDate.getMonth() + 1).padStart(2, '0');
         const day = String(chinaDate.getDate()).padStart(2, '0');
         const hours = String(chinaDate.getHours()).padStart(2, '0');
@@ -420,28 +418,21 @@ export function useCesium(containerId) {
       };
     }
     
-    // 添加时钟变化事件监听
+    // 说明
     viewer.value.clock.onTick.addEventListener(() => {
       if (!viewer.value.clock.currentTime) return;
       const currentTime = Cesium.JulianDate.toDate(viewer.value.clock.currentTime);
       
       if (!currentTime) return;
       
-      // 更新热力图数据
-      if (resources.value.heatMapInstance && resources.value.heatMapInstance.heatmapState) {
-        if (typeof resources.value.heatMapInstance.heatmapState.heatmapPrimitive.updateHeatmapTime === 'function') {
-          resources.value.heatMapInstance.heatmapState.heatmapPrimitive.updateHeatmapTime(currentTime);
-        }
-      }
-      
-      // 更新航线分析数据（根据时间偏移量）
+      // 说明
       if (routeStore.currentRoute) {
         const timeOffset = Math.floor((currentTime - new Date()) / 1000);
         eventManager.emit('timeChange', { time: currentTime, timeOffset });
       }
     });
     
-    // 添加时间轴拖动事件监听（用于手动拖动时间轴时）
+    // 说明
     if (viewer.value.timeline) {
       viewer.value.timeline.addEventListener('settime', (event) => {
         if (!event || !event.time) return;
@@ -461,55 +452,83 @@ export function useCesium(containerId) {
 
 
   /**
-   * 设置响应式监听
+   * 功能说明
    */
   const setupReactiveWatchers = () => {
-    // 监听选中监测点变化
+    // 说明
     watch(
       () => areaStore.selectedArea,
       async (newArea) => {
-        if (newArea && viewer.value) {
-          resources.value.areaManager.setSelected(`area_${newArea.id}`)
-          flyToRegion(viewer.value, { bbox: newArea.bbox, duration: 1.0 })
-          
-          // 区域切换时重新加载热力图数据
-          if (resources.value.heatMapInstance) {
-            const currentTime = new Date()
-            console.log('区域切换，重新加载热力图数据:', newArea.name, currentTime)
-            await updateHeatmapTime(currentTime)
-          }
+        if (!newArea || !viewer.value) {
+          return
         }
+
+        resources.value.areaManager?.setSelected(`area_${newArea.id}`)
+        if (newArea.bbox) {
+          flyToRegion(viewer.value, { bbox: newArea.bbox, duration: 1.0 })
+        }
+
+        const pointId = newArea.id || newArea.pointId || null
+        if (pointId) {
+          heatmapStore.setCurrentPointId(pointId)
+        }
+
+        if (!resources.value.heatMapManager) {
+          return
+        }
+
+        const currentTime = viewer.value.clock.currentTime
+        const jsDate = currentTime ? Cesium.JulianDate.toDate(currentTime) : new Date()
+
+        // 桥接模式下由 createReactiveHeatmapBridge 统一负责 area/mode 的刷新，
+        // 这里只同步 pointId，避免同一次区域切换触发两次接口调用。
+        if (resources.value.heatMapBridge) return
+
+        await updateHeatmapTime(jsDate)
       },
       { deep: true }
     )
 
-    // 监听当前航线变化
+    // 说明
+    watch(
+      () => heatmapStore.heatmapMode,
+      async (newMode, oldMode) => {
+        // 桥接内部已监听 heatmapMode 并刷新，避免重复请求
+        if (newMode !== oldMode && resources.value.heatMapManager && !resources.value.heatMapBridge) {
+          const currentTime = new Date()
+          console.log('热力图模式切换:', newMode, currentTime)
+          await updateHeatmapTime(currentTime)
+        }
+      }
+    )
+
+    // 说明
     watch(
       () => routeStore.currentRoute,
       (newRoute) => {
         if (newRoute && viewer.value) {
-          // 检查新航线是否包含起始时间和终止时间
+          // 说明
           if (newRoute.startTime && newRoute.endTime) {
-            // 先设置时钟参数            
+            // 说明
             setClockParams(newRoute.startTime, newRoute.endTime)
-            // 再渲染航线
+            // 说明
             routeManager.render(newRoute)
-            // 显示时间线
+            // 说明
             setTimelineVisible(true)
           } else {
-            // 没有时间信息时也渲染航线
+            // 说明
             routeManager.render(newRoute)
-            // 隐藏时间线
+            // 说明
             setTimelineVisible(false)
           }
         } else {
-          // 没有航线时，隐藏时间线
+          // 说明
           setTimelineVisible(false)
         }
       }
     )
 
-    // 监听监测点列表变化
+    // 说明
     watch(
       () => areaStore.areaList,
       (newAreas) => {
@@ -520,20 +539,20 @@ export function useCesium(containerId) {
       { deep: true }
     )
 
-    // 键盘事件监听 - 按P键打印相机参数
+    // 说明
     resources.value.cameraPrintKeydownHandler = setupCameraPrintKeydown(viewer.value)
   }
 
   /**
-   * 初始化Cesium主流程
+   * 功能说明
    */
   const initCesium = async () => {
     try {
       isLoading.value = true
-      console.log('[Cesium] 开始初始化...')
+      console.log('[Cesium] 开始初始化 Cesium...')
 
-      // 执行初始化步骤
-      console.log('[Cesium] 1. 初始化Viewer...')
+      // 说明
+      console.log('[Cesium] 1. 初始化 Viewer...')
       initViewer()
       
       console.log('[Cesium] 2. 配置相机...')
@@ -542,19 +561,19 @@ export function useCesium(containerId) {
       console.log('[Cesium] 3. 加载基础图层...')
       loadBaseLayers()
       
-      console.log('[Cesium] 4. 加载3D模型...')
+      console.log('[Cesium] 4. 加载 3D 模型...')
       await load3DModel()
       
-      console.log('[Cesium] 5. 初始化实体和可视化...')
+      console.log('[Cesium] 5. 初始化实体与可视化...')
       await initEntitiesAndVisualizations()
       
       console.log('[Cesium] 6. 设置响应式监听...')
       setupReactiveWatchers()
       
-      // 系统初始化时默认隐藏时间轴
+      // 说明
       setTimelineVisible(false)
       
-      console.log('[Cesium] 初始化完成！')
+      console.log('[Cesium] 初始化完成')
 
     } catch (error) {
       console.error('[Cesium] 初始化失败:', error)
@@ -566,66 +585,71 @@ export function useCesium(containerId) {
   }
 
   /**
-   * 清理Cesium资源
+   * 功能说明
    */
   const cleanup = () => {
-    console.log('开始清理Cesium资源...')
+    console.log('开始清理 Cesium 资源...')
 
-    // 移除键盘事件监听
+    // 说明
     if (resources.value.cameraPrintKeydownHandler) {
       document.removeEventListener('keydown', resources.value.cameraPrintKeydownHandler)
       resources.value.cameraPrintKeydownHandler = null
     }
 
-    // 移除相机移动事件监听
+    // 说明
     if (resources.value.cameraMoveHandler) {
       document.removeEventListener('keydown', resources.value.cameraMoveHandler)
       resources.value.cameraMoveHandler = null
     }
 
-    // 移除相机高度监听（用于风场可见性控制）
+    // 说明
     if (resources.value.cameraHeightWatcher) {
       resources.value.cameraHeightWatcher()
       resources.value.cameraHeightWatcher = null
     }
 
     if (viewer.value) {
-      // 清理天空盒管理器
+      // 说明
       if (resources.value.skyBoxManager) {
         resources.value.skyBoxManager.destroy()
         resources.value.skyBoxManager = null
       }
 
-      // 清理云层
+      // 说明
       if (resources.value.cloud) {
         resources.value.cloud.destroy()
         resources.value.cloud = null
       }
 
-      // 清理航线
+      // 说明
       routeManager.destroy()
 
-      // 清理监测点
+      // 说明
       if (resources.value.areaManager) {
         resources.value.areaManager.destroy()
         resources.value.areaManager = null
       }
 
-      // 清理热力图
-      if (resources.value.heatMapInstance) {
-        resources.value.heatMapInstance.destroy()
-        resources.value.heatMapInstance = null
+      // 说明
+      if (resources.value.heatMapBridge) {
+        resources.value.heatMapBridge.destroy()
+        resources.value.heatMapBridge = null
       }
 
-      // 清理风场
+      if (resources.value.heatMapManager) {
+        resources.value.heatMapManager.destroy()
+        resources.value.heatMapManager = null
+      }
+
+      // 说明
       if (resources.value.windLayer) {
-        // Support both single wind layer and array of wind layers
+        // 说明
         if (Array.isArray(resources.value.windLayer)) {
-          // Check if the array has a destroy method (custom implementation)
+          // 说明
           if (typeof resources.value.windLayer.destroy === 'function') {
             resources.value.windLayer.destroy();
           } else {
-            // Fallback to individual layer cleanup
+            // 说明
             resources.value.windLayer.forEach(layer => {
               layer.destroy();
             });
@@ -636,10 +660,10 @@ export function useCesium(containerId) {
         resources.value.windLayer = null;
       }
 
-      // 销毁Viewer
+      // 说明
       destroyViewer(viewer.value)
       
-      // 移除全局viewer引用
+      // 说明
       if (window.viewer === viewer.value) {
         delete window.viewer
       }
@@ -649,9 +673,9 @@ export function useCesium(containerId) {
   }
 
 
-  // ==================== 图层控制 ====================
+  // 说明
   /**
-   * 设置模型图层可见性
+   * 功能说明
    */
   const setModelVisibility = (visible) => {
     if (resources.value.modelTileset) {
@@ -660,38 +684,38 @@ export function useCesium(containerId) {
   };
 
   /**
-   * 设置风场图层可见性
+   * 功能说明
    */
   const setWindVisibility = (visible) => {
     if (resources.value.windLayer) {
-      // Store the wind layer visibility state in layerSettingsStore
+      // 说明
       layerSettingsStore.setLayerVisibility('wind', visible);
 
-      // Update wind layer visibility considering both camera height and visibility setting
+      // 说明
       updateWindVisibilityBasedOnConditions();
     }
   };
 
 
   /**
-   * Update wind visibility based on both camera height and visibility setting
+   * 功能说明
    */
   const updateWindVisibilityBasedOnConditions = () => {
     if (!resources.value.windLayer) return;
 
-    // Get current camera height
+    // 说明
     const cameraPosition = viewer.value.camera.positionCartographic;
     const cameraHeight = cameraPosition.height;
 
-    // Get visibility setting from store
+    // 说明
     const isWindEnabled = layerSettingsStore.layers.wind.visible;
 
-    // Define camera height threshold for wind field visibility
+    // 说明
 
-    // Determine final visibility based on both conditions
+    // 说明
     const shouldBeVisible = isWindEnabled && cameraHeight <= CAMERA_HEIGHT_THRESHOLD;
 
-    // Update visibility for all wind layers
+    // 说明
     if (Array.isArray(resources.value.windLayer)) {
       resources.value.windLayer.forEach(layer => {
         layer.show = shouldBeVisible;
@@ -703,7 +727,7 @@ export function useCesium(containerId) {
 
 
   /**
-   * 设置监测点图层可见性
+   * 功能说明
    */
   const setAreasVisibility = (visible) => {
     if (resources.value.areaManager) {
@@ -712,486 +736,65 @@ export function useCesium(containerId) {
   };
 
   /**
-   * 设置温度图层可见性
+   * 功能说明
    */
   const setTemperatureVisibility = (visible) => {
     console.log('设置温度图层可见性:', visible);
-    console.log('热力图实例:', resources.value.heatMapInstance);
-
-    if (resources.value.heatMapInstance) {
-      if (resources.value.heatMapInstance.heatmapState && resources.value.heatMapInstance.heatmapState.heatmapPrimitive) {
-        resources.value.heatMapInstance.heatmapState.heatmapPrimitive.show = visible
-      } else {
-        console.warn('热力图实例存在但heatmapState或heatmapPrimitive不存在');
-      }
-    } else {
-      console.warn('热力图实例未初始化');
+    if (resources.value.heatMapBridge) {
+      resources.value.heatMapBridge.setVisible(visible)
+      return
+    }
+    if (resources.value.heatMapManager) {
+      resources.value.heatMapManager.setVisible(visible)
     }
   };
 
-  /**
-   * 更新热力图时间
-   * @param {Date} time - JavaScript Date对象
-   */
-  /**
-   * 转换后端热力图数据为Cesium需要的格式
-   * @param {Object} backendData - 后端返回的热力图数据
-   * @param {Object} currentArea - 当前选中的区域
-   * @returns {Array} Cesium热力图数据点数组
-   */
-  const convertHeatmapDataForCesium = (backendData, currentArea) => {
-    const dataPoints = []
-    
-    // 检查数据类型
-    const dataType = backendData.dataType || 'point_heatmap'
-    
-    console.log('转换热力图数据，数据类型:', dataType)
-    
-    if (dataType === 'geo_heatmap' || backendData.points) {
-      // 地理空间热力图数据（Cesium地图用）
-      return convertGeoHeatmapData(backendData, currentArea)
-    } else if (dataType === 'area_heatmap' || backendData.gridData) {
-      // 区域范围热力图数据
-      return convertAreaHeatmapData(backendData, currentArea)
-    } else {
-      // 单点热力图数据（保持原有逻辑）
-      return convertPointHeatmapData(backendData, currentArea)
-    }
-  }
+ 
+  const updateHeatmapTime = async (time) => {
 
-  /**
-   * 转换地理空间热力图数据（Cesium地图用）
-   */
-  const convertGeoHeatmapData = (backendData, currentArea) => {
-    const dataPoints = []
-    
-    const points = backendData.points || []
-    
-    console.log('转换地理空间热力图数据，点数量:', points.length)
-    
-    for (const point of points) {
-      const lng = point.lon || point.lng
-      const lat = point.lat
-      const value = point.value
-      const riskLevel = point.riskLevel
-      
-      if (lng !== undefined && lat !== undefined && value !== undefined) {
-        // 转换为Cesium需要的格式
-        dataPoints.push({
-          x: lng,
-          y: lat,
-          value: value,
-          // 添加元数据
-          metadata: {
-            riskLevel: riskLevel || getRiskLevel(value),
-            gridX: point.x,
-            gridY: point.y,
-            dataType: 'geo_heatmap'
-          }
-        })
-      } else {
-        console.warn('无效的点数据:', point)
+    if (!resources.value.heatMapManager) {
+      console.error('[Heatmap] 热力图管理器尚未初始化')
+      return
+    }
+
+    if (resources.value.heatMapBridge) {
+      try {
+        await resources.value.heatMapBridge.refresh(time)
+      } catch (error) {
+        console.error('[HeatmapBridge] 刷新失败', error)
       }
-    }
-    
-    console.log('转换完成，Cesium数据点数量:', dataPoints.length)
-    if (dataPoints.length > 0) {
-      console.log('数据范围:', {
-        minLng: Math.min(...dataPoints.map(p => p.x)),
-        maxLng: Math.max(...dataPoints.map(p => p.x)),
-        minLat: Math.min(...dataPoints.map(p => p.y)),
-        maxLat: Math.max(...dataPoints.map(p => p.y)),
-        minValue: Math.min(...dataPoints.map(p => p.value)),
-        maxValue: Math.max(...dataPoints.map(p => p.value))
-      })
-    }
-    
-    return dataPoints
-  }
-
-  /**
-   * 转换区域范围热力图数据
-   */
-  const convertAreaHeatmapData = (backendData, currentArea) => {
-    const dataPoints = []
-    
-    const gridData = backendData.gridData || []
-    const times = backendData.times || []
-    
-    // 获取当前时间索引（默认使用第一个时间点）
-    const currentTimeIndex = 0
-    
-    for (const gridPoint of gridData) {
-      const lng = gridPoint.lng
-      const lat = gridPoint.lat
-      const riskData = gridPoint.riskData || {}
-      const timeSeries = riskData.timeSeries || []
-      
-      // 获取当前时间的风险值
-      let riskValue = 50 // 默认值
-      if (timeSeries.length > currentTimeIndex) {
-        riskValue = timeSeries[currentTimeIndex]
-      } else if (timeSeries.length > 0) {
-        riskValue = timeSeries[0]
-      }
-      
-      // 转换为Cesium需要的格式
-      dataPoints.push({
-        x: lng,
-        y: lat,
-        value: riskValue,
-        // 添加元数据
-        metadata: {
-          gridX: gridPoint.x,
-          gridY: gridPoint.y,
-          time: times[currentTimeIndex] || '当前',
-          riskLevel: getRiskLevel(riskValue),
-          dataType: 'area_heatmap'
-        }
-      })
-    }
-    
-    console.log(`转换区域热力图数据: ${gridData.length}个网格点`)
-    return dataPoints
-  }
-
-  /**
-   * 转换单点热力图数据
-   */
-  const convertPointHeatmapData = (backendData, currentArea) => {
-    const dataPoints = []
-    
-    // 从后端数据中提取热力图矩阵
-    const times = backendData.times || []
-    const heights = backendData.heights || []
-    const riskMatrix = backendData.data || []
-    
-    // 获取区域边界
-    let bbox = null
-    
-    // 首先尝试从bbox获取边界
-    if (currentArea.bbox) {
-      let bboxValue = currentArea.bbox
-      
-      // 处理字符串格式的bbox
-      if (typeof bboxValue === 'string') {
-        // 尝试解析字符串格式的坐标
-        const coordinates = bboxValue.split(',').map(coord => parseFloat(coord.trim())).filter(coord => !isNaN(coord))
-        if (coordinates.length >= 2) {
-          bboxValue = coordinates
-        }
-      }
-      
-      if (Array.isArray(bboxValue)) {
-        if (bboxValue.length >= 4) {
-          // bbox是边界框格式 [minLng, minLat, maxLng, maxLat]
-          bbox = bboxValue
-        } else if (bboxValue.length >= 2) {
-          // bbox是点坐标格式 [lng, lat]
-          const [lng, lat] = bboxValue
-          if (!isNaN(lng) && !isNaN(lat)) {
-            bbox = [
-              lng - 0.01, lat - 0.01,
-              lng + 0.01, lat + 0.01
-            ]
-          }
-        }
-      }
-    }
-    
-    // 使用默认边界
-    if (!bbox) {
-      bbox = [
-        currentArea.longitude - 0.01, currentArea.latitude - 0.01,
-        currentArea.longitude + 0.01, currentArea.latitude + 0.01
-      ]
-    }
-    
-    // 解析边界框
-    const [minLng, minLat, maxLng, maxLat] = bbox
-    
-    // 生成网格点
-    const gridSize = 10 // 10x10网格
-    for (let i = 0; i < gridSize; i++) {
-      for (let j = 0; j < gridSize; j++) {
-        // 计算网格点坐标
-        const lng = minLng + (maxLng - minLng) * (i / (gridSize - 1))
-        const lat = minLat + (maxLat - minLat) * (j / (gridSize - 1))
-        
-        // 根据位置计算风险值（模拟空间分布）
-        const xRatio = i / (gridSize - 1)
-        const yRatio = j / (gridSize - 1)
-        
-        // 从风险矩阵中获取对应的风险值
-        let riskValue = 50 // 默认值
-        
-        if (riskMatrix.length > 0) {
-          // 使用高度层和时间点的平均值
-          const heightIndex = Math.floor(yRatio * (heights.length - 1))
-          const timeIndex = Math.floor(xRatio * (times.length - 1))
-          
-          if (heightIndex >= 0 && heightIndex < riskMatrix.length &&
-              timeIndex >= 0 && timeIndex < riskMatrix[0].length) {
-            riskValue = riskMatrix[heightIndex][timeIndex]
-          }
-        }
-        
-        // 转换为Cesium需要的格式
-        dataPoints.push({
-          x: lng,
-          y: lat,
-          value: riskValue,
-          // 添加元数据
-          metadata: {
-            height: heights[Math.floor(yRatio * (heights.length - 1))] || 0,
-            time: times[Math.floor(xRatio * (times.length - 1))] || '当前',
-            riskLevel: getRiskLevel(riskValue),
-            dataType: 'point_heatmap'
-          }
-        })
-      }
-    }
-    
-    return dataPoints
-  }
-
-  /**
-   * 根据风险值获取风险等级
-   * @param {number} riskValue - 风险值 (0-100)
-   * @returns {string} 风险等级
-   */
-  const getRiskLevel = (riskValue) => {
-    if (riskValue >= 80) return 'high'
-    if (riskValue >= 60) return 'medium'
-    if (riskValue >= 40) return 'low'
-    return 'very_low'
-  }
-
-   const updateHeatmapTime = async (time) => {
-    console.log('更新热力图时间:', time)
-
-    if (!resources.value.heatMapInstance) {
-      console.error('热力图实例未初始化')
       return
     }
 
     try {
-      // 获取当前选中的区域
-      const currentArea = areaStore.selectedArea
-      if (!currentArea) {
-        console.warn('未选中任何区域，无法获取热力图数据')
-        return
-      }
+      let heatmapData = null
 
-      
-      // 检查是否有边界信息
-      let boundsToUse = null
-      
-      // 首先尝试从bbox获取边界
-      if (currentArea.bbox) {
-        let bboxValue = currentArea.bbox
-        
-        // 处理字符串格式的bbox
-        if (typeof bboxValue === 'string') {
-          // 尝试解析字符串格式的坐标
-          const coordinates = bboxValue.split(',').map(coord => parseFloat(coord.trim())).filter(coord => !isNaN(coord))
-          if (coordinates.length >= 2) {
-            bboxValue = coordinates
-            console.log('解析字符串bbox为坐标数组:', bboxValue)
-          }
+      if (heatmapStore.heatmapMode === 'citywide') {
+        heatmapData = await getCitywideHeatmap()
+      } else {
+        const currentArea = areaStore.selectedArea
+        const pointId = heatmapStore.currentPointId || currentArea?.id || currentArea?.pointId
+        if (!pointId) {
+          return
         }
-        
-        if (Array.isArray(bboxValue)) {
-          if (bboxValue.length >= 4) {
-            // bbox是边界框格式 [minLng, minLat, maxLng, maxLat]
-            boundsToUse = bboxValue
-            console.log('使用bbox属性作为边界框:', boundsToUse)
-          } else if (bboxValue.length >= 2) {
-            // bbox是点坐标格式 [lng, lat]
-            const [lng, lat] = bboxValue
-            if (!isNaN(lng) && !isNaN(lat)) {
-              boundsToUse = [
-                lng - 0.01, lat - 0.01,
-                lng + 0.01, lat + 0.01
-              ]
-              console.log('使用bbox点坐标生成边界:', boundsToUse)
-            }
-          }
-        }
-      }
-      // 然后尝试从bounds获取
-      else if (currentArea.bounds) {
-        let boundsValue = currentArea.bounds
-        
-        // 处理字符串格式的bounds
-        if (typeof boundsValue === 'string') {
-          // 尝试解析字符串格式的坐标
-          const coordinates = boundsValue.split(',').map(coord => parseFloat(coord.trim())).filter(coord => !isNaN(coord))
-          if (coordinates.length >= 2) {
-            boundsValue = coordinates
-            console.log('解析字符串bounds为坐标数组:', boundsValue)
-          }
-        }
-        
-        if (Array.isArray(boundsValue)) {
-          if (boundsValue.length >= 4) {
-            // bounds是边界框格式 [minLng, minLat, maxLng, maxLat]
-            boundsToUse = boundsValue
-            console.log('使用bounds属性作为边界框:', boundsToUse)
-          } else if (boundsValue.length >= 2) {
-            // bounds是点坐标格式 [lng, lat]
-            const [lng, lat] = boundsValue
-            if (!isNaN(lng) && !isNaN(lat)) {
-              boundsToUse = [
-                lng - 0.01, lat - 0.01,
-                lng + 0.01, lat + 0.01
-              ]
-              console.log('使用bounds点坐标生成边界:', boundsToUse)
-            }
-          }
-        }
-      }
-      // 然后尝试从coordinates获取（可能是边界框或点坐标）
-      else if (currentArea.coordinates) {
-        let coordinatesValue = currentArea.coordinates
-        
-        // 处理字符串格式的coordinates
-        if (typeof coordinatesValue === 'string') {
-          // 尝试解析字符串格式的坐标
-          const coordinates = coordinatesValue.split(',').map(coord => parseFloat(coord.trim())).filter(coord => !isNaN(coord))
-          if (coordinates.length >= 2) {
-            coordinatesValue = coordinates
-            console.log('解析字符串coordinates为坐标数组:', coordinatesValue)
-          }
-        }
-        
-        if (Array.isArray(coordinatesValue)) {
-          if (coordinatesValue.length >= 4) {
-            // coordinates是边界框格式 [minLng, minLat, maxLng, maxLat]
-            boundsToUse = coordinatesValue
-            console.log('使用coordinates属性作为边界框:', boundsToUse)
-          } else if (coordinatesValue.length >= 2) {
-            // coordinates是点坐标格式 [lng, lat]
-            const [lng, lat] = coordinatesValue
-            if (!isNaN(lng) && !isNaN(lat)) {
-              boundsToUse = [
-                lng - 0.01, lat - 0.01,
-                lng + 0.01, lat + 0.01
-              ]
-              console.log('使用coordinates点坐标生成边界:', boundsToUse)
-            }
-          }
-        }
-      }
-      
-      // 如果还没有边界，尝试从其他属性提取
-      if (!boundsToUse) {
-        console.warn('区域没有直接的边界信息，尝试从其他属性提取')
-        
-        // 尝试提取经纬度
-        let lng, lat
-        
-        // 1. 从longitude/latitude字段
-        if (currentArea.longitude !== undefined && currentArea.latitude !== undefined) {
-          lng = currentArea.longitude
-          lat = currentArea.latitude
-          console.log('使用longitude/latitude字段:', lng, lat)
-        }
-        // 2. 从coordinates点坐标
-        else if (currentArea.coordinates && Array.isArray(currentArea.coordinates) && currentArea.coordinates.length >= 2) {
-          [lng, lat] = currentArea.coordinates
-          console.log('从coordinates提取经纬度:', lng, lat)
-        }
-        // 3. 从bbox中心点计算
-        else if (currentArea.bbox && Array.isArray(currentArea.bbox) && currentArea.bbox.length >= 4) {
-          lng = (currentArea.bbox[0] + currentArea.bbox[2]) / 2
-          lat = (currentArea.bbox[1] + currentArea.bbox[3]) / 2
-          console.log('从bbox计算中心点:', lng, lat)
-        }
-        
-        if (lng !== undefined && lat !== undefined) {
-          boundsToUse = [
-            lng - 0.01, lat - 0.01,
-            lng + 0.01, lat + 0.01
-          ]
-          console.log('使用计算得到的边界:', boundsToUse)
-        } else {
-          console.error('无法从区域数据中提取边界信息，使用默认边界')
-          // 使用青岛的默认边界
-          boundsToUse = [120.3, 36.0, 120.5, 36.2]
-          console.log('使用默认边界:', boundsToUse)
-        }
-      }
 
-      // 调用后端API获取地理空间热力图数据（用于Cesium地图）
-      const { getWeatherHeatmapGeo } = await import('@/api')
-      
-      const apiParams = {
-        time: time,
-        resolution: 'medium',
-        pointId: currentArea.id || currentArea.pointId
-      }
-      
-      const heatmapData = await getWeatherHeatmapGeo(apiParams)
-      
-      // 处理数据格式：可能points在heatmapData.data中，也可能在顶层
-      let heatmapDataToConvert = heatmapData
-      if (heatmapData.data && (heatmapData.data.points || heatmapData.data.dataType)) {
-        heatmapDataToConvert = heatmapData.data
-      }
-      
-      if (!heatmapDataToConvert || !heatmapDataToConvert.points) {
-        console.error('获取热力图数据失败，缺少points属性')
-        return
-      }
+        heatmapData = await getWeatherHeatmapGeo({
+          time,
+          pointId
+        })
 
-      // 转换后端数据为Cesium热力图需要的格式
-      const convertedData = convertHeatmapDataForCesium(heatmapDataToConvert, currentArea)
-      
-      // 转换为heatmap.js期望的格式：{lnglat: [lon, lat], value: number}
-      const dataPoints = convertedData.map(point => ({
-        lnglat: [point.x, point.y],
-        value: point.value
-      }))
-      
-      console.log('数据点范围:', {
-        minLng: Math.min(...dataPoints.map(p => p.lnglat[0])),
-        maxLng: Math.max(...dataPoints.map(p => p.lnglat[0])),
-        minLat: Math.min(...dataPoints.map(p => p.lnglat[1])),
-        maxLat: Math.max(...dataPoints.map(p => p.lnglat[1]))
-      })
-      
-      // 更新热力图数据
-      const result = resources.value.heatMapInstance.updateData(dataPoints)
-      
-      // 如果updateData返回了新的实例，更新引用
-      if (result) {
-        resources.value.heatMapInstance = result
+        heatmapStore.setCurrentPointId(pointId)
       }
-
-      console.log('热力图数据更新成功，基于区域:', currentArea.name)
-      console.log('区域边界:', boundsToUse)
-      
+      heatmapStore.setHeatmapData(heatmapData)
+      const visible = layerSettingsStore.layers.temperature?.visible !== false
+      resources.value.heatMapManager.setData(heatmapData)
+      resources.value.heatMapManager.setVisible(visible)
     } catch (error) {
-      console.error('更新热力图时间失败:', error)
-      // 降级：使用模拟数据
-      try {
-        const timestamp = time.getTime()
-        const { default: generateHeatmapData } = await import('@/mock/heatmapData')
-        const dataPoints = generateHeatmapData(timestamp)
-        const result = resources.value.heatMapInstance.updateData(dataPoints)
-        if (result) {
-          resources.value.heatMapInstance = result
-        }
-        console.warn('使用模拟数据作为降级方案')
-      } catch (fallbackError) {
-        console.error('降级方案也失败:', fallbackError)
-      }
+      console.error('更新热力图失败:', error)
     }
   };
   /**
-   * 设置当前时间
-   * @param {Date} time - JavaScript Date对象
+   * 功能说明
    */
   const setCurrentTime = (time) => {
     if (viewer.value) {
@@ -1200,7 +803,7 @@ export function useCesium(containerId) {
     }
   };
 
-  // 矩形绘制功能
+  // 说明
   const startRectangleDrawing = (callback) => {
     eventManager.startRectangleDrawing(callback);
   };
@@ -1213,36 +816,40 @@ export function useCesium(containerId) {
     eventManager.cancelRectangleDrawing();
   };
 
-  // 暴露公共方法
+  // 说明
   return {
     viewer,
     isLoading,
     errorMsg,
     initCesium,
     cleanup,
-    // 相机控制
+    // 说明
     flyToRegion: (region) => flyToRegion(viewer.value, region),
     flyToRectangle: (region) => flyToRectangle(viewer.value, region),
     getCurrentCameraParams: () => getCurrentCameraParams(viewer.value),
-    // 模式切换
+    // 说明
     switchToOverviewMode: () => switchToOverviewMode(viewer.value),
     switchToFocusMode: (region) => switchToFocusMode(viewer.value, region),
-    // 图层控制
+    // 说明
     setModelVisibility,
     setWindVisibility,
     setAreasVisibility,
     setTemperatureVisibility,
-    // 可视化更新
+    // 说明
     updateHeatmapTime,
-    // 时间控制
+    // 说明
     setCurrentTime,
     setClockParams,
     setTimelineVisible,
-    // 矩形绘制
+    // 说明
     startRectangleDrawing,
     stopRectangleDrawing,
     cancelRectangleDrawing,
-    // 天空盒控制
+    // 说明
     getSkyBoxManager: () => resources.value.skyBoxManager
   }
 }
+
+
+
+

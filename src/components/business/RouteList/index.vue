@@ -20,24 +20,26 @@
       <div class="current-route-info">
 
         <div class="route-path">
-          <span class="start-point">{{ routeStore.currentRoute.startName }}</span>
+          <span class="start-point">{{ currentRouteInfo.startName }}</span>
           <span class="path-arrow">→</span>
-          <template v-if="routeStore.currentRoute.waypoints && routeStore.currentRoute.waypoints.length > 2">
-            <span v-for="(waypoint, index) in routeStore.currentRoute.waypoints.slice(1, -1)" :key="index"
+          <template v-if="currentRouteInfo.waypoints.length > 2">
+            <span v-for="(waypoint, index) in currentRouteInfo.waypoints.slice(1, -1)" :key="index"
               class="waypoint">
               {{ waypoint.name || `途经点${index + 1}` }}
 
             </span>
             <span class="path-arrow">→</span>
           </template>
-          <span class="end-point">{{ routeStore.currentRoute.endName }}</span>
+          <span class="end-point">{{ currentRouteInfo.endName }}</span>
         </div>
         <div class="route-details">
-          <span class="detail-item">总长: {{ routeStore.currentRoute.length.toFixed(1) }}km</span>
-          <span class="detail-item">航段数: {{ routeStore.currentRoute.segments }}</span>
+          <span class="detail-item">总长: {{ currentRouteInfo.lengthText }}</span>
+          <span class="detail-item">航段数: {{ currentRouteInfo.segmentsText }}</span>
+          <span class="detail-item">飞行器: {{ currentRouteInfo.aircraftModel }}</span>
+
           <span class="detail-item">平均风险:
-            <span class="risk-badge" :class="getRiskClass(routeStore.currentRoute.averageRisk)">
-              {{ getRiskText(routeStore.currentRoute.averageRisk) }}
+            <span class="risk-badge" :class="getRiskClass(currentRouteInfo.averageRisk)">
+              {{ getRiskText(currentRouteInfo.averageRisk) }}
             </span>
           </span>
         </div>
@@ -126,20 +128,65 @@
         </p>
       </div>
     </div>
-
-    <!-- 航线分析弹窗已替换为底部面板 -->
-
-    <!-- 底部查询面板 -->
-    <div v-if="routeStore.currentRoute" class="bottom-query-panel">
-
-      <div class="panel-content">
-        <RouterRisk :current-route="routeStore.currentRoute" :route-data="currentRouteData" />
-      </div>
-    </div>
-
-    <!-- 使用封装好的DialogContainer组件 -->
-
   </div>
+
+  <Teleport to="body">
+    <transition name="risk-panel-fade" @after-enter="handleFloatingPanelAfterEnter">
+      <div
+        v-if="routeStore.currentRoute && panelVisible"
+        ref="floatingPanelRef"
+        class="route-risk-floating-panel"
+        :class="{ minimized: panelMinimized, dragging: panelDragging }"
+        :style="{ left: `${panelPosition.x}px`, top: `${panelPosition.y}px` }"
+        @transitionend="handleFloatingPanelTransitionEnd"
+      >
+        <div class="floating-panel-header">
+          <div class="panel-drag-handle" @pointerdown="startPanelDrag">
+            <span class="panel-grip" aria-hidden="true">⋮⋮</span>
+            <div class="panel-title-group">
+              <p class="panel-eyebrow">风险分析窗口</p>
+              <h3 class="panel-title">{{ currentRouteInfo.startName }} → {{ currentRouteInfo.endName }}</h3>
+            </div>
+          </div>
+
+          <div class="panel-actions">
+            <button type="button" class="panel-action-btn" @click="togglePanelMinimized">
+              {{ panelMinimized ? "展开" : "收起" }}
+            </button>
+            <button type="button" class="panel-action-btn danger" @click="hideRiskPanel">
+              关闭
+            </button>
+          </div>
+        </div>
+
+        <transition name="risk-panel-body" @after-enter="handlePanelBodyAfterEnter">
+          <div v-show="!panelMinimized" class="floating-panel-body">
+            <RouterRisk
+            v-if="panelContentMounted"
+            ref="routerRiskRef"
+            :current-route="routeStore.currentRoute"
+            :route-data="currentRouteData"
+            :panel-visible="panelVisible && !panelMinimized && panelExpandedReady"
+            @highlightSegment="handleSegmentHighlight"
+            @alternativeRouteSelected="handleAlternativeRouteSelected"
+          />
+        </div>
+        </transition>
+      </div>
+    </transition>
+
+    <transition name="risk-panel-fade">
+      <button
+        v-if="routeStore.currentRoute && !panelVisible"
+        type="button"
+        class="risk-panel-launcher"
+        @click="openRiskPanel()"
+      >
+        打开风险分析
+      </button>
+    </transition>
+  </Teleport>
+
   <DialogContainer :visible="showAddRouteModalFlag" title="添加新航线" @close="closeAddRouteModal">
     <form @submit.prevent="addNewRoute" class="add-route-form">
       <div class="form-group">
@@ -221,10 +268,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import * as Cesium from 'cesium';
+import { ElMessage } from "element-plus";
 import RouterRisk from "@/components/business/RouterRisk/index.vue";
-import { useCesium } from "@/hooks/useCesium";
 import eventManager from "@/cesium/core/eventManager";
 import DialogContainer from "@/components/common/DialogContainer.vue";
 import { useRouteStore } from "@/store/modules/routeStore"; // 引入store
@@ -239,6 +286,8 @@ const isLoading = ref(true);
 const searchKeyword = ref("");
 const currentRoute = ref(null);
 const currentRouteData = ref([]);
+const floatingPanelRef = ref(null);
+const routerRiskRef = ref(null);
 // 历史记录展开状态管理
 const expandedRouteIds = ref(new Set());
 // 航段tooltip状态
@@ -246,9 +295,441 @@ const showSegmentTooltip = ref(false);
 const currentSegment = ref(null);
 const tooltipLeft = ref(0);
 const tooltipTop = ref(0);
+const HIGHLIGHT_SEGMENT_ENTITY_ID = "route-risk-highlight-segment";
 
-// 使用Cesium hook
-const { showRouteOnMap, clearCurrentRoute, getCesiumRiskColor } = useCesium();
+const panelVisible = ref(true);
+const panelMinimized = ref(true);
+const panelDragging = ref(false);
+const panelPosition = ref({ x: 24, y: 96 });
+const panelDragOffset = ref({ x: 0, y: 0 });
+const panelHasManualPosition = ref(false);
+const panelContentMounted = ref(false);
+const panelExpandedReady = ref(false);
+let panelSyncTimeoutId = 0;
+let panelExpandFrameId = 0;
+const PANEL_WIDTH = 720;
+const PANEL_HEIGHT = 620;
+const PANEL_MINIMIZED_HEIGHT = 72;
+const PANEL_MARGIN = 20;
+
+const toFiniteNumber = (value, fallback = NaN) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+const normalizeRiskScore = (value) => {
+  const number = toFiniteNumber(value, 0);
+
+  if (number > 1) {
+    return Math.max(0, Math.min(1, number / 100));
+  }
+
+  return Math.max(0, Math.min(1, number));
+};
+
+const normalizeCoordinatePair = (point) => {
+  if (!Array.isArray(point) || point.length < 2) {
+    return null;
+  }
+
+  const longitude = toFiniteNumber(point[0], NaN);
+  const latitude = toFiniteNumber(point[1], NaN);
+
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+    return null;
+  }
+
+  return [longitude, latitude];
+};
+
+const normalizeCoordinatePath = (points) => {
+  if (!Array.isArray(points)) {
+    return [];
+  }
+
+  return points.map((point) => normalizeCoordinatePair(point)).filter(Boolean);
+};
+
+const buildWaypointFromAny = (point, fallbackName = "") => {
+  if (!point) {
+    return null;
+  }
+
+  const longitude = toFiniteNumber(
+    point.longitude,
+    NaN
+  );
+  const latitude = toFiniteNumber(
+    point.latitude,
+    NaN
+  );
+
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+    return null;
+  }
+
+  return {
+    name: point.name || fallbackName || "",
+    longitude,
+    latitude,
+    height: toFiniteNumber(
+      point.height ?? point.altitude,
+      300
+    )
+  };
+};
+
+const normalizeSegmentData = (segmentsSource) => {
+  if (!Array.isArray(segmentsSource) || segmentsSource.length === 0) {
+    return [];
+  }
+
+  let accumulatedDistance = 0;
+
+  return segmentsSource.map((segment, index) => {
+    const startCoordinates = normalizeCoordinatePair(segment?.startCoordinates);
+    const endCoordinates = normalizeCoordinatePair(segment?.endCoordinates);
+    const normalizedPath = normalizeCoordinatePath(segment?.pathCoordinates);
+    const pathCoordinates =
+      normalizedPath.length > 1 ? normalizedPath : [startCoordinates, endCoordinates].filter(Boolean);
+
+    const segmentLength = toFiniteNumber(segment?.segmentLength, 0);
+    let distance = toFiniteNumber(segment?.distance, NaN);
+
+    if (!Number.isFinite(distance)) {
+      distance = accumulatedDistance + segmentLength;
+    }
+
+    accumulatedDistance = distance;
+
+    return {
+      ...segment,
+      segment: toFiniteNumber(segment?.segment, index + 1),
+      distance,
+      segmentLength,
+      risk: normalizeRiskScore(segment?.risk),
+      windSpeed: toFiniteNumber(segment?.windSpeed, NaN),
+      windDir: toFiniteNumber(segment?.windDir, NaN),
+      windShear: toFiniteNumber(segment?.windShear, NaN),
+      turbulence: toFiniteNumber(segment?.turbulence, NaN),
+      rainfall: toFiniteNumber(segment?.rainfall, NaN),
+      startCoordinates,
+      endCoordinates,
+      pathCoordinates,
+      coordinates: pathCoordinates
+    };
+  });
+};
+
+const normalizeWaypoints = (routeLike, segmentData = []) => {
+  const height = toFiniteNumber(routeLike?.flightHeight, 300);
+  const waypointSources = Array.isArray(routeLike?.waypoints)
+    ? routeLike.waypoints
+    : [];
+  const normalizedWaypoints = waypointSources
+    .map((point, index) =>
+      buildWaypointFromAny(point, index === 0 ? routeLike?.startName : "")
+    )
+    .filter(Boolean)
+    .map((point) => ({ ...point, height: toFiniteNumber(point.height, height) }));
+
+  if (normalizedWaypoints.length >= 2) {
+    return normalizedWaypoints;
+  }
+
+  if (segmentData.length > 0) {
+    const converted = routeStore.convertSegmentsToWaypoints(segmentData);
+    if (Array.isArray(converted) && converted.length >= 2) {
+      return converted.map((point, index) => ({
+        name:
+          point.name ||
+          (index === 0
+            ? routeLike?.startName || "起点"
+            : index === converted.length - 1
+              ? routeLike?.endName || "终点"
+              : `途经点${index}`),
+        longitude: toFiniteNumber(point.longitude, NaN),
+        latitude: toFiniteNumber(point.latitude, NaN),
+        height: toFiniteNumber(point.height, height)
+      }));
+    }
+  }
+
+  return [];
+};
+
+const normalizeRouteForActivation = (routeLike, detailLike = null) => {
+  const mergedRoute = {
+    ...(routeLike || {}),
+    ...(detailLike || {})
+  };
+  const segmentData = normalizeSegmentData(mergedRoute.segmentData);
+  const waypoints = normalizeWaypoints(mergedRoute, segmentData);
+  const length =
+    toFiniteNumber(mergedRoute.length, NaN) ||
+    (segmentData.length > 0
+      ? segmentData[segmentData.length - 1]?.distance
+      : NaN);
+  const segments = toFiniteNumber(mergedRoute.segments, segmentData.length);
+
+  return {
+    ...mergedRoute,
+    id: mergedRoute.id || routeLike?.id || detailLike?.id || "",
+    name:
+      mergedRoute.name ||
+      `${mergedRoute.startName || "起点"}-${mergedRoute.endName || "终点"}`,
+    startName: mergedRoute.startName || waypoints[0]?.name || "起点",
+    endName:
+      mergedRoute.endName || waypoints[waypoints.length - 1]?.name || "终点",
+    averageRisk: normalizeRiskScore(mergedRoute.averageRisk),
+    aircraftModel: mergedRoute.aircraftModel || "--",
+    flightHeight: toFiniteNumber(mergedRoute.flightHeight, 300),
+    length: Number.isFinite(length) ? length : 0,
+    segments,
+    waypoints,
+    segmentData,
+    startTime: mergedRoute.startTime
+      ? new Date(mergedRoute.startTime)
+      : mergedRoute.startTime,
+    endTime: mergedRoute.endTime ? new Date(mergedRoute.endTime) : mergedRoute.endTime
+  };
+};
+
+const getPanelBounds = () => {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const panelWidth = Math.min(PANEL_WIDTH, Math.max(360, width - PANEL_MARGIN * 2));
+  const panelHeight = panelMinimized.value
+    ? PANEL_MINIMIZED_HEIGHT
+    : Math.min(PANEL_HEIGHT, Math.max(240, height - PANEL_MARGIN * 2));
+
+  return {
+    minX: PANEL_MARGIN,
+    maxX: Math.max(PANEL_MARGIN, width - panelWidth - PANEL_MARGIN),
+    minY: PANEL_MARGIN,
+    maxY: Math.max(PANEL_MARGIN, height - panelHeight - PANEL_MARGIN)
+  };
+};
+
+const clampPanelPosition = (position) => {
+  const bounds = getPanelBounds();
+
+  return {
+    x: Math.min(Math.max(position.x, bounds.minX), bounds.maxX),
+    y: Math.min(Math.max(position.y, bounds.minY), bounds.maxY)
+  };
+};
+
+const resetPanelPosition = () => {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const panelWidth = Math.min(PANEL_WIDTH, Math.max(360, viewportWidth - PANEL_MARGIN * 2));
+  const topOffset = Math.max(PANEL_MARGIN, Math.round(viewportHeight * 0.12));
+
+  panelPosition.value = clampPanelPosition({
+    x: Math.round((viewportWidth - panelWidth) / 2),
+    y: topOffset
+  });
+};
+
+const clearPanelSyncTimers = () => {
+  if (panelExpandFrameId) {
+    cancelAnimationFrame(panelExpandFrameId);
+    panelExpandFrameId = 0;
+  }
+
+  if (panelSyncTimeoutId) {
+    clearTimeout(panelSyncTimeoutId);
+    panelSyncTimeoutId = 0;
+  }
+};
+
+const schedulePanelChartSync = ({ recreate = false, settle = true } = {}) => {
+  clearPanelSyncTimers();
+
+  const runSync = () => {
+    routerRiskRef.value?.syncLayout?.({
+      recreate,
+      render: true,
+      settle
+    });
+  };
+
+  nextTick(() => {
+    panelExpandFrameId = requestAnimationFrame(() => {
+      panelExpandFrameId = 0;
+      runSync();
+    });
+  });
+};
+
+const markPanelExpandedReady = () => {
+  if (!panelVisible.value || panelMinimized.value) {
+    panelExpandedReady.value = false;
+    return;
+  }
+
+  panelExpandedReady.value = true;
+};
+
+const handleFloatingPanelAfterEnter = () => {
+  markPanelExpandedReady();
+};
+
+const handlePanelBodyAfterEnter = () => {
+  markPanelExpandedReady();
+  schedulePanelChartSync({
+    recreate: true,
+    settle: true
+  });
+};
+
+const handleFloatingPanelTransitionEnd = (event) => {
+  if (!event || event.target !== floatingPanelRef.value || panelMinimized.value || !panelVisible.value) {
+    return;
+  }
+
+  if (event.propertyName === "width" || event.propertyName === "max-height" || event.propertyName === "transform") {
+    markPanelExpandedReady();
+    schedulePanelChartSync({
+      recreate: true,
+      settle: true
+    });
+  }
+};
+
+const openRiskPanel = ({ resetPosition = false, minimized = false } = {}) => {
+  panelVisible.value = true;
+  panelMinimized.value = minimized;
+  panelExpandedReady.value = !minimized;
+
+  if (!minimized) {
+    panelContentMounted.value = true;
+  }
+
+  if (resetPosition || !panelHasManualPosition.value) {
+    nextTick(() => {
+      resetPanelPosition();
+    });
+  }
+
+  if (!minimized) {
+    schedulePanelChartSync({
+      recreate: true,
+      settle: true
+    });
+  }
+};
+
+const hideRiskPanel = () => {
+  panelVisible.value = false;
+  panelDragging.value = false;
+  panelExpandedReady.value = false;
+  clearPanelSyncTimers();
+};
+
+const togglePanelMinimized = () => {
+  const nextMinimized = !panelMinimized.value;
+  panelMinimized.value = nextMinimized;
+  panelExpandedReady.value = false;
+
+  if (!nextMinimized) {
+    panelContentMounted.value = true;
+  }
+
+  nextTick(() => {
+    panelPosition.value = clampPanelPosition(panelPosition.value);
+
+    if (!nextMinimized) {
+      schedulePanelChartSync({
+        recreate: true,
+        settle: true
+      });
+      return;
+    }
+
+    clearPanelSyncTimers();
+  });
+};
+
+const startPanelDrag = (event) => {
+  if (!event.isPrimary) {
+    return;
+  }
+
+  panelDragging.value = true;
+  panelHasManualPosition.value = true;
+  panelDragOffset.value = {
+    x: event.clientX - panelPosition.value.x,
+    y: event.clientY - panelPosition.value.y
+  };
+
+  try {
+    event.currentTarget?.setPointerCapture?.(event.pointerId);
+  } catch (error) {
+    console.debug("setPointerCapture skipped:", error);
+  }
+
+  event.preventDefault();
+};
+
+const handlePanelDrag = (event) => {
+  if (!panelDragging.value) {
+    return;
+  }
+
+  panelPosition.value = clampPanelPosition({
+    x: event.clientX - panelDragOffset.value.x,
+    y: event.clientY - panelDragOffset.value.y
+  });
+};
+
+const stopPanelDrag = () => {
+  if (!panelDragging.value) {
+    return;
+  }
+
+  panelDragging.value = false;
+  panelPosition.value = clampPanelPosition(panelPosition.value);
+};
+
+const handlePanelViewportResize = () => {
+  if (panelHasManualPosition.value) {
+    panelPosition.value = clampPanelPosition(panelPosition.value);
+    return;
+  }
+
+  resetPanelPosition();
+};
+
+const currentRouteInfo = computed(() => {
+  const route = routeStore.currentRoute;
+
+  if (!route) {
+    return {
+      startName: "起点",
+      endName: "终点",
+      waypoints: [],
+      lengthText: "--",
+      segmentsText: "--",
+      aircraftModel: "--",
+      averageRisk: 0
+    };
+  }
+
+  const segmentCount = toFiniteNumber(route.segments, route.segmentData?.length || 0);
+  const routeLength = toFiniteNumber(route.length, NaN);
+
+  return {
+    startName: route.startName || "起点",
+    endName: route.endName || "终点",
+    waypoints: Array.isArray(route.waypoints) ? route.waypoints : [],
+    lengthText: Number.isFinite(routeLength) ? `${routeLength.toFixed(1)} km` : "--",
+    segmentsText: segmentCount > 0 ? `${segmentCount} 段` : "--",
+    aircraftModel: route.aircraftModel || "--",
+    averageRisk: normalizeRiskScore(route.averageRisk)
+  };
+});
 
 // 当前正在选点的目标（start, end, waypoint_${index}）
 const selectingPointTarget = ref(null);
@@ -321,7 +802,9 @@ const filteredRoutes = computed(() => {
   if (!searchKeyword.value) return routes.value;
   const keyword = searchKeyword.value.toLowerCase();
   return routes.value.filter((route) =>
-    route.name.toLowerCase().includes(keyword)
+    String(route.name || `${route.startName || ""}${route.endName || ""}`)
+      .toLowerCase()
+      .includes(keyword)
   );
 });
 
@@ -331,21 +814,24 @@ const filteredRoutes = computed(() => {
 const loadRoutes = async () => {
   isLoading.value = true;
 
-  const { getRoutes } = await import('@/api');
-  const routeData = await getRoutes();
-  if (routeData && routeData.routes) {
-    routes.value = routeData.routes.map(route => ({
-      ...route,
-      // 确保时间格式正确
-      startTime: route.startTime ? new Date(route.startTime) : new Date(),
-      endTime: route.endTime ? new Date(route.endTime) : new Date()
-    }));
-  } else {
+  try {
+    const { getRoutes } = await import("@/api");
+    const routeResult = await getRoutes();
+    const routeList = Array.isArray(routeResult?.routes) ? routeResult.routes : [];
+
+    routes.value = routeList
+      .map((route) => normalizeRouteForActivation(route))
+      .filter((route) => route.id);
+
+    routeStore.setRouteList(routes.value);
+  } catch (error) {
+    console.error("加载航线列表失败:", error);
     routes.value = [];
+    routeStore.clearRouteList();
+    ElMessage.error(error?.message || "加载航线列表失败，请稍后重试");
+  } finally {
+    isLoading.value = false;
   }
-
-  isLoading.value = false;
-
 };
 
 
@@ -355,14 +841,14 @@ const clearHistory = async () => {
   if (confirm('确定要清空所有历史记录吗？')) {
     try {
       const { clearRoutes } = await import('@/api');
-      const response = await clearRoutes();
-      if (response && (response.success || response.data?.success)) {
-        routes.value = [];
-        alert('历史记录已清空！');
-      }
+      await clearRoutes();
+      routes.value = [];
+      routeStore.clearRouteList();
+      releaseRoute();
+      ElMessage.success('历史记录已清空');
     } catch (error) {
       console.error('清空历史记录失败:', error);
-      alert('清空历史记录失败，请稍后重试');
+      ElMessage.error(error?.message || '清空历史记录失败，请稍后重试');
     }
   }
 };
@@ -379,36 +865,141 @@ const getRiskText = (value) => {
   return "高风险";
 };
 // 新增：列表点击事件（核心！）
-const onRouteClick = async (route) => {
+const clearHighlightedSegment = () => {
+  const viewer = window.viewer;
+  if (viewer?.entities) {
+    const entity = viewer.entities.getById(HIGHLIGHT_SEGMENT_ENTITY_ID);
+    if (entity) {
+      viewer.entities.remove(entity);
+    }
+  }
+  showSegmentTooltip.value = false;
+  currentSegment.value = null;
+};
 
-  // 获取航路详情
-  const { getRouteDetail } = await import('@/api');
-  const detailData = await getRouteDetail(route.id);
+const handleSegmentHighlight = (payload) => {
+  if (!payload) return;
 
-  // 合并详情数据
-  const fullRouteData = {
-    ...route,
-    ...detailData,
-    // 确保 segmentData 格式一致
-    segmentData: route.segmentData || []
-  };
+  const segmentNo = Number(payload.segment);
+  const matchedSegment = currentRouteData.value.find(
+    (item) => Number(item.segment) === segmentNo
+  );
+  currentSegment.value = matchedSegment || null;
+  showSegmentTooltip.value = Boolean(matchedSegment);
+  tooltipLeft.value = 24;
+  tooltipTop.value = 140;
 
-  routeStore.setCurrentRoute(fullRouteData);
+  const viewer = window.viewer;
+  if (!viewer?.entities) return;
 
+  const rawCoords = Array.isArray(payload.coordinates) ? payload.coordinates : [];
+  const positions = rawCoords
+    .filter((coord) => Array.isArray(coord) && coord.length >= 2)
+    .map(([lon, lat]) => Cesium.Cartesian3.fromDegrees(Number(lon), Number(lat), 320))
+    .filter(Boolean);
 
-  // 切换到全市热力图模式
-  heatmapStore.switchToCitywideMode();
-  console.log('切换到全市热力图模式，当前模式:', heatmapStore.heatmapMode);
+  if (positions.length < 2) return;
 
-  // 2. 可选：滚动/高亮当前航线
-  document.querySelector(`[data-route-id="${route.id}"]`)?.scrollIntoView({
-    behavior: "smooth",
-    block: "center",
+  const oldEntity = viewer.entities.getById(HIGHLIGHT_SEGMENT_ENTITY_ID);
+  if (oldEntity) {
+    viewer.entities.remove(oldEntity);
+  }
+
+  const highlightEntity = viewer.entities.add({
+    id: HIGHLIGHT_SEGMENT_ENTITY_ID,
+    polyline: {
+      positions,
+      width: 10,
+      material: Cesium.Color.YELLOW.withAlpha(0.9),
+      depthFailMaterial: Cesium.Color.YELLOW.withAlpha(0.9),
+      clampToGround: false
+    }
   });
+
+  viewer.flyTo(highlightEntity, { duration: 0.8 });
+};
+
+const activateRoute = async (routeLike, { scrollIntoView = false } = {}) => {
+  if (!routeLike) {
+    return null;
+  }
+
+  const routeId = routeLike.id;
+  let detailPayload = null;
+
+  if (routeId && (!Array.isArray(routeLike.segmentData) || routeLike.segmentData.length === 0)) {
+    const { getRouteDetail } = await import("@/api");
+    detailPayload = await getRouteDetail(routeId);
+  }
+
+  const normalizedRoute = normalizeRouteForActivation(routeLike, detailPayload);
+
+  if (!normalizedRoute.id) {
+    console.warn("航线缺少唯一标识，无法激活:", routeLike);
+    return null;
+  }
+
+  currentRoute.value = normalizedRoute;
+  currentRouteData.value = normalizedRoute.segmentData || [];
+  routeStore.setCurrentRoute(normalizedRoute);
+  heatmapStore.switchToCitywideMode();
+  clearHighlightedSegment();
+  openRiskPanel({ minimized: true });
+
+  const existingIndex = routes.value.findIndex(
+    (item) => item.id === normalizedRoute.id
+  );
+
+  if (existingIndex >= 0) {
+    routes.value.splice(existingIndex, 1, normalizedRoute);
+  } else {
+    routes.value = [normalizedRoute, ...routes.value];
+  }
+
+  routeStore.setRouteList(routes.value);
+
+  if (scrollIntoView) {
+    nextTick(() => {
+      document
+        .querySelector(`[data-route-id="${normalizedRoute.id}"]`)
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+    });
+  }
+
+  return normalizedRoute;
+};
+
+const handleAlternativeRouteSelected = async (route) => {
+  try {
+    await activateRoute(route, { scrollIntoView: true });
+  } catch (error) {
+    console.error("切换备选航线失败:", error);
+    ElMessage.error(error?.message || "切换备选航线失败，请稍后重试");
+  }
+};
+
+const onRouteClick = async (route) => {
+  try {
+    await activateRoute(route, { scrollIntoView: true });
+  } catch (error) {
+    console.error("加载航线详情失败:", error);
+    ElMessage.error(error?.message || "加载航线详情失败，请稍后重试");
+  }
 };
 
 const releaseRoute = () => {
   currentRoute.value = null;
+  currentRouteData.value = [];
+  clearHighlightedSegment();
+  clearPanelSyncTimers();
+  panelVisible.value = false;
+  panelMinimized.value = true;
+  panelDragging.value = false;
+  panelExpandedReady.value = false;
+  panelContentMounted.value = false;
   routeStore.clearCurrentRoute();
 
   routeManager.clearAllRoutes();
@@ -424,6 +1015,10 @@ const clearScreen = () => {
 
 onMounted(() => {
   loadRoutes();
+  resetPanelPosition();
+  window.addEventListener("pointermove", handlePanelDrag);
+  window.addEventListener("pointerup", stopPanelDrag);
+  window.addEventListener("resize", handlePanelViewportResize);
 });
 
 // 监听当前航线变化，更新图表数据
@@ -432,9 +1027,40 @@ watch(
   (newRoute) => {
     if (newRoute && newRoute.segmentData) {
       currentRouteData.value = newRoute.segmentData;
+      clearHighlightedSegment();
+    } else {
+      currentRouteData.value = [];
+      clearHighlightedSegment();
     }
   },
   { deep: true }
+);
+
+watch(
+  () => routeStore.currentRoute?.id,
+  (routeId) => {
+    if (!routeId) {
+      panelVisible.value = false;
+      panelExpandedReady.value = false;
+      panelContentMounted.value = false;
+      return;
+    }
+
+    panelVisible.value = true;
+    panelMinimized.value = true;
+    panelExpandedReady.value = false;
+
+    if (!panelHasManualPosition.value) {
+      nextTick(() => {
+        resetPanelPosition();
+      });
+    } else {
+      nextTick(() => {
+        panelPosition.value = clampPanelPosition(panelPosition.value);
+      });
+    }
+  },
+  { immediate: true }
 );
 
 const showAddRouteModalFlag = ref(false);
@@ -558,28 +1184,34 @@ const addNewRoute = async () => {
   };
 
   // 调用API保存航线到后端
-  const { createRoute } = await import('@/api');
-  const response = await createRoute(routeRequestData);
-  if (response && response.success) {
-    // 后端返回完整航线数据（包含计算后的字段）
-    const routeFromBackend = response.route;
+  try {
+    const { createRoute } = await import('@/api');
+    const createdRoute = await createRoute(routeRequestData);
+    const createdRouteId = createdRoute?.id;
 
-    // 保存成功后重新加载航线列表
     await loadRoutes();
 
-    // 设置当前航线，触发地图更新（使用后端返回的完整数据）
-    routeStore.setCurrentRoute(routeFromBackend);
-    heatmapStore.switchToCitywideMode();
+    const matchedRoute = routes.value.find(
+      (route) => route.id === createdRouteId
+    );
 
-    // 关闭模态框并重置表单
+    await activateRoute(matchedRoute || createdRoute, { scrollIntoView: true });
     closeAddRouteModal();
-
-    alert("航线添加成功！");
-  } else {
-    alert(`航线添加失败: ${response?.message || '未知错误'}`);
+    ElMessage.success("航线添加成功");
+  } catch (error) {
+    console.error("航线添加失败:", error);
+    ElMessage.error(error?.message || "航线添加失败，请稍后重试");
   }
-
 };
+
+onUnmounted(() => {
+  stopPanelDrag();
+  stopMapSelection();
+  clearPanelSyncTimers();
+  window.removeEventListener("pointermove", handlePanelDrag);
+  window.removeEventListener("pointerup", stopPanelDrag);
+  window.removeEventListener("resize", handlePanelViewportResize);
+});
 
 </script>
 
@@ -1466,6 +2098,43 @@ const addNewRoute = async () => {
 }
 
 @media (max-width: 768px) {
+  .route-risk-floating-panel {
+    width: calc(100vw - 24px);
+    border-radius: 18px;
+
+    &.minimized {
+      width: calc(100vw - 24px);
+    }
+  }
+
+  .floating-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 14px;
+  }
+
+  .panel-drag-handle,
+  .panel-actions {
+    width: 100%;
+  }
+
+  .panel-actions {
+    justify-content: flex-end;
+  }
+
+  .panel-action-btn {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .floating-panel-body {
+    padding: 10px;
+  }
+
+  .risk-panel-launcher {
+    right: 12px;
+    bottom: 12px;
+  }
 
   .table-header .max-risk,
   .route-basic-info .max-risk {
@@ -1503,6 +2172,252 @@ const addNewRoute = async () => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.route-risk-floating-panel {
+  position: fixed;
+  width: min(720px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  z-index: 2200;
+  display: flex;
+  flex-direction: column;
+  border-radius: 22px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.2), transparent 32%),
+    linear-gradient(180deg, rgba(8, 18, 37, 0.97), rgba(5, 13, 28, 0.95));
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
+  transition:
+    width 0.28s ease,
+    max-height 0.28s ease,
+    box-shadow 0.24s ease,
+    border-color 0.24s ease,
+    transform 0.24s ease;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.16;
+    pointer-events: none;
+  }
+
+  & > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  &.dragging {
+    cursor: grabbing;
+    box-shadow: 0 36px 88px rgba(0, 0, 0, 0.5);
+    border-color: rgba(125, 211, 252, 0.34);
+    transform: scale(1.004);
+  }
+
+  &.minimized {
+    width: min(520px, calc(100vw - 40px));
+    max-height: 72px;
+  }
+}
+
+.floating-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 72px;
+  padding: 14px 16px 14px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  background: linear-gradient(180deg, rgba(13, 28, 54, 0.92), rgba(9, 21, 43, 0.82));
+}
+
+.panel-drag-handle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.panel-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  color: rgba(191, 219, 254, 0.9);
+  font-size: 15px;
+  letter-spacing: -1px;
+}
+
+.panel-title-group {
+  min-width: 0;
+}
+
+.panel-eyebrow {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.82);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #f8fbff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.panel-action-btn {
+  min-width: 68px;
+  padding: 8px 14px;
+  border: 1px solid rgba(96, 165, 250, 0.24);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    background: rgba(30, 41, 59, 0.92);
+    border-color: rgba(125, 211, 252, 0.36);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &.danger {
+    border-color: rgba(248, 113, 113, 0.26);
+    color: #fecaca;
+    background: rgba(69, 10, 10, 0.38);
+
+    &:hover {
+      background: rgba(127, 29, 29, 0.5);
+      border-color: rgba(252, 165, 165, 0.42);
+    }
+  }
+}
+
+.floating-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.46);
+    border-radius: 999px;
+  }
+}
+
+.risk-panel-body-enter-active,
+.risk-panel-body-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.24s ease,
+    max-height 0.28s ease,
+    padding-top 0.24s ease,
+    padding-bottom 0.24s ease;
+}
+
+.risk-panel-body-enter-from,
+.risk-panel-body-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.risk-panel-body-enter-to,
+.risk-panel-body-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: calc(100vh - 140px);
+}
+
+.risk-panel-launcher {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2190;
+  padding: 12px 18px;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at top left, rgba(125, 211, 252, 0.26), transparent 40%),
+    rgba(8, 18, 37, 0.94);
+  color: #eff6ff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(14px);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: rgba(125, 211, 252, 0.42);
+    box-shadow: 0 26px 54px rgba(0, 0, 0, 0.38);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.risk-panel-fade-enter-active,
+.risk-panel-fade-leave-active {
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.risk-panel-fade-enter-from,
+.risk-panel-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
 }
 
 .form-row {

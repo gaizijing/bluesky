@@ -243,7 +243,6 @@ const drawerVisible = ref(false)
 const isEditing = ref(false)
 const searchKeyword = ref('')
 const showEnabledOnly = ref(false)
-const dataSource = ref('remote')
 const formRef = ref(null)
 const aircrafts = ref([])
 const formSnapshot = ref(null)
@@ -319,67 +318,6 @@ const serializeAircraft = (item) => {
   return payload
 }
 
-const generateMockAircrafts = () => [
-  normalizeAircraft({
-    id: 'AC-M3',
-    modelName: 'DJI Mavic 3',
-    category: '多旋翼',
-    manufacturer: 'DJI',
-    maxAltitude: 1000,
-    maxSpeed: 80,
-    cruiseSpeed: 60,
-    maxRange: 15,
-    maxEndurance: 46,
-    maxPayload: 0.5,
-    description: '适用于巡检与低空侦测任务。',
-    isActive: true
-  }),
-  normalizeAircraft({
-    id: 'AC-M300',
-    modelName: 'Matrice 300 RTK',
-    category: '多旋翼',
-    manufacturer: 'DJI',
-    maxAltitude: 7000,
-    maxSpeed: 82,
-    cruiseSpeed: 62,
-    maxRange: 18,
-    maxEndurance: 55,
-    maxPayload: 2.7,
-    description: '支持多传感器挂载与复杂作业环境。',
-    isActive: true
-  }),
-  normalizeAircraft({
-    id: 'AC-EH216',
-    modelName: 'EHang 216',
-    category: 'eVTOL',
-    manufacturer: '亿航',
-    maxAltitude: 3000,
-    maxSpeed: 130,
-    cruiseSpeed: 95,
-    maxRange: 35,
-    maxEndurance: 25,
-    maxPayload: 220,
-    description: '用于载人示范和短途低空通航场景。',
-    isActive: false
-  }),
-  normalizeAircraft({
-    id: 'AC-FWX8',
-    modelName: 'Fixed Wing X8',
-    category: '固定翼',
-    manufacturer: 'Autel Robotics',
-    maxAltitude: 3500,
-    maxSpeed: 120,
-    cruiseSpeed: 85,
-    maxRange: 60,
-    maxEndurance: 120,
-    maxPayload: 2,
-    description: '适合长航时测绘和区域巡检。',
-    isActive: true
-  })
-]
-
-const dataSourceLabel = computed(() => (dataSource.value === 'mock' ? '示例数据' : '接口数据'))
-
 const visibleAircrafts = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
 
@@ -424,17 +362,10 @@ const loadAircrafts = async () => {
   try {
     const payload = await getAllAircraftModels()
     const remoteList = extractList(payload).map((item, index) => normalizeAircraft(item, index))
-
-    aircrafts.value = remoteList.length ? remoteList : generateMockAircrafts()
-    dataSource.value = remoteList.length ? 'remote' : 'mock'
-
-    if (!remoteList.length) {
-      ElMessage.warning('飞行器接口暂不可用，当前展示示例数据。')
-    }
+    aircrafts.value = remoteList
   } catch (error) {
-    aircrafts.value = generateMockAircrafts()
-    dataSource.value = 'mock'
-    ElMessage.warning('飞行器接口暂不可用，当前展示示例数据。')
+    aircrafts.value = []
+    ElMessage.error(error.message || '加载飞行器列表失败，请稍后重试')
     console.error('加载飞行器列表失败:', error)
   } finally {
     loading.value = false
@@ -467,19 +398,6 @@ const handleReset = () => {
   applyFormModel(formSnapshot.value || createAircraftForm())
 }
 
-const upsertLocalAircraft = (payload) => {
-  const normalized = normalizeAircraft({
-    ...payload,
-    id: payload.id || `AC-${Date.now()}`
-  })
-
-  if (isEditing.value) {
-    aircrafts.value = aircrafts.value.map((item) => (item.id === normalized.id ? normalized : item))
-  } else {
-    aircrafts.value = [normalized, ...aircrafts.value]
-  }
-}
-
 const handleSave = async () => {
   await formRef.value?.validate()
   saving.value = true
@@ -487,14 +405,11 @@ const handleSave = async () => {
   const payload = serializeAircraft(formModel)
 
   try {
-    if (dataSource.value === 'mock') {
-      upsertLocalAircraft(payload)
-      ElMessage.success(isEditing.value ? '已更新示例机型' : '已新增示例机型')
-      drawerVisible.value = false
-      return
+    if (isEditing.value) {
+      await updateAircraftModel(payload)
+    } else {
+      await addAircraftModel(payload)
     }
-
-    const response = isEditing.value ? await updateAircraftModel(payload) : await addAircraftModel(payload)
 
     ElMessage.success(isEditing.value ? '飞行器已更新' : '飞行器已新增')
     drawerVisible.value = false
@@ -519,12 +434,6 @@ const handleDelete = async (row) => {
   }
 
   try {
-    if (dataSource.value === 'mock') {
-      aircrafts.value = aircrafts.value.filter((item) => item.id !== row.id)
-      ElMessage.success('已删除示例机型')
-      return
-    }
-
     await deleteAircraftModel(row.id)
     ElMessage.success('飞行器已删除')
     await loadAircrafts()

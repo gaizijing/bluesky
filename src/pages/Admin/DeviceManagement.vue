@@ -289,6 +289,7 @@ import {
 } from '@/api'
 import {
   extractList,
+  extractRecord,
   normalizeBoolean,
   normalizeNumber
 } from '@/utils/admin'
@@ -300,7 +301,6 @@ const isEditing = ref(false)
 const searchKeyword = ref('')
 const selectedType = ref('')
 const showOnlineOnly = ref(false)
-const dataSource = ref('remote')
 const formRef = ref(null)
 const devices = ref([])
 const formSnapshot = ref(null)
@@ -452,78 +452,9 @@ const serializeDevice = (item) => {
   return payload
 }
 
-const generateMockDevices = () => [
-  normalizeDevice({
-    id: 'DEV-QD-RW-01',
-    name: '流亭机场风廓线雷达',
-    code: 'RW-QD-001',
-    type: '风廓线雷达',
-    pointId: 'MP-QD-Airport',
-    location: '流亭机场东侧观测区',
-    longitude: 120.3895,
-    latitude: 36.2747,
-    altitude: 23,
-    status: 'online',
-    onlineCount: 1,
-    totalCount: 1,
-    lastHeartbeat: Date.now() - 2 * 60 * 1000,
-    isActive: true
-  }),
-  normalizeDevice({
-    id: 'DEV-HD-MW-01',
-    name: '黄岛微波辐射计',
-    code: 'MW-HD-002',
-    type: '微波辐射计',
-    pointId: 'MP-HD-Station',
-    location: '黄岛新区海岸监测区',
-    longitude: 120.1689,
-    latitude: 35.9907,
-    altitude: 18,
-    status: 'online',
-    onlineCount: 2,
-    totalCount: 2,
-    lastHeartbeat: Date.now() - 5 * 60 * 1000,
-    isActive: true
-  }),
-  normalizeDevice({
-    id: 'DEV-LS-CAM-01',
-    name: '崂山云台摄像头',
-    code: 'CAM-LS-003',
-    type: '摄像头',
-    pointId: 'MP-LD-Radar',
-    location: '崂山山顶观测平台',
-    longitude: 120.5631,
-    latitude: 36.1924,
-    altitude: 417,
-    status: 'maintenance',
-    onlineCount: 0,
-    totalCount: 1,
-    lastHeartbeat: Date.now() - 8 * 60 * 60 * 1000,
-    isActive: true
-  }),
-  normalizeDevice({
-    id: 'DEV-CY-AWS-01',
-    name: '城阳自动气象站',
-    code: 'AWS-CY-004',
-    type: '自动站',
-    pointId: 'MP-CY-AWS',
-    location: '城阳综合保障区',
-    longitude: 120.3361,
-    latitude: 36.3017,
-    altitude: 31,
-    status: 'offline',
-    onlineCount: 0,
-    totalCount: 1,
-    lastHeartbeat: Date.now() - 36 * 60 * 60 * 1000,
-    isActive: false
-  })
-]
-
 const deviceTypeOptions = computed(() =>
   [...new Set([...baseTypeOptions, ...devices.value.map((item) => item.type), selectedType.value].filter(Boolean))]
 )
-
-const dataSourceLabel = computed(() => (dataSource.value === 'mock' ? '示例数据' : '接口数据'))
 
 const visibleDevices = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
@@ -622,16 +553,9 @@ const loadDevices = async () => {
     }
 
     devices.value = remoteList
-    dataSource.value = 'remote'
   } catch (error) {
-    const fallbackList = generateMockDevices()
-    devices.value = fallbackList.filter((item) => {
-      const matchesType = !selectedType.value || item.type === selectedType.value
-      const matchesOnline = !showOnlineOnly.value || item.status === 'online'
-      return matchesType && matchesOnline
-    })
-    dataSource.value = 'mock'
-    ElMessage.warning('设备接口暂不可用，当前展示示例数据。')
+    devices.value = []
+    ElMessage.error(error.message || '加载设备列表失败，请稍后重试')
     console.error('加载设备列表失败:', error)
   } finally {
     loading.value = false
@@ -655,7 +579,7 @@ const openEdit = async (row) => {
   isEditing.value = true
 
   let detail = row
-  if (dataSource.value === 'remote' && row?.id) {
+  if (row?.id) {
     try {
       const payload = await getDeviceById(row.id)
       detail = normalizeDevice(extractRecord(payload) || row)
@@ -675,19 +599,6 @@ const handleReset = () => {
   applyFormModel(formSnapshot.value || createDeviceForm())
 }
 
-const upsertLocalDevice = (payload) => {
-  const normalized = normalizeDevice({
-    ...payload,
-    id: payload.id || `DEV-${Date.now()}`
-  })
-
-  if (isEditing.value) {
-    devices.value = devices.value.map((item) => (item.id === normalized.id ? normalized : item))
-  } else {
-    devices.value = [normalized, ...devices.value]
-  }
-}
-
 const handleSave = async () => {
   await formRef.value?.validate()
   saving.value = true
@@ -695,16 +606,11 @@ const handleSave = async () => {
   const payload = serializeDevice(formModel)
 
   try {
-    if (dataSource.value === 'mock') {
-      upsertLocalDevice(payload)
-      ElMessage.success(isEditing.value ? '已更新示例设备' : '已新增示例设备')
-      drawerVisible.value = false
-      return
+    if (isEditing.value) {
+      await updateDevice(payload.id, payload)
+    } else {
+      await createDevice(payload)
     }
-
-    const response = isEditing.value
-      ? await updateDevice(payload.id, payload)
-      : await addNewDevice(payload)
 
     ElMessage.success(isEditing.value ? '设备已更新' : '设备已新增')
     drawerVisible.value = false
@@ -729,12 +635,6 @@ const handleDelete = async (row) => {
   }
 
   try {
-    if (dataSource.value === 'mock') {
-      devices.value = devices.value.filter((item) => item.id !== row.id)
-      ElMessage.success('已删除示例设备')
-      return
-    }
-
     await deleteDevice(row.id)
     ElMessage.success('设备已删除')
     await loadDevices()

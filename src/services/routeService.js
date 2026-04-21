@@ -1,7 +1,8 @@
 import { WeatherService } from './weatherService';
 import { useWeatherStore } from '@/store/modules/weather';
 import { useAreaStore } from '@/store/modules/area';
-import { getRoutes, getRouteDetail } from '@/api';
+import { getRoutes } from '@/api';
+import { fetchRouteRiskAnalysis } from './routeRiskService';
 import { useRouteStore } from '@/store/modules/routeStore';
 
 class RouteService {
@@ -46,22 +47,36 @@ class RouteService {
 
   // 加载航路列表数据
   async loadRouteListData() {
-
-    const routeData = await getRoutes();
-
-    // 更新 store
     const routeStore = this.getRouteStore();
-    if (routeData && routeData.routes) {
-      routeStore.setRouteList(routeData.routes);
-    }
 
-    return routeData;
+    try {
+      const routeData = await getRoutes();
+
+      if (routeData && routeData.routes) {
+        routeStore.setRouteList(routeData.routes);
+      } else {
+        routeStore.clearRouteList();
+      }
+
+      return routeData;
+    } catch (error) {
+      routeStore.clearRouteList();
+      console.error('加载航路列表数据失败:', error);
+      throw error;
+    }
   }
 
   // 加载航路分析详情数据
   async loadRouteAnalysisData(routeId) {
-    const analysisData = await getRouteDetail(routeId);
-    return analysisData;
+    try {
+      const analysisData = await fetchRouteRiskAnalysis(routeId, {
+        currentTime: new Date().toISOString()
+      });
+      return analysisData;
+    } catch (error) {
+      console.error('加载航路分析详情失败:', error);
+      throw error;
+    }
   }
 }
 

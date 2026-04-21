@@ -147,7 +147,7 @@ export default class Cloud {
         height = getRandomNumberInRange(minHeight, maxHeight);
         
         // 调整云的尺寸，使其更自然
-        scaleX = getRandomNumberInRange(500, 1000);  // 稍微增大尺寸，减少数量
+        scaleX = getRandomNumberInRange(2000, 10000);  // 稍微增大尺寸，减少数量
         scaleY = scaleX / 2.0 - getRandomNumberInRange(0, scaleX / 5.0);  // 更自然的比例
         slice = getRandomNumberInRange(sliceRange.min, sliceRange.max);  // 根据云量调整密度
         depth = getRandomNumberInRange(8, 25);     // 调整深度
@@ -193,12 +193,11 @@ export default class Cloud {
     createBackLayerClouds.bind(this)();
 
     // 根据云量添加不同数量的云
-    const { center } = getRegionConfig();
-    const [centerLng, centerLat] = center;
-    createRandomClouds.bind(this)(cloudCount, centerLng - 0.03, centerLng + 0.07, centerLat - 0.05, centerLat + 0.05, 100, 200);
+    const { west, east, south, north } = getRegionConfig();
+    createRandomClouds.bind(this)(cloudCount, west, east, south, north, 100, 200);
 
     // 添加第二层中等高度的云
-    createRandomClouds.bind(this)(highCloudCount, centerLng - 0.02, centerLng + 0.06, centerLat - 0.04, centerLat + 0.04, 200, 300);
+    createRandomClouds.bind(this)(highCloudCount, west, east, south, north, 200, 300);
 
     // 添加高层稀疏云层增加层次感
     //createRandomClouds(300, 120.35, 120.45, 36.05, 36.15, 450, 600);

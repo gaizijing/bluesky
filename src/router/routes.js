@@ -74,6 +74,14 @@ export const routes = [
         }
       },
       {
+        path: '/admin/user',
+        name: 'UserManagement',
+        component: () => import('@/pages/Admin/UserManagement.vue'),
+        meta: {
+          title: '用户管理'
+        }
+      },
+      {
         path: '/admin/aircraft',
         name: 'AircraftManagement',
         component: () => import('@/pages/Admin/AircraftManagement.vue'),
@@ -95,6 +103,14 @@ export const routes = [
         component: () => import('@/pages/Admin/DeviceManagement.vue'),
         meta: {
           title: '设备管理'
+        }
+      },
+      {
+        path: '/admin/camera',
+        name: 'CameraManagement',
+        component: () => import('@/pages/Admin/CameraManagement.vue'),
+        meta: {
+          title: '摄像头管理'
         }
       },
       {
