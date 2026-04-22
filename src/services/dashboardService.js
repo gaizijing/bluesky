@@ -30,7 +30,6 @@ class DashboardService {
         const areaStore = this.getAreaStore();
         const currentArea = areaStore.selectedArea;
         const pointId = currentArea?.id ;
-        debugger
         this.dashboardWeatherService.getRealTimeWeatherPanelData(pointId);
         this.dashboardWeatherService.getweatherForecastPanelData(currentArea);
         this.dashboardWeatherService.loadFlightSuitableAnalysisPanel(currentArea);

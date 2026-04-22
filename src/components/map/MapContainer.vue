@@ -63,6 +63,9 @@ const applyLayerVisibilitySettings = () => {
         case "temperature":
           cesiumHooks.setTemperatureVisibility?.(layer.visible)
           break
+          case "cloud":
+          cesiumHooks.setCloudVisibility?.(layer.visible)
+          break
       }
     }
   }

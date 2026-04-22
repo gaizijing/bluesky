@@ -212,7 +212,25 @@ export default class Cloud {
     console.log(`${name}云层已生成，云量: ${(adjustedCloudCover * 100).toFixed(0)}%`)
   
 
- }
+  }
+
+  /**
+   * 控制云的显示/隐藏
+   * @param {boolean} visible - 是否显示云
+   */
+  setVisible(visible) {
+    if (this.clouds) {
+      this.clouds.show = visible;
+    }
+  }
+
+  /**
+   * 检查云是否可见
+   * @returns {boolean} - 云是否可见
+   */
+  isVisible() {
+    return this.clouds ? this.clouds.show : false;
+  }
 
   /**
    * 移除云

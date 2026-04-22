@@ -47,11 +47,16 @@ export const initWind = async (viewer, layerSettingsStore) => {
           if (windLayerRefs[index]) {
             try {
               // 使用updateWindData方法更新风场数据
+
               windLayerRefs[index].updateWindData(windData);
               console.log(`成功更新高度 ${layer.height} 的风场数据`);
+            
             } catch (error) {
               console.error(`更新风场数据失败：`, error);
             }
+              // if(layer.height==50){
+              //   return;
+              // }
           }
         });
       } else if (newData && newData.layers && Array.isArray(newData.layers) && windLayerRefs.length === 0) {

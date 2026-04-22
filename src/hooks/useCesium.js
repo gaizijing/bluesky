@@ -247,7 +247,12 @@ export function useCesium(containerId) {
           resources.value.areaManager.setAreasVisibility(false);
         }
         if (resources.value.cloud) {
-          resources.value.cloud.show();
+          const isCloudEnabled = layerSettingsStore.layers.cloud.visible;
+          if (isCloudEnabled) {
+            resources.value.cloud.show();
+            resources.value.cloud.setVisible(true);
+            console.log('云层已显示');
+          }
         }
       } else {
         if (resources.value.windLayer && resources.value.windLayer.length > 0) {
@@ -749,7 +754,37 @@ export function useCesium(containerId) {
     }
   };
 
- 
+  /**
+   * 功能说明
+   */
+  const setCloudVisibility = (visible) => {
+    if (resources.value.cloud) {
+      layerSettingsStore.setLayerVisibility('cloud', visible);
+      console.log('设置云层可见性:', visible);
+      resources.value.cloud.setVisible(visible);
+    }
+  };
+
+  /**
+   * 功能说明
+   */
+  const updateCloudVisibilityBasedOnConditions = () => {
+    if (!resources.value.cloud) return;
+
+    // 说明
+    const cameraPosition = viewer.value.camera.positionCartographic;
+    const cameraHeight = cameraPosition.height;
+
+    // 说明
+    const isCloudEnabled = layerSettingsStore.layers.cloud.visible;
+
+    // 说明
+    const shouldBeVisible = isCloudEnabled && cameraHeight <= CAMERA_HEIGHT_THRESHOLD;
+
+    // 说明
+    resources.value.cloud.setVisible(shouldBeVisible);
+  };
+
   const updateHeatmapTime = async (time) => {
 
     if (!resources.value.heatMapManager) {
@@ -835,6 +870,7 @@ export function useCesium(containerId) {
     setWindVisibility,
     setAreasVisibility,
     setTemperatureVisibility,
+    setCloudVisibility,
     // 说明
     updateHeatmapTime,
     // 说明

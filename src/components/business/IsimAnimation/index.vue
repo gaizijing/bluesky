@@ -479,7 +479,6 @@ onUnmounted(() => {
   border: 1px solid #334155;
   border-radius: 4px;
   font-size: 14px;
-  color: #f1f5f9;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 

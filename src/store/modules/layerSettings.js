@@ -10,8 +10,9 @@ export const useLayerSettingsStore = defineStore('layerSettings', {
     // 图层显示状态
     layers: {
       model: { visible: true, name: '3D模型' },
-      temperature: { visible: true, name: '温度图层' },
+      temperature: { visible: true, name: '风险图层' },
       wind: { visible: true, name: '风场图层' },
+      cloud: { visible: true, name: '云雾图层' },
       areaPoints: { visible: true, name: '重点关注区域' }
     },
     show: false,

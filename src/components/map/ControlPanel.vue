@@ -40,8 +40,8 @@
             </div>
           </label>
           <div class="slider-input-group">
-            <input type="range" min="1" max="100" step="1" v-model.number="localOptions.particlesTextureSize" />
-            <input type="number" min="1" max="100" step="1" v-model.number="localOptions.particlesTextureSize"
+            <input type="range" min="1" max="1000" step="1" v-model.number="localOptions.particlesTextureSize" />
+            <input type="number" min="1" max="1000" step="1" v-model.number="localOptions.particlesTextureSize"
               class="num-input" />
           </div>
         </div>
@@ -56,8 +56,8 @@
             </div>
           </label>
           <div class="slider-input-group">
-            <input type="range" min="0" max="1" step="0.01" v-model.number="localOptions.speedFactor" />
-            <input type="number" min="0" max="1" step="0.01" v-model.number="localOptions.speedFactor"
+            <input type="range" min="0" max="10" step="1" v-model.number="localOptions.speedFactor" />
+            <input type="number" min="0" max="10" step="1" v-model.number="localOptions.speedFactor"
               class="num-input" />
           </div>
         </div>
@@ -72,9 +72,9 @@
             </div>
           </label>
           <div class="range-inputs">
-            <input type="number" min="0" max="1" step="0.01" v-model.number="localOptions.lineWidth.min"
+            <input type="number" min="0" max="10" step="0.5" v-model.number="localOptions.lineWidth.min"
               class="num-input" />
-            <input type="number" min="0" max="5" step="0.01" v-model.number="localOptions.lineWidth.max"
+            <input type="number" min="0" max="50" step="0.5" v-model.number="localOptions.lineWidth.max"
               class="num-input" />
           </div>
         </div>
@@ -89,9 +89,9 @@
             </div>
           </label>
           <div class="range-inputs">
-            <input type="number" min="0" max="1" step="0.1" v-model.number="localOptions.lineLength.min"
+            <input type="number" min="0" max="10" step="1" v-model.number="localOptions.lineLength.min"
               class="num-input" />
-            <input type="number" min="0" max="20" step="0.1" v-model.number="localOptions.lineLength.max"
+            <input type="number" min="0" max="200" step="1" v-model.number="localOptions.lineLength.max"
               class="num-input" />
           </div>
         </div>

@@ -237,7 +237,12 @@
 
       <div class="form-group">
         <label>飞行器型号:</label>
-        <input v-model="newRouteForm.aircraftModel" type="text" placeholder="例如: DJI Mavic 3" required />
+        <el-select v-model="newRouteForm.aircraftModel" placeholder="请选择飞行器型号" required style="width: 100%">
+          <el-option value="">请选择飞行器型号</el-option>
+          <el-option v-for="aircraft in aircraftModels" :key="aircraft" :label="aircraft" :value="aircraft">
+            {{ aircraft }}
+          </el-option>
+        </el-select>
       </div>
 
       <div class="form-group">
@@ -1070,6 +1075,9 @@ const now = new Date();
 const todayMin = ref(now.toISOString().slice(0, 16)); // 今天 00:00
 const todayMax = ref(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59).toISOString().slice(0, 16)); // 今天 23:59
 
+// 飞行器型号列表
+const aircraftModels = ref([]);
+
 const newRouteForm = ref({
   startName: "",
   startLon: null,
@@ -1083,8 +1091,21 @@ const newRouteForm = ref({
   startTime: todayMin.value, // 起始时间，默认今天 00:00
   endTime: todayMax.value, // 终止时间，默认今天 23:59
 });
+
+// 加载飞行器型号列表
+const loadAircraftModels = async () => {
+  try {
+    const { getActiveAircraftModels } = await import("@/api");
+    const result = await getActiveAircraftModels();
+    aircraftModels.value =result.map(item => item.modelName) 
+  } catch (error) {
+    console.error("加载飞行器型号失败:", error);
+    aircraftModels.value = [];
+  }
+};
 // 显示添加航线模态框
-const showAddRouteModal = () => {
+const showAddRouteModal = async () => {
+  await loadAircraftModels();
   showAddRouteModalFlag.value = true;
   document.body.style.overflow = "hidden";
 };

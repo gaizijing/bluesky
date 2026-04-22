@@ -30,10 +30,10 @@
  */
 
 export const WIND_LAYER_DEFAULTS = {
-    particlesTextureSize: 50,  // 粒子数量
+    particlesTextureSize: 200,  // 粒子数量
     //particleHeight: 150,        // 粒子高度
-    lineWidth: { min: 0.05, max: 0.08 },  // 线宽
-    lineLength: { min:1, max: 1 },  // 线长
+    lineWidth: { min: 1, max: 5 },  // 线宽
+    lineLength: { min:5, max: 10 },  // 线长
     speedFactor: 0.3,           // 速度因子
     dropRate: 0.003,            // 粒子消失率
     dropRateBump: 0.001,       // 粒子重置率

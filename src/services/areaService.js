@@ -38,15 +38,13 @@ class AreaService {
         name: areaData.name,
         type: areaData.type,
         location: `${areaData.bbox.west.toFixed(2)}, ${areaData.bbox.south.toFixed(2)}`,
-        coordinates: [
-          (areaData.bbox.west + areaData.bbox.east) / 2,
-          (areaData.bbox.south + areaData.bbox.north) / 2
-        ],
+        longitude:(areaData.bbox.west + areaData.bbox.east) / 2,
+        latitude:(areaData.bbox.south + areaData.bbox.north) / 2,
         bbox: areaData.bbox
       };
 
       const newArea = await addNewArea(newAreaData);
-      const updatedList = [newAreaData, ...this.areaStore.areaList];
+      const updatedList = [newArea, ...this.areaStore.areaList];
       this.areaStore.setAreaList(updatedList);
       return newArea;
     } catch (error) {
