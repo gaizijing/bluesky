@@ -244,14 +244,20 @@ export const switchToOverviewMode = (viewer) => {
  * @param {Cesium.Viewer} viewer - Cesium viewer实例
  * @param {Object} region - 重点关注区域信息（可选，默认使用地区中心点）
  */
-export const switchToFocusMode = (viewer, region = null) => {
+export const switchToFocusMode = (viewer, area = null) => {
   if (!viewer) return;
 
   // 获取最新的地区配置
   const regionConfig = getRegionConfig();
   
-  // 默认使用地区视觉中心点
-  const center = region?.coordinates || regionConfig.center;
+  // 确定聚焦中心点
+  let center;
+  if (area) {
+    // 如果提供了监测点，使用监测点的经纬度
+    if (area.longitude !== undefined && area.latitude !== undefined) {
+      center = [area.longitude, area.latitude];
+    } 
+  }
   
   // 创建边界球，用于重点关注模式
   const boundingSphere = new Cesium.BoundingSphere(

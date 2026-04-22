@@ -160,6 +160,7 @@ const toggleMode = () => {
 
   // 如果是切换到重点关注模式，先检查是否有选中的区域
   if (newMode === 'focus') {
+    console.log('切换到重点关注模式',areaStore.selectedArea);
     const selectedArea = areaStore.selectedArea;
     if (!selectedArea) {
       console.warn('没有选中的重点关注区域，无法切换到重点关注模式');
