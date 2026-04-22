@@ -189,10 +189,10 @@ const initChart = () => {
       ]
     },
     grid: {
-      left: 72,
+      left: 45,
       right: 16,
       top: 10,
-      bottom: 38
+      bottom: 18
     },
     xAxis: [
       {
