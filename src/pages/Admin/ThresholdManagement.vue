@@ -238,16 +238,17 @@ import {
   getAllThresholds,
   getDefaultThreshold,
   updateThreshold,
-  updateDefaultThreshold,
-  getAllAircraftModels
+  updateDefaultThreshold
 } from '@/api'
 import { useThresholdsStore } from '@/store/modules/thresholds'
+import { useAircraftStore } from '@/store/modules/aircraft'
 import {
   extractList,
   extractRecord,
   normalizeNumber
 } from '@/utils/admin'
 const thresholdsStore = useThresholdsStore()
+const aircraftStore = useAircraftStore()
 
 const searchAircraftId = ref('')
 const drawerVisible = ref(false)
@@ -276,7 +277,7 @@ const aircraftList = ref([])
 
 const loadAircrafts = async () => {
   try {
-    const response = await getAllAircraftModels()
+    const response = await aircraftStore.fetchAllAircraftModels()
     const aircrafts = extractList(response)
     aircraftList.value = aircrafts
       .filter(item => (item.id || item.aircraftId || item.modelId) !== 'default')

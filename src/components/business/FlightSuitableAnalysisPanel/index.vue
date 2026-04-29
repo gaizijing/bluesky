@@ -56,7 +56,6 @@ const normalizeChartData = (rawData) => {
   const rawStatusData = Array.isArray(rawData.statusData) ? rawData.statusData : [];
   const rawValueData = Array.isArray(rawData.valueData) ? rawData.valueData : [];
   const rawUnitData = Array.isArray(rawData.unitData) ? rawData.unitData : [];
-  console.log('gzj',rawData.rawUnitData);
 
   let slotCount = 0;
   rawStatusData.forEach(row => {
@@ -68,57 +67,16 @@ const normalizeChartData = (rawData) => {
     return null;
   }
 
-  const factorMap = new Map();
-  rawFactors.forEach((name, idx) => {
-    factorMap.set(name, {
-      status: Array.isArray(rawStatusData[idx]) ? rawStatusData[idx] : [],
-      value: Array.isArray(rawValueData[idx]) ? rawValueData[idx] : [],
-      unit: rawUnitData[idx] 
-    });
-  });
-  
-  const factors = FACTOR_ORDER.filter(name => factorMap.has(name));
-  const fallbackFactors = rawFactors.filter(name => !factors.includes(name));
-  const finalFactors = [...factors, ...fallbackFactors];
-
-  const statusData = finalFactors.map((name) => {
-    const row = factorMap.get(name)?.status || [];
-    const fixed = [];
-    for (let i = 0; i < slotCount; i++) {
-      fixed.push(toStatus(row[i]));
-    }
-    return fixed;
-  });
-
-  const valueData = finalFactors.map((name) => {
-    const row = factorMap.get(name)?.value || [];
-    const fixed = [];
-    for (let i = 0; i < slotCount; i++) {
-      const value = Number(row[i]);
-      fixed.push(Number.isFinite(value) ? value : 0);
-    }
-    return fixed;
-  });
-
- const unitData = finalFactors.map((name) => {
-  const unit = factorMap.get(name)?.unit || '';
-  const fixed = [];
-  for (let i = 0; i < slotCount; i++) {
-    fixed.push(unit);
-  }
-  return fixed;
-});
-
   const backendTimeLabels = Array.isArray(rawData.timeLabels) ? rawData.timeLabels : [];
   const timeLabels = backendTimeLabels.length === slotCount + 1
     ? backendTimeLabels
     : buildFallbackTimeLabels(slotCount);
 
   return {
-    factors: finalFactors,
-    statusData,
-    valueData,
-    unitData,
+    factors: rawFactors,
+    statusData: rawStatusData,
+    valueData: rawValueData,
+    unitData: rawUnitData,
     slotCount,
     timeLabels
   };

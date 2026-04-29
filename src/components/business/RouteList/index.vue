@@ -20,26 +20,26 @@
       <div class="current-route-info">
 
         <div class="route-path">
-          <span class="start-point">{{ currentRouteInfo.startName }}</span>
+          <span class="start-point">{{ routeStore.currentRoute.startName }}</span>
           <span class="path-arrow">→</span>
-          <template v-if="currentRouteInfo.waypoints.length > 2">
-            <span v-for="(waypoint, index) in currentRouteInfo.waypoints.slice(1, -1)" :key="index"
+          <template v-if="routeStore.currentRoute.waypoints.length > 2">
+            <span v-for="(waypoint, index) in routeStore.currentRoute.waypoints.slice(1, -1)" :key="index"
               class="waypoint">
               {{ waypoint.name || `途经点${index + 1}` }}
 
             </span>
             <span class="path-arrow">→</span>
           </template>
-          <span class="end-point">{{ currentRouteInfo.endName }}</span>
+          <span class="end-point">{{ routeStore.currentRoute.endName }}</span>
         </div>
         <div class="route-details">
-          <span class="detail-item">总长: {{ currentRouteInfo.lengthText }}</span>
-          <span class="detail-item">航段数: {{ currentRouteInfo.segmentsText }}</span>
-          <span class="detail-item">飞行器: {{ currentRouteInfo.aircraftModel }}</span>
+          <span class="detail-item">总长: {{ routeStore.currentRoute.lengthText }}</span>
+          <span class="detail-item">航段数: {{ routeStore.currentRoute.segmentsText }}</span>
+          <span class="detail-item">飞行器: {{ routeStore.currentRoute.aircraftModel }}</span>
 
           <span class="detail-item">平均风险:
-            <span class="risk-badge" :class="getRiskClass(currentRouteInfo.averageRisk)">
-              {{ getRiskText(currentRouteInfo.averageRisk) }}
+            <span class="risk-badge" :class="getRiskClass(routeStore.currentRoute.averageRisk)">
+              {{ getRiskText(routeStore.currentRoute.averageRisk) }}
             </span>
           </span>
         </div>
@@ -54,7 +54,7 @@
         </div>
 
         <button class="clear-history-btn" @click="clearHistory"
-          v-if="filteredRoutes && filteredRoutes.length > 0">清空</button>
+          v-if="routes && routes.length > 0">清空</button>
       </div>
       <!-- 加载状态 -->
       <div v-if="isLoading" class="loading-state">
@@ -63,28 +63,20 @@
       </div>
 
       <!-- 空状态 -->
-      <div v-if="!isLoading && filteredRoutes?.length === 0" class="empty-state">
+      <div v-if="!isLoading && routes?.length === 0" class="empty-state">
         <p>没有历史航线记录</p>
       </div>
 
       <!-- 历史记录列表项 -->
       <div class="history-list">
-        <div v-for="route in filteredRoutes" :key="route.id" class="history-item" :data-route-id="route.id"
+        <div v-for="route in routes" :key="route.id" class="history-item" :data-route-id="route.id"
           :class="{ active: route.id === routeStore.renderedRouteId }">
-          <div class="route-path" @click="onRouteClick(route)">
+          <div class="route-path" @click="activateRoute(route)">
             <span class="start-point">{{ route.startName }}</span>
             <span class="path-arrow">→</span>
             <template v-if="route.waypoints && route.waypoints.length > 2">
-              <span v-if="expandedRouteIds.has(route.id)" class="waypoint-toggle"
-                @click.stop="expandedRouteIds.delete(route.id)">▼</span>
-
-              <div v-if="expandedRouteIds.has(route.id)" class="waypoints-expanded">
-                <span v-for="(waypoint, index) in route.waypoints.slice(1, -1)" :key="index" class="waypoint">
-                  {{ waypoint.name || `途经点${index + 1}` }}
-                  <span class="path-arrow">→</span>
-                </span>
-              </div>
-              <span v-else class="waypoints-count">
+              
+              <span class="waypoints-count">
                 ({{ route.waypoints.length - 2 }}个途经点)
               </span>
               <span class="path-arrow">→</span>
@@ -93,39 +85,6 @@
           </div>
 
         </div>
-      </div>
-    </div>
-
-    <!-- 航段详情悬浮tooltip -->
-    <div v-if="showSegmentTooltip && currentSegment" class="segment-tooltip"
-      :style="{ left: tooltipLeft + 'px', top: tooltipTop + 'px' }">
-      <div class="tooltip-header">
-        <h4>第{{ currentSegment.segment }}航段</h4>
-      </div>
-      <div class="tooltip-content">
-        <p>
-          <span>距离：</span>{{
-            currentSegment.distance
-              ? currentSegment.distance.toFixed(1)
-              : "N/A"
-          }}km
-        </p>
-        <p><span>风险等级：</span>{{ getRiskText(currentSegment.risk) }}</p>
-        <p><span>风速：</span>{{ currentSegment.windSpeed || "N/A" }}m/s</p>
-        <p>
-          <span>风切变：</span>{{
-            currentSegment.windShear
-              ? currentSegment.windShear.toFixed(1)
-              : "N/A"
-          }}
-        </p>
-        <p>
-          <span>湍流：</span>{{
-            currentSegment.turbulence
-              ? currentSegment.turbulence.toFixed(1)
-              : "N/A"
-          }}
-        </p>
       </div>
     </div>
   </div>
@@ -145,7 +104,7 @@
             <span class="panel-grip" aria-hidden="true">⋮⋮</span>
             <div class="panel-title-group">
               <p class="panel-eyebrow">风险分析窗口</p>
-              <h3 class="panel-title">{{ currentRouteInfo.startName }} → {{ currentRouteInfo.endName }}</h3>
+              <h3 class="panel-title">{{ routeStore.currentRoute.startName }} → {{ routeStore.currentRoute.endName }}</h3>
             </div>
           </div>
 
@@ -165,10 +124,9 @@
             v-if="panelContentMounted"
             ref="routerRiskRef"
             :current-route="routeStore.currentRoute"
-            :route-data="currentRouteData"
+            :route-data="currentRoute.segmentData"
             :panel-visible="panelVisible && !panelMinimized && panelExpandedReady"
-            @highlightSegment="handleSegmentHighlight"
-            @alternativeRouteSelected="handleAlternativeRouteSelected"
+            @alternativeRouteSelected="activateRoute"
           />
         </div>
         </transition>
@@ -281,27 +239,20 @@ import eventManager from "@/cesium/core/eventManager";
 import DialogContainer from "@/components/common/DialogContainer.vue";
 import { useRouteStore } from "@/store/modules/routeStore"; // 引入store
 import { useHeatmapStore } from "@/store/modules/heatmap"; // 引入热力图store
+import { useAircraftStore } from "@/store/modules/aircraft"; // 引入飞行器store
 import routeManager from "@/cesium/entities/routes"; // 导入航线管理器
+import { getRoutes, clearRoutes,createRoute } from "@/api";
+
 const routeStore = useRouteStore();
 const heatmapStore = useHeatmapStore();
+const aircraftStore = useAircraftStore();
 
 // 状态管理
 const routes = ref([]);
 const isLoading = ref(true);
-const searchKeyword = ref("");
 const currentRoute = ref(null);
-const currentRouteData = ref([]);
 const floatingPanelRef = ref(null);
 const routerRiskRef = ref(null);
-// 历史记录展开状态管理
-const expandedRouteIds = ref(new Set());
-// 航段tooltip状态
-const showSegmentTooltip = ref(false);
-const currentSegment = ref(null);
-const tooltipLeft = ref(0);
-const tooltipTop = ref(0);
-const HIGHLIGHT_SEGMENT_ENTITY_ID = "route-risk-highlight-segment";
-
 const panelVisible = ref(true);
 const panelMinimized = ref(true);
 const panelDragging = ref(false);
@@ -317,188 +268,6 @@ const PANEL_HEIGHT = 620;
 const PANEL_MINIMIZED_HEIGHT = 72;
 const PANEL_MARGIN = 20;
 
-const toFiniteNumber = (value, fallback = NaN) => {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
-};
-
-const normalizeRiskScore = (value) => {
-  const number = toFiniteNumber(value, 0);
-
-  if (number > 1) {
-    return Math.max(0, Math.min(1, number / 100));
-  }
-
-  return Math.max(0, Math.min(1, number));
-};
-
-const normalizeCoordinatePair = (point) => {
-  if (!Array.isArray(point) || point.length < 2) {
-    return null;
-  }
-
-  const longitude = toFiniteNumber(point[0], NaN);
-  const latitude = toFiniteNumber(point[1], NaN);
-
-  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
-    return null;
-  }
-
-  return [longitude, latitude];
-};
-
-const normalizeCoordinatePath = (points) => {
-  if (!Array.isArray(points)) {
-    return [];
-  }
-
-  return points.map((point) => normalizeCoordinatePair(point)).filter(Boolean);
-};
-
-const buildWaypointFromAny = (point, fallbackName = "") => {
-  if (!point) {
-    return null;
-  }
-
-  const longitude = toFiniteNumber(
-    point.longitude,
-    NaN
-  );
-  const latitude = toFiniteNumber(
-    point.latitude,
-    NaN
-  );
-
-  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
-    return null;
-  }
-
-  return {
-    name: point.name || fallbackName || "",
-    longitude,
-    latitude,
-    height: toFiniteNumber(
-      point.height ?? point.altitude,
-      300
-    )
-  };
-};
-
-const normalizeSegmentData = (segmentsSource) => {
-  if (!Array.isArray(segmentsSource) || segmentsSource.length === 0) {
-    return [];
-  }
-
-  let accumulatedDistance = 0;
-
-  return segmentsSource.map((segment, index) => {
-    const startCoordinates = normalizeCoordinatePair(segment?.startCoordinates);
-    const endCoordinates = normalizeCoordinatePair(segment?.endCoordinates);
-    const normalizedPath = normalizeCoordinatePath(segment?.pathCoordinates);
-    const pathCoordinates =
-      normalizedPath.length > 1 ? normalizedPath : [startCoordinates, endCoordinates].filter(Boolean);
-
-    const segmentLength = toFiniteNumber(segment?.segmentLength, 0);
-    let distance = toFiniteNumber(segment?.distance, NaN);
-
-    if (!Number.isFinite(distance)) {
-      distance = accumulatedDistance + segmentLength;
-    }
-
-    accumulatedDistance = distance;
-
-    return {
-      ...segment,
-      segment: toFiniteNumber(segment?.segment, index + 1),
-      distance,
-      segmentLength,
-      risk: normalizeRiskScore(segment?.risk),
-      windSpeed: toFiniteNumber(segment?.windSpeed, NaN),
-      windDir: toFiniteNumber(segment?.windDir, NaN),
-      windShear: toFiniteNumber(segment?.windShear, NaN),
-      turbulence: toFiniteNumber(segment?.turbulence, NaN),
-      rainfall: toFiniteNumber(segment?.rainfall, NaN),
-      startCoordinates,
-      endCoordinates,
-      pathCoordinates,
-      coordinates: pathCoordinates
-    };
-  });
-};
-
-const normalizeWaypoints = (routeLike, segmentData = []) => {
-  const height = toFiniteNumber(routeLike?.flightHeight, 300);
-  const waypointSources = Array.isArray(routeLike?.waypoints)
-    ? routeLike.waypoints
-    : [];
-  const normalizedWaypoints = waypointSources
-    .map((point, index) =>
-      buildWaypointFromAny(point, index === 0 ? routeLike?.startName : "")
-    )
-    .filter(Boolean)
-    .map((point) => ({ ...point, height: toFiniteNumber(point.height, height) }));
-
-  if (normalizedWaypoints.length >= 2) {
-    return normalizedWaypoints;
-  }
-
-  if (segmentData.length > 0) {
-    const converted = routeStore.convertSegmentsToWaypoints(segmentData);
-    if (Array.isArray(converted) && converted.length >= 2) {
-      return converted.map((point, index) => ({
-        name:
-          point.name ||
-          (index === 0
-            ? routeLike?.startName || "起点"
-            : index === converted.length - 1
-              ? routeLike?.endName || "终点"
-              : `途经点${index}`),
-        longitude: toFiniteNumber(point.longitude, NaN),
-        latitude: toFiniteNumber(point.latitude, NaN),
-        height: toFiniteNumber(point.height, height)
-      }));
-    }
-  }
-
-  return [];
-};
-
-const normalizeRouteForActivation = (routeLike, detailLike = null) => {
-  const mergedRoute = {
-    ...(routeLike || {}),
-    ...(detailLike || {})
-  };
-  const segmentData = normalizeSegmentData(mergedRoute.segmentData);
-  const waypoints = normalizeWaypoints(mergedRoute, segmentData);
-  const length =
-    toFiniteNumber(mergedRoute.length, NaN) ||
-    (segmentData.length > 0
-      ? segmentData[segmentData.length - 1]?.distance
-      : NaN);
-  const segments = toFiniteNumber(mergedRoute.segments, segmentData.length);
-
-  return {
-    ...mergedRoute,
-    id: mergedRoute.id || routeLike?.id || detailLike?.id || "",
-    name:
-      mergedRoute.name ||
-      `${mergedRoute.startName || "起点"}-${mergedRoute.endName || "终点"}`,
-    startName: mergedRoute.startName || waypoints[0]?.name || "起点",
-    endName:
-      mergedRoute.endName || waypoints[waypoints.length - 1]?.name || "终点",
-    averageRisk: normalizeRiskScore(mergedRoute.averageRisk),
-    aircraftModel: mergedRoute.aircraftModel || "--",
-    flightHeight: toFiniteNumber(mergedRoute.flightHeight, 300),
-    length: Number.isFinite(length) ? length : 0,
-    segments,
-    waypoints,
-    segmentData,
-    startTime: mergedRoute.startTime
-      ? new Date(mergedRoute.startTime)
-      : mergedRoute.startTime,
-    endTime: mergedRoute.endTime ? new Date(mergedRoute.endTime) : mergedRoute.endTime
-  };
-};
 
 const getPanelBounds = () => {
   const width = window.innerWidth;
@@ -707,35 +476,6 @@ const handlePanelViewportResize = () => {
   resetPanelPosition();
 };
 
-const currentRouteInfo = computed(() => {
-  const route = routeStore.currentRoute;
-
-  if (!route) {
-    return {
-      startName: "起点",
-      endName: "终点",
-      waypoints: [],
-      lengthText: "--",
-      segmentsText: "--",
-      aircraftModel: "--",
-      averageRisk: 0
-    };
-  }
-
-  const segmentCount = toFiniteNumber(route.segments, route.segmentData?.length || 0);
-  const routeLength = toFiniteNumber(route.length, NaN);
-
-  return {
-    startName: route.startName || "起点",
-    endName: route.endName || "终点",
-    waypoints: Array.isArray(route.waypoints) ? route.waypoints : [],
-    lengthText: Number.isFinite(routeLength) ? `${routeLength.toFixed(1)} km` : "--",
-    segmentsText: segmentCount > 0 ? `${segmentCount} 段` : "--",
-    aircraftModel: route.aircraftModel || "--",
-    averageRisk: normalizeRiskScore(route.averageRisk)
-  };
-});
-
 // 当前正在选点的目标（start, end, waypoint_${index}）
 const selectingPointTarget = ref(null);
 
@@ -802,16 +542,6 @@ const stopMapSelection = () => {
   selectingPointTarget.value = null;
 };
 
-// 过滤后的航线列表
-const filteredRoutes = computed(() => {
-  if (!searchKeyword.value) return routes.value;
-  const keyword = searchKeyword.value.toLowerCase();
-  return routes.value.filter((route) =>
-    String(route.name || `${route.startName || ""}${route.endName || ""}`)
-      .toLowerCase()
-      .includes(keyword)
-  );
-});
 
 
 
@@ -820,14 +550,8 @@ const loadRoutes = async () => {
   isLoading.value = true;
 
   try {
-    const { getRoutes } = await import("@/api");
     const routeResult = await getRoutes();
-    const routeList = Array.isArray(routeResult?.routes) ? routeResult.routes : [];
-
-    routes.value = routeList
-      .map((route) => normalizeRouteForActivation(route))
-      .filter((route) => route.id);
-
+    routes.value = routeResult?.routes
     routeStore.setRouteList(routes.value);
   } catch (error) {
     console.error("加载航线列表失败:", error);
@@ -845,7 +569,6 @@ const loadRoutes = async () => {
 const clearHistory = async () => {
   if (confirm('确定要清空所有历史记录吗？')) {
     try {
-      const { clearRoutes } = await import('@/api');
       await clearRoutes();
       routes.value = [];
       routeStore.clearRouteList();
@@ -869,136 +592,48 @@ const getRiskText = (value) => {
   if (value < 0.7) return "中风险";
   return "高风险";
 };
-// 新增：列表点击事件（核心！）
-const clearHighlightedSegment = () => {
-  const viewer = window.viewer;
-  if (viewer?.entities) {
-    const entity = viewer.entities.getById(HIGHLIGHT_SEGMENT_ENTITY_ID);
-    if (entity) {
-      viewer.entities.remove(entity);
-    }
-  }
-  showSegmentTooltip.value = false;
-  currentSegment.value = null;
-};
 
-const handleSegmentHighlight = (payload) => {
-  if (!payload) return;
 
-  const segmentNo = Number(payload.segment);
-  const matchedSegment = currentRouteData.value.find(
-    (item) => Number(item.segment) === segmentNo
-  );
-  currentSegment.value = matchedSegment || null;
-  showSegmentTooltip.value = Boolean(matchedSegment);
-  tooltipLeft.value = 24;
-  tooltipTop.value = 140;
-
-  const viewer = window.viewer;
-  if (!viewer?.entities) return;
-
-  const rawCoords = Array.isArray(payload.coordinates) ? payload.coordinates : [];
-  const positions = rawCoords
-    .filter((coord) => Array.isArray(coord) && coord.length >= 2)
-    .map(([lon, lat]) => Cesium.Cartesian3.fromDegrees(Number(lon), Number(lat), 320))
-    .filter(Boolean);
-
-  if (positions.length < 2) return;
-
-  const oldEntity = viewer.entities.getById(HIGHLIGHT_SEGMENT_ENTITY_ID);
-  if (oldEntity) {
-    viewer.entities.remove(oldEntity);
-  }
-
-  const highlightEntity = viewer.entities.add({
-    id: HIGHLIGHT_SEGMENT_ENTITY_ID,
-    polyline: {
-      positions,
-      width: 10,
-      material: Cesium.Color.YELLOW.withAlpha(0.9),
-      depthFailMaterial: Cesium.Color.YELLOW.withAlpha(0.9),
-      clampToGround: false
-    }
-  });
-
-  viewer.flyTo(highlightEntity, { duration: 0.8 });
-};
-
-const activateRoute = async (routeLike, { scrollIntoView = false } = {}) => {
-  if (!routeLike) {
-    return null;
-  }
-
+const activateRoute = async (routeLike) => {
+  
   const routeId = routeLike.id;
   let detailPayload = null;
-
-  if (routeId && (!Array.isArray(routeLike.segmentData) || routeLike.segmentData.length === 0)) {
-    const { getRouteDetail } = await import("@/api");
-    detailPayload = await getRouteDetail(routeId);
-  }
-
-  const normalizedRoute = normalizeRouteForActivation(routeLike, detailPayload);
-
-  if (!normalizedRoute.id) {
-    console.warn("航线缺少唯一标识，无法激活:", routeLike);
-    return null;
-  }
-
-  currentRoute.value = normalizedRoute;
-  currentRouteData.value = normalizedRoute.segmentData || [];
-  routeStore.setCurrentRoute(normalizedRoute);
+  const { getRouteDetail } = await import("@/api");
+  detailPayload = await getRouteDetail(routeId);
+  currentRoute.value = detailPayload;
+  routeStore.setCurrentRoute(detailPayload);
   heatmapStore.switchToCitywideMode();
-  clearHighlightedSegment();
   openRiskPanel({ minimized: true });
 
   const existingIndex = routes.value.findIndex(
-    (item) => item.id === normalizedRoute.id
+    (item) => item.id === detailPayload.id
   );
 
   if (existingIndex >= 0) {
-    routes.value.splice(existingIndex, 1, normalizedRoute);
+    routes.value.splice(existingIndex, 1, detailPayload);
   } else {
-    routes.value = [normalizedRoute, ...routes.value];
+    routes.value = [detailPayload, ...routes.value];
   }
 
   routeStore.setRouteList(routes.value);
 
-  if (scrollIntoView) {
+  
     nextTick(() => {
       document
-        .querySelector(`[data-route-id="${normalizedRoute.id}"]`)
+        .querySelector(`[data-route-id="${routeId}"]`)
         ?.scrollIntoView({
           behavior: "smooth",
           block: "center"
         });
     });
-  }
+  
 
-  return normalizedRoute;
+  return;
 };
 
-const handleAlternativeRouteSelected = async (route) => {
-  try {
-    await activateRoute(route, { scrollIntoView: true });
-  } catch (error) {
-    console.error("切换备选航线失败:", error);
-    ElMessage.error(error?.message || "切换备选航线失败，请稍后重试");
-  }
-};
-
-const onRouteClick = async (route) => {
-  try {
-    await activateRoute(route, { scrollIntoView: true });
-  } catch (error) {
-    console.error("加载航线详情失败:", error);
-    ElMessage.error(error?.message || "加载航线详情失败，请稍后重试");
-  }
-};
 
 const releaseRoute = () => {
   currentRoute.value = null;
-  currentRouteData.value = [];
-  clearHighlightedSegment();
   clearPanelSyncTimers();
   panelVisible.value = false;
   panelMinimized.value = true;
@@ -1026,20 +661,7 @@ onMounted(() => {
   window.addEventListener("resize", handlePanelViewportResize);
 });
 
-// 监听当前航线变化，更新图表数据
-watch(
-  () => routeStore.currentRoute,
-  (newRoute) => {
-    if (newRoute && newRoute.segmentData) {
-      currentRouteData.value = newRoute.segmentData;
-      clearHighlightedSegment();
-    } else {
-      currentRouteData.value = [];
-      clearHighlightedSegment();
-    }
-  },
-  { deep: true }
-);
+
 
 watch(
   () => routeStore.currentRoute?.id,
@@ -1095,9 +717,8 @@ const newRouteForm = ref({
 // 加载飞行器型号列表
 const loadAircraftModels = async () => {
   try {
-    const { getActiveAircraftModels } = await import("@/api");
-    const result = await getActiveAircraftModels();
-    aircraftModels.value =result.map(item => item.modelName) 
+    const result = await aircraftStore.fetchActiveAircraftModels();
+    aircraftModels.value = result.map(item => item.modelName);
   } catch (error) {
     console.error("加载飞行器型号失败:", error);
     aircraftModels.value = [];
@@ -1187,36 +808,18 @@ const addNewRoute = async () => {
 
   // 构造发送给后端的基本数据（不包含计算字段）
   const routeRequestData = {
-    startName: newRouteForm.value.startName,
-    startLon: newRouteForm.value.startLon,
-    startLat: newRouteForm.value.startLat,
-    endName: newRouteForm.value.endName,
-    endLon: newRouteForm.value.endLon,
-    endLat: newRouteForm.value.endLat,
-    waypoints: newRouteForm.value.waypoints.map(wp => ({
-      name: wp.name || "途经点",
-      lon: wp.lon,
-      lat: wp.lat
-    })),
-    aircraftModel: newRouteForm.value.aircraftModel,
-    flightHeight: newRouteForm.value.flightHeight,
+    ...newRouteForm.value,
     startTime: startTime.toISOString(), // ISO字符串格式
     endTime: endTime.toISOString(),     // ISO字符串格式
   };
 
   // 调用API保存航线到后端
   try {
-    const { createRoute } = await import('@/api');
     const createdRoute = await createRoute(routeRequestData);
-    const createdRouteId = createdRoute?.id;
 
     await loadRoutes();
 
-    const matchedRoute = routes.value.find(
-      (route) => route.id === createdRouteId
-    );
-
-    await activateRoute(matchedRoute || createdRoute, { scrollIntoView: true });
+    await activateRoute( createdRoute);
     closeAddRouteModal();
     ElMessage.success("航线添加成功");
   } catch (error) {
@@ -1237,80 +840,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
-/* 右下角航线分析面板样式 */
-.bottom-query-panel {
-  position: absolute;
-  bottom: -325px;
-  left: -18px;
-  width: 650px;
-  max-width: 90vw;
-
-  z-index: 1000;
-  max-height: 40vh;
-  display: flex;
-  flex-direction: column;
-
-  .panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-
-    h3 {
-      margin: 0;
-      font-size: 15px;
-      color: #ffffff;
-    }
-
-    .panel-close {
-      background: none;
-      border: none;
-      color: #94a3b8;
-      font-size: 20px;
-      cursor: pointer;
-      transition: color 0.2s;
-      padding: 0;
-      width: 24px;
-      height: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-
-      &:hover {
-        color: #ffffff;
-      }
-    }
-  }
-
-  .panel-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px 16px;
-  }
-
-  .panel-footer {
-    display: flex;
-    justify-content: flex-end;
-    padding: 12px 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-
-    .export-btn {
-      padding: 8px 16px;
-      background-color: rgba(59, 130, 246, 0.1);
-      border: 1px solid #3b82f6;
-      color: #3b82f6;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-size: 14px;
-
-      &:hover {
-        background-color: rgba(59, 130, 246, 0.2);
-      }
-    }
-  }
-}
 
 .route-list-container {
   max-height: 80vh;

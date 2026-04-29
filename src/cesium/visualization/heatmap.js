@@ -3,6 +3,7 @@ import { CesiumHeatmap } from 'cesium-heatmap-es6';
 import { watch } from 'vue';
 import { getCitywideHeatmap, getWeatherHeatmapGeo } from '@/api';
 import warningIcon from '@/assets/icons/ic_warning.png';
+import { tr } from 'element-plus/es/locales.mjs';
 
 const HEATMAP_GRADIENT = {
   '0.0': 'rgba(29, 78, 216, 0)',

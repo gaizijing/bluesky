@@ -56,8 +56,8 @@
             </div>
           </label>
           <div class="slider-input-group">
-            <input type="range" min="0" max="10" step="1" v-model.number="localOptions.speedFactor" />
-            <input type="number" min="0" max="10" step="1" v-model.number="localOptions.speedFactor"
+            <input type="range" min="0" max="5" step="0.1" v-model.number="localOptions.speedFactor" />
+            <input type="number" min="0" max="5" step="0.1" v-model.number="localOptions.speedFactor"
               class="num-input" />
           </div>
         </div>
@@ -124,7 +124,7 @@
 
 <script setup lang="ts">
 import { reactive, watch  } from 'vue'
-import type { WindLayer, WindLayerOptions } from 'cesium-wind-layer'
+import type { WindLayer, WindLayerOptions } from '@/cesium/vendors/cesium-wind-layer/index.mjs'
 import { WIND_LAYER_DEFAULTS } from '@/config/windLayerDefaults'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 
@@ -171,14 +171,13 @@ const toggleLayerVisibility = (key: string, e: Event) => {
 
 const localOptions = reactive<WindLayerOptions>({
   ...WIND_LAYER_DEFAULTS,
+  ...layerSettingsStore.windOptions
 })
 const applyOptions = (changedOptions: Partial<WindLayerOptions>) => {
   if (props.windLayer) {
     const layers = Array.isArray(props.windLayer)
-      ?
-      props.windLayer
-      :
-      [props.windLayer.value];
+      ? props.windLayer
+      : [props.windLayer];
     layers.forEach(layer => layer?.updateOptions?.(changedOptions));
   }
   emit("optionsChange", changedOptions);
@@ -220,9 +219,9 @@ watch(() => localOptions.displayRange, v => {
 
 watch(() => props.windLayer, (newLayer) => {
   if (newLayer) {
-    applyOptions(localOptions)
+    applyOptions(layerSettingsStore.windOptions)
   }
-}, { immediate: true })
+})
 
 /* reset */
 

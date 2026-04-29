@@ -111,6 +111,12 @@ export const useLayerSettingsStore = defineStore('layerSettings', {
           if (windOptions.lineLength) {
             mergedWindOptions.lineLength = { ...this.windOptions.lineLength, ...windOptions.lineLength }
           }
+          if (windOptions.displayRange) {
+            mergedWindOptions.displayRange = { ...this.windOptions.displayRange, ...windOptions.displayRange }
+          }
+          if (windOptions.domain) {
+            mergedWindOptions.domain = { ...this.windOptions.domain, ...windOptions.domain }
+          }
           this.windOptions = mergedWindOptions
         }
       } catch (error) {

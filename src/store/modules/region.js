@@ -9,6 +9,11 @@ export const useRegionStore = defineStore('region', {
   }),
 
   getters: {
+     // 添加 modelUrl getter
+    getModelUrl: (state) => {
+
+      return state.regionConfig.modelUrl ;
+    },
     getRegionName: (state) => {
       if (!state.regionConfig) {
         throw new Error('地区配置未获取');

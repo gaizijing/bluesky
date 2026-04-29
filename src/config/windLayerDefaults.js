@@ -31,22 +31,26 @@
 
 export const WIND_LAYER_DEFAULTS = {
     particlesTextureSize: 200,  // 粒子数量
-    //particleHeight: 150,        // 粒子高度
-    lineWidth: { min: 1, max: 5 },  // 线宽
+    particleHeight: 150,        // 粒子高度
+    lineWidth: { min: 1, max: 1 },  // 线宽
     lineLength: { min:5, max: 10 },  // 线长
     speedFactor: 0.3,           // 速度因子
     dropRate: 0.003,            // 粒子消失率
     dropRateBump: 0.001,       // 粒子重置率
-    colors: ['#050404ff', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF'],
+    colors: ['#050404', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF'],
     flipY: true,
     useViewerBounds: false,
     dynamic: true,
     displayRange: {
       min: 0,
-      max: 10                  
+      max: 10
+    },
+    domain: {
+      min: 0,
+      max: 30
     }
 };
-export const CAMERA_HEIGHT_THRESHOLD = 10000; // Show wind field only when camera is below 500m
+export const CAMERA_HEIGHT_THRESHOLD = 10000; // Show wind field only when camera is below 10000m
 
 // 预定义颜色方案
 export const COLOR_SCHEMES = {

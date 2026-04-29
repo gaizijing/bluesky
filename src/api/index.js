@@ -293,7 +293,6 @@ export const getWeatherHeatmapGeo = async (params = {}) => {
       time,
       pointId
     } = params;
-
     if (!pointId) {
       throw new Error('监测点ID参数(pointId)是必需的');
     }
@@ -640,6 +639,7 @@ export const getRoutes = async () => {
 // 获取航路详情
 export const getRouteDetail = async (routeId) => {
   try {
+    
     const data = await request.get(`/routes/${routeId}`);
     return data;
   } catch (error) {

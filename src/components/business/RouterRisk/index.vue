@@ -228,7 +228,7 @@ import { fetchRouteRiskAnalysis } from "@/services/routeRiskService";
 
 const moduleStore = useModuleStore();
 
-const emit = defineEmits(["highlightSegment", "alternativeRouteSelected"]);
+const emit = defineEmits([ "alternativeRouteSelected"]);
 
 const props = defineProps({
   currentRoute: {
@@ -1216,58 +1216,6 @@ const hideTooltip = () => {
   tooltipData.value = null;
 };
 
-const updateTooltipPosition = (event) => {
-  if (!event || !chartContainerRef.value || !tooltipData.value) {
-    return;
-  }
-
-  const rect = chartContainerRef.value.getBoundingClientRect();
-  const padding = 14;
-  const tooltipHeight = TOOLTIP_BASE_HEIGHT + (tooltipData.value.reason ? TOOLTIP_REASON_HEIGHT : 0);
-  const nextLeft = event.clientX - rect.left + 16;
-  const nextTop = event.clientY - rect.top - 24;
-
-  tooltipLeft.value = clamp(nextLeft, padding, rect.width - TOOLTIP_WIDTH - padding);
-  tooltipTop.value = clamp(nextTop, padding, rect.height - tooltipHeight - padding);
-};
-
-const handleSegmentClick = (params) => {
-  if (params?.componentType !== "series" || params?.seriesName !== "风险指数") {
-    return;
-  }
-
-  const segmentData = normalizedRouteDataRef.value[params?.dataIndex];
-  if (!segmentData) {
-    return;
-  }
-
-  emit("highlightSegment", {
-    segment: segmentData.segment,
-    coordinates: segmentData.coordinates,
-    risk: segmentData.risk
-  });
-};
-
-const handleSegmentHover = (params) => {
-  if (params?.componentType !== "series" || params?.seriesName !== "风险指数") {
-    return;
-  }
-
-  const segmentData = normalizedRouteDataRef.value[params?.dataIndex];
-  if (!segmentData) {
-    return;
-  }
-
-  const nativeEvent = params?.event?.event ?? params?.event;
-  if (!nativeEvent) {
-    return;
-  }
-
-  tooltipData.value = { ...segmentData };
-  showTooltip.value = true;
-  updateTooltipPosition(nativeEvent);
-};
-
 const getChartViewportSize = () => {
   const container = chartContainerRef.value;
   const chartDom = chartRef.value;
@@ -1286,16 +1234,6 @@ const isChartReadyForRender = () => {
   return width > 0 && height > 0;
 };
 
-const bindChartEvents = (chart) => {
-  chart.off("click", handleSegmentClick);
-  chart.off("mousemove", handleSegmentHover);
-  chart.off("mouseout", hideTooltip);
-  chart.off("globalout", hideTooltip);
-  chart.on("click", handleSegmentClick);
-  chart.on("mousemove", handleSegmentHover);
-  chart.on("mouseout", hideTooltip);
-  chart.on("globalout", hideTooltip);
-};
 
 const clearPendingChartSync = () => {
   if (chartFrameId) {
@@ -1361,7 +1299,6 @@ const renderChart = ({ recreate = false } = {}) => {
       notMerge: true,
       lazyUpdate: false
     });
-    bindChartEvents(chart);
   };
 
   let chart = getOrCreateChart();

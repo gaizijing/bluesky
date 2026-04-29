@@ -72,20 +72,17 @@ export function parseIsimData(rawData) {
       return null
     }
     
-    // 标准化数据格式
-    const normalizedData = normalizeIsimData(data)
-    
     // 添加时间戳
-    if (!normalizedData.timestamp) {
-      normalizedData.timestamp = new Date().toISOString()
+    if (!data.timestamp) {
+      data.timestamp = new Date().toISOString()
     }
     
     // 添加数据来源
-    if (!normalizedData.source) {
-      normalizedData.source = 'ISIM'
+    if (!data.source) {
+      data.source = 'ISIM'
     }
     
-    return normalizedData
+    return data
   } catch (error) {
     console.error('[ISIM Parser] 解析ISIM数据失败:', error)
     return null
@@ -140,52 +137,6 @@ function parseStringFormat(str) {
   }
 }
 
-/**
- * 标准化ISIM数据格式
- * @param {Object} data - 原始数据
- * @returns {Object} 标准化后的数据
- */
-function normalizeIsimData(data) {
-  const normalized = { ...data }
-  
-  // 确保核心字段存在
-  const defaults = {
-    header: data.header || 'UE5_SIM_DATA',
-    aircraftRoll: data.aircraftRoll || 0,
-    aircraftPitch: data.aircraftPitch || 0,
-    aircraftHeading: data.aircraftHeading || 0,
-    aircraftLon: data.aircraftLon || 120.3844, // 默认青岛
-    aircraftLat: data.aircraftLat || 36.1052,
-    aircraftAlt: data.aircraftAlt || 100,
-    eyeLon: data.eyeLon || (data.aircraftLon || 120.3844) + 0.0001,
-    eyeLat: data.eyeLat || (data.aircraftLat || 36.1052) + 0.0001,
-    eyeAlt: data.eyeAlt || (data.aircraftAlt || 100) + 1,
-    observeLon: data.observeLon || (data.aircraftLon || 120.3844) + 0.0006,
-    observeLat: data.observeLat || (data.aircraftLat || 36.1052) + 0.0008,
-    observeAlt: data.observeAlt || (data.aircraftAlt || 100) + 50,
-    observePitch: data.observePitch || 10,
-    observeHeading: data.observeHeading || 90,
-    trailHide: data.trailHide || 0,
-    airwayHide: data.airwayHide || 0,
-    ownshipLight: data.ownshipLight || 1
-  }
-  
-  // 应用默认值
-  Object.keys(defaults).forEach(key => {
-    if (normalized[key] === undefined) {
-      normalized[key] = defaults[key]
-    }
-  })
-  
-  // 确保数值类型
-  Object.keys(normalized).forEach(key => {
-    if (typeof defaults[key] === 'number' && typeof normalized[key] !== 'number') {
-      normalized[key] = parseFloat(normalized[key]) || defaults[key]
-    }
-  })
-  
-  return normalized
-}
 
 /**
  * 计算飞机速度（基于连续两个数据点）

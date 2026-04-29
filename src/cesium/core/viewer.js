@@ -22,7 +22,6 @@ export const getViewerOptions = () => ({
   shadows: false, // 禁用阴影计算
 
   showRenderLoopErrors: false, // 生产环境禁用错误弹窗
- 
   // WebGL上下文配置
   contextOptions: {
     requestWebgl1: false,

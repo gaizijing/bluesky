@@ -11,7 +11,11 @@ import { loadTerrain } from '@/cesium/layers/terrain'
 import { addWhiteModel } from '@/cesium/layers/model3d'
 import { AreaManager } from '@/cesium/entities/area.js'
 import { initWind } from '@/cesium/visualization/wind'
-import { initHeatVolume, createReactiveHeatmapBridge } from '@/cesium/visualization/heatmap'
+//3d
+import { initHeatVolume, createReactiveHeatmapBridge } from '@/cesium/visualization/heatmap-grid'
+//2d
+// import { initHeatVolume, createReactiveHeatmapBridge } from '@/cesium/visualization/heatmap'
+
 import { routeManager } from '@/cesium/entities/routes' 
 import { useRouteStore } from '@/store/modules/routeStore'
 import eventManager from '@/cesium/core/eventManager' 
@@ -89,33 +93,14 @@ export function useCesium(containerId) {
    */
   const initViewer = () => {
     try {
-      console.log('[Cesium] 开始创建 Viewer...')
       viewer.value = createViewer(containerId)
       viewer.value.cesiumWidget.creditContainer.style.display = 'none'
-      
+     // viewer.value.scene.globe.depthTestAgainstTerrain = false
       // 说明
       window.viewer = viewer.value
-      console.log('[Cesium] Viewer 初始化完成')
-      
-      console.log('[Cesium] 开始初始化天空盒...')
-      try {
         resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
           cameraHeightThreshold: 240000
         })
-        console.log('[Cesium] 天空盒初始化完成')
-      } catch (skyError) {
-        console.warn('[Cesium] 天空盒初始化失败:', skyError)
-      }
-      
-      console.log('[Cesium] 开始初始化云层...')
-      try {
-        resources.value.cloud = new Cloud(viewer.value)
-        resources.value.cloud.show()
-        console.log('[Cesium] 云层初始化完成')
-      } catch (cloudError) {
-        console.warn('[Cesium] 云层初始化失败:', cloudError)
-      }
-      
       viewer.value.shadows = true;
       viewer.value.terrainShadows = Cesium.ShadowMode.ENABLED;
       console.log('[Cesium] Viewer 基础配置完成')
@@ -312,7 +297,7 @@ export function useCesium(containerId) {
   const load3DModel = async () => {
     try {
       console.log('[Cesium] 4.1 加载白膜模型...')
-      resources.value.modelTileset = await addWhiteModel(viewer.value)
+      resources.value.modelTileset = await addWhiteModel(viewer.value,{url:regionStore.getModelUrl})
       console.log('[Cesium] 白膜模型加载完成')
     } catch (error) {
       console.warn('[Cesium] 白膜模型加载失败:', error)
@@ -333,36 +318,6 @@ export function useCesium(containerId) {
       console.warn('[Cesium] 监测点管理器初始化失败:', error)
     }
 
-    try {
-      console.log('[Cesium] 5.3 初始化风场...')
-      resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
-      console.log('[Cesium] 风场初始化完成')
-    } catch (error) {
-      console.warn('[Cesium] 风场初始化失败:', error)
-    }
-
-    // 说明
-    if (!windStore.windData) {
-      const unwatch = watch(
-        () => windStore.windData,
-        (newData) => {
-          if (newData) {
-            unwatch();
-            setupCameraHeightWatcher();
-          }
-        }
-      );
-    } else {
-      setupCameraHeightWatcher();
-    }
-
-    // 说明
-    try {
-      setupCameraHeightWatcher()
-      console.log('[Cesium] 相机高度监听设置完成')
-    } catch (error) {
-      console.warn('[Cesium] 相机高度监听设置失败:', error)
-    }
 
     try {
       console.log('[Cesium] 5.4 初始化热力图...')
@@ -452,6 +407,46 @@ export function useCesium(containerId) {
           eventManager.emit('timeChange', { time: currentTime, timeOffset, manual: true });
         }
       });
+    }
+     console.log('[Cesium] 开始初始化云层...')
+      try {
+        resources.value.cloud = new Cloud(viewer.value)
+        resources.value.cloud.show()
+        console.log('[Cesium] 云层初始化完成')
+      } catch (cloudError) {
+        console.warn('[Cesium] 云层初始化失败:', cloudError)
+      }
+
+      
+    try {
+      console.log('[Cesium] 5.3 初始化风场...')
+      resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
+      console.log('[Cesium] 风场初始化完成')
+    } catch (error) {
+      console.warn('[Cesium] 风场初始化失败:', error)
+    }
+
+    // 说明
+    if (!windStore.windData) {
+      const unwatch = watch(
+        () => windStore.windData,
+        (newData) => {
+          if (newData) {
+            unwatch();
+            setupCameraHeightWatcher();
+          }
+        }
+      );
+    } else {
+      setupCameraHeightWatcher();
+    }
+
+    // 说明
+    try {
+      setupCameraHeightWatcher()
+      console.log('[Cesium] 相机高度监听设置完成')
+    } catch (error) {
+      console.warn('[Cesium] 相机高度监听设置失败:', error)
     }
   }
 
@@ -808,6 +803,8 @@ export function useCesium(containerId) {
         heatmapData = await getCitywideHeatmap()
       } else {
         const currentArea = areaStore.selectedArea
+        console.log(currentArea);
+        
         const pointId = heatmapStore.currentPointId || currentArea?.id || currentArea?.pointId
         if (!pointId) {
           return

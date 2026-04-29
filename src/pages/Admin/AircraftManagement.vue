@@ -228,9 +228,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addAircraftModel,
   deleteAircraftModel,
-  getAllAircraftModels,
   updateAircraftModel
 } from '@/api'
+import { useAircraftStore } from '@/store/modules/aircraft'
 import {
   extractList,
   normalizeBoolean,
@@ -246,6 +246,7 @@ const showEnabledOnly = ref(false)
 const formRef = ref(null)
 const aircrafts = ref([])
 const formSnapshot = ref(null)
+const aircraftStore = useAircraftStore()
 
 const categoryOptions = ['多旋翼', '固定翼', '直升机', '无人机', 'eVTOL']
 
@@ -360,7 +361,7 @@ const loadAircrafts = async () => {
   loading.value = true
 
   try {
-    const payload = await getAllAircraftModels()
+    const payload = await aircraftStore.fetchAllAircraftModels()
     const remoteList = extractList(payload).map((item, index) => normalizeAircraft(item, index))
     aircrafts.value = remoteList
   } catch (error) {

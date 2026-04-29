@@ -61,18 +61,6 @@ const selectedPointId = computed(() => {
   return String(area.id || area.pointId || '').trim()
 })
 
-const normalizeStatus = (value) => {
-  const normalized = String(value || '').trim().toLowerCase()
-  return normalized === 'offline' ? 'offline' : 'online'
-}
-
-const normalizeCamera = (camera) => ({
-  id: String(camera?.id ?? ''),
-  name: String(camera?.name || '未命名摄像头'),
-  status: normalizeStatus(camera?.status),
-  previewUrl: String(camera?.previewUrl || '').trim()
-})
-
 const loadSelectedArea = async () => {
   if (selectedPointId.value) {
     return
@@ -98,7 +86,7 @@ const loadCameras = async () => {
   loading.value = true
   try {
     const data = await getCameras({ pointId })
-    cameras.value = extractList(data).map(normalizeCamera)
+    cameras.value = extractList(data)
     if (selectedCameraIndex.value >= cameras.value.length) {
       selectedCameraIndex.value = 0
     }
