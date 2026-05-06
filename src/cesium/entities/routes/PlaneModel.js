@@ -50,10 +50,20 @@ export class PlaneModel {
               return Cesium.Quaternion.IDENTITY
             }
             
-            return Cesium.Transforms.headingPitchRollQuaternion(
+            // 创建基础姿态四元数
+            const baseQuaternion = Cesium.Transforms.headingPitchRollQuaternion(
               currentPosition,
               new Cesium.HeadingPitchRoll(heading, pitch, roll)
             )
+            
+            // 模型需要额外旋转90度（模型自身朝向与Cesium坐标系不一致）
+            const modelRotation = Cesium.Quaternion.fromAxisAngle(
+              Cesium.Cartesian3.UNIT_Z, // 绕Y轴旋转
+              Cesium.Math.toRadians(-90) // 旋转90度
+            )
+            
+            // 组合旋转：先应用模型修正旋转，再应用姿态旋转
+            return Cesium.Quaternion.multiply(baseQuaternion, modelRotation, new Cesium.Quaternion())
           } catch (error) {
             console.warn('[DEBUG] 计算姿态时出错:', error)
             return Cesium.Quaternion.IDENTITY

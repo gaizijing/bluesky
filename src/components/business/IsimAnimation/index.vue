@@ -11,7 +11,7 @@
               id="simulator-ip"
               type="text" 
               v-model="simulatorIp" 
-              placeholder="127.0.0.1"
+              placeholder="192.168.0.102"
               class="ip-input"
             />
           </div>
@@ -22,7 +22,7 @@
               id="send-port"
               type="number" 
               v-model="sendPort" 
-              placeholder="8152"
+              placeholder="8154"
               min="1" 
               max="65535"
               class="port-input"
@@ -182,8 +182,8 @@ const autoSendWeather = ref(true)
 const recordFlightPath = ref(true)
 
 // 联机配置
-const simulatorIp = ref('127.0.0.1')
-const sendPort = ref(8152)
+const simulatorIp = ref('192.168.0.102')
+const sendPort = ref(8154)
 const receivePort = ref(8151)
 const connectionError = ref(null)
 
