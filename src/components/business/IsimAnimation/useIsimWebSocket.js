@@ -68,16 +68,6 @@ export function useIsimWebSocket() {
             timestamp: new Date().toISOString()
           })
           
-          // 发送激活ISIM数据处理消息
-          setTimeout(() => {
-            sendMessage({
-              type: 'connection_control',
-              action: 'activate',
-              timestamp: new Date().toISOString()
-            })
-            console.log('[ISIM] 已发送激活ISIM数据处理请求')
-          }, 500)
-          
           resolve()
         }
         
@@ -423,6 +413,28 @@ export function useIsimWebSocket() {
   }
   
   /**
+   * 激活ISIM数据处理
+   */
+  const activateIsim = () => {
+    return sendMessage({
+      type: 'connection_control',
+      action: 'activate',
+      timestamp: new Date().toISOString()
+    })
+  }
+  
+  /**
+   * 停用ISIM数据处理
+   */
+  const deactivateIsim = () => {
+    return sendMessage({
+      type: 'connection_control',
+      action: 'deactivate',
+      timestamp: new Date().toISOString()
+    })
+  }
+  
+  /**
    * 组件卸载时清理
    */
   onUnmounted(() => {
@@ -441,6 +453,8 @@ export function useIsimWebSocket() {
     disconnect,
     sendMessage,
     sendCommand,
+    activateIsim,
+    deactivateIsim,
     
     // 便捷方法
     requestWeatherData,

@@ -1,352 +1,406 @@
 <template>
-  <div class="isim-animation-container">
-    
-      <!-- 连接配置区域 - 平铺展示 -->
-      <div class="connection-config">
-        <!-- 输入项平铺展示 -->
-        <div class="config-inputs">
-          <div class="input-group">
-            <label for="simulator-ip">模拟机IP</label>
-            <input 
-              id="simulator-ip"
-              type="text" 
-              v-model="simulatorIp" 
-              placeholder="192.168.0.102"
-              class="ip-input"
-            />
+  <div class="isim-container">
+    <!-- 主内容区域 -->
+    <div class="main-content">
+      <!-- 连接配置 -->
+      <div class="section">
+        <div class="section-header">
+          <h3>连接配置</h3>
+          <div class="status-badges">
+            <span class="status-badge" :class="isConnected ? 'connected' : 'disconnected'">
+              {{ isConnected ? '已连接' : '未连接' }}
+            </span>
+            <span class="status-badge" :class="isSendingWindData ? 'sending' : 'idle'">
+              {{ isSendingWindData ? '发送中' : '空闲' }}
+            </span>
           </div>
-          
-          <div class="input-group optional">
-            <label for="send-port">发送端口</label>
-            <input 
-              id="send-port"
-              type="number" 
-              v-model="sendPort" 
-              placeholder="8154"
-              min="1" 
-              max="65535"
-              class="port-input"
-            />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>ISIM主机地址</label>
+            <input v-model="config.host" type="text" class="input-field" />
           </div>
-          
-          <div class="input-group optional">
-            <label for="receive-port">接收端口</label>
-            <input 
-              id="receive-port"
-              type="number" 
-              v-model="receivePort" 
-              placeholder="8151"
-              min="1" 
-              max="65535"
-              class="port-input"
-            />
+          <div class="form-group">
+            <label>发送端口</label>
+            <input v-model.number="config.sendPort" type="number" min="1" max="65535" class="input-field" />
           </div>
-          
-          <button 
-            @click="toggleConnection" 
-            :disabled="isConnecting"
-            class="control-button"
-            :class="{ 'button-connected': isWebSocketConnected }"
-          >
-            {{ isWebSocketConnected ? '断开连接' : '连接ISIM' }}
+          <div class="form-group">
+            <label>接收端口</label>
+            <input v-model.number="config.receivePort" type="number" min="1" max="65535" class="input-field" />
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>初始经度</label>
+            <input v-model.number="config.longitude" type="number" min="-180" max="180" step="0.0001"
+              class="input-field" />
+          </div>
+          <div class="form-group">
+            <label>初始纬度</label>
+            <input v-model.number="config.latitude" type="number" min="-90" max="90" step="0.0001"
+              class="input-field" />
+          </div>
+          <div class="form-group">
+            <label>初始高度(m)</label>
+            <input v-model.number="config.altitude" type="number" min="0" max="10000" class="input-field" />
+          </div>
+        </div>
+        <div class="control-buttons">
+
+          <button @click="handleConnectButtonClick" class="btn" :class="isConnected ? 'btn-danger' : 'btn-primary'"
+            :disabled="isUpdating || isConnecting">
+            {{ isUpdating ? '更新中...' : (isConnecting ? '连接中...' : (isConnected ? '断开连接' : '连接ISIM')) }}
+          </button>
+          <button @click="focusOnIsimAircraft" class="btn btn-secondary" :disabled="!isConnected"> 聚焦飞机
           </button>
         </div>
-        
-        <div v-if="connectionError" class="error-message">
-          {{ connectionError }}
-        </div>
       </div>
-   
-    
-    <!-- 状态面板 -->
-    <div class="status-panel">
-      <div class="status-section compact">
-        <div class="section-title">飞机姿态</div>
-        <div class="status-grid compact">
-          <div class="status-item compact">
-            <div class="status-label">滚转</div>
-            <div class="status-value">{{ aircraftRoll.toFixed(2) }}°</div>
-          </div>
-          <div class="status-item compact">
-            <div class="status-label">俯仰</div>
-            <div class="status-value">{{ aircraftPitch.toFixed(2) }}°</div>
-          </div>
-          <div class="status-item compact">
-            <div class="status-label">航向</div>
-            <div class="status-value">{{ aircraftHeading.toFixed(2) }}°</div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="status-section compact">
-        <div class="section-title">位置信息</div>
-        <div class="status-grid compact">
-          <div class="status-item compact">
-            <div class="status-label">经度</div>
-            <div class="status-value">{{ aircraftLon.toFixed(6) }}</div>
-          </div>
-          <div class="status-item compact">
-            <div class="status-label">纬度</div>
-            <div class="status-value">{{ aircraftLat.toFixed(6) }}</div>
-          </div>
-          <div class="status-item compact">
-            <div class="status-label">高度</div>
-            <div class="status-value">{{ aircraftAlt.toFixed(2) }}m</div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="status-section">
-        <div class="section-title">连接状态</div>
-        <div class="connection-status">
-          <div class="status-indicator" :class="connectionStatusClass"></div>
-          <span class="status-text">{{ connectionStatusText }}</span>
-        </div>
-        <div v-if="flightPath.length > 0" class="flight-info">
-          <div class="flight-info-item">
-            <span>轨迹点数:</span>
-            <span class="flight-info-value">{{ flightPath.length }}</span>
-          </div>
-          <div class="flight-info-item">
-            <span>飞行时间:</span>
-            <span class="flight-info-value">{{ flightDuration }}s</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- 控制面板 -->
-    <div class="control-panel">
-      <div class="control-group">
-        <label class="checkbox-label">
-          <input type="checkbox" v-model="autoSendWeather" />
-          <span>自动发送气象数据</span>
-        </label>
-        
-        <label class="checkbox-label">
-          <input type="checkbox" v-model="recordFlightPath" />
-          <span>记录飞行轨迹</span>
-        </label>
-        
-      </div>
-      
-      <div class="control-group">
 
-        <button 
-          @click="focusOnIsimAircraft" 
-          :disabled="!isWebSocketConnected || !planeEntity" 
-          class="control-button secondary"
-        >
-          聚焦飞机
-        </button>
-        <button @click="exportFlightData" class="control-button secondary">
-          导出飞行数据
-        </button>
-        
-        <button @click="sendTestCommand" class="control-button secondary">
-          发送测试指令
-        </button>
+      <!-- 控制按钮 -->
+      <div class="section">
+        <h3>数据传输控制</h3>
+        <div class="control-buttons">
+          <button @click="controlIsim('START_SENDING')" class="btn btn-success"
+            :disabled="isControlling || sendingStatus === 'started' || !isConnected">
+            ▶ 开始发送气象数据
+          </button>
+          <button @click="controlIsim('STOP_SENDING')" class="btn btn-danger"
+            :disabled="isControlling || sendingStatus !== 'started'">
+            ■ 停止发送
+          </button>
+        </div>
+        <div v-if="sendStatusMessage" class="status-message" :class="sendStatusClass">
+          {{ sendStatusMessage }}
+        </div>
       </div>
+
+      <!-- 调试面板 -->
+      <div class="section debug-panel">
+        <h3>调试面板</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>X风 (m/s)</label>
+            <input v-model.number="wind.u" type="number" step="0.1" class="input-field"
+              :disabled="sendingStatus === 'started'" />
+          </div>
+          <div class="form-group">
+            <label>Y风 (m/s)</label>
+            <input v-model.number="wind.v" type="number" step="0.1" class="input-field"
+              :disabled="sendingStatus === 'started'" />
+          </div>
+          <div class="form-group">
+            <label>Z风 (m/s)</label>
+            <input v-model.number="wind.w" type="number" step="0.1" class="input-field"
+              :disabled="sendingStatus === 'started'" />
+          </div>
+        </div>
+        <button @click="toggleDebugSending" class="btn btn-secondary" :disabled="sendingStatus !== 'started'">
+          {{ isDebugSending ? '⏹ 停止发送' : '▶ 开始调试发送' }}
+        </button>
+        <div v-if="isDebugSending" class="debug-status">
+          <span class="pulse-dot"></span>
+          <span>正在持续发送风分量...</span>
+        </div>
+      </div>
+
+
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, markRaw } from 'vue'
+import { ref, computed, onMounted, onUnmounted, markRaw, watch } from 'vue'
 import * as Cesium from 'cesium'
 import { useIsimWebSocket } from './useIsimWebSocket'
 import { useIsimStore } from './isimStore'
 import { useHeatmapStore } from '@/store/modules/heatmap'
 import { PlaneModel } from '@/cesium/entities/routes/PlaneModel'
 
-// 使用WebSocket Hook
-const { 
-  connect: connectWebSocket, 
-  disconnect: disconnectWebSocket, 
-  isConnected: isWebSocketConnected,
-  isConnecting,
-  sendMessage
-} = useIsimWebSocket()
+// 状态数据
+const isUpdating = ref(false)
+const isControlling = ref(false)
+const isSendingWind = ref(false)
+const isDebugSending = ref(false)
+
+// 飞机模型相关
+const planeEntity = ref(null)
+const planeModel = ref(null)
+const isimPlaneId = 'isim_live_aircraft'
 
 // 使用状态管理
 const isimStore = useIsimStore()
 const heatmapStore = useHeatmapStore()
 
-// Cesium相关
-const planeEntity = ref(null)
-const planeModel = ref(null)
-const isimPlaneId = 'isim_live_aircraft'
-
-// 本地状态
-const autoSendWeather = ref(true)
-const recordFlightPath = ref(true)
-
-// 联机配置
-const simulatorIp = ref('192.168.0.102')
-const sendPort = ref(8154)
-const receivePort = ref(8151)
-const connectionError = ref(null)
-
-// 计算属性
+// 计算属性 - 从状态管理获取飞机数据
 const simData = computed(() => isimStore.simData)
 const flightPath = computed(() => isimStore.flightPath)
 
-const aircraftRoll = computed(() => simData.value?.aircraftRoll || 0)
-const aircraftPitch = computed(() => simData.value?.aircraftPitch || 0)
-const aircraftHeading = computed(() => simData.value?.aircraftHeading || 0)
-const aircraftLon = computed(() => simData.value?.aircraftLon || 120.3844)
-const aircraftLat = computed(() => simData.value?.aircraftLat || 36.1052)
-const aircraftAlt = computed(() => simData.value?.aircraftAlt || 100)
+const aircraftRoll = computed(() => simData.value?.aircraftRoll)
+const aircraftPitch = computed(() => simData.value?.aircraftPitch)
+const aircraftHeading = computed(() => simData.value?.aircraftHeading)
+const aircraftLon = computed(() => simData.value?.aircraftLon)
+const aircraftLat = computed(() => simData.value?.aircraftLat)
+const aircraftAlt = computed(() => simData.value?.aircraftAlt)
 
-const connectionStatusText = computed(() => {
-  if (isConnecting.value) return '连接中...'
-  return isWebSocketConnected.value ? '已连接' : '未连接'
+// 调试发送定时器
+let debugSendTimer = null
+
+// 配置数据
+const config = ref({
+  host: '127.0.0.1',
+  sendPort: 8154,
+  receivePort: 8151,
+  longitude: 117.5,
+  latitude: 39.3,
+  altitude: 1500
 })
 
-const connectionStatusClass = computed(() => ({
-  'connected': isWebSocketConnected.value,
-  'connecting': isConnecting.value,
-  'disconnected': !isWebSocketConnected.value && !isConnecting.value
-}))
-
-const flightDuration = computed(() => {
-  if (flightPath.value.length < 2) return 0
-  // 简化计算：假设每秒一个点
-  return flightPath.value.length
+// 风分量数据
+const wind = ref({
+  u: 5.0,
+  v: 3.0,
+  w: 0.5
 })
 
+// 发送状态
+const sendingStatus = ref('stopped')
+const sendStatusMessage = ref('')
 
+// 基础路径
+const baseUrl = '/api/isim'
 
-// 方法
-const connectToIsim = async () => {
-  connectionError.value = null
-  
-  try {
-    // 1. 更新ISIM目标地址
-    const updatePayload = {
-      host: simulatorIp.value,
-      sendPort: sendPort.value,
-      receivePort: receivePort.value
-    }
-    
-    const response = await fetch('/api/isim/update-target', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatePayload)
-    })
-    
-    const result = await response.json()
-    
-    if (!response.ok) {
-      throw new Error(result.message || '更新目标地址失败')
-    }    
-    // 2. 连接WebSocket
-    await connectWebSocket()
-    
-    // 3. 切换到全市热力图模式
-    heatmapStore.switchToCitywideMode()
-    console.log('ISIM连接成功，切换到全市热力图模式，当前模式:', heatmapStore.heatmapMode)
-    
-  } catch (error) {
-    console.error('连接ISIM失败:', error)
-    connectionError.value = error.message || '连接失败，请检查网络和配置'
-  }
+// WebSocket hook
+const {
+  isConnected,
+  isConnecting,
+  connect,
+  disconnect,
+  sendMessage,
+  sendCommand,
+  sendAircraftPosition,
+  activateIsim,
+  deactivateIsim
+} = useIsimWebSocket()
+
+// 计算发送状态样式
+const sendStatusClass = computed(() => {
+  return sendingStatus.value === 'started' ? 'success' : 'info'
+})
+
+// 判断是否正在发送风场数据
+const isSendingWindData = computed(() => {
+  return sendingStatus.value === 'started'
+})
+
+// 格式化时间戳
+const formatTime = (timestamp) => {
+  if (!timestamp) return 'N/A'
+
+  const date = new Date(timestamp)
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  const seconds = date.getSeconds().toString().padStart(2, '0')
+  const ms = date.getMilliseconds().toString().padStart(3, '0')
+
+  return `${hours}:${minutes}:${seconds}.${ms}`
 }
 
-const toggleConnection = async () => {
-  if (isWebSocketConnected.value) {
-    disconnectWebSocket()
-    clearCesiumAircraft()
-    // 断开连接时恢复区域热力图模式
-    heatmapStore.resetToDefault()
-    console.log('ISIM断开连接，恢复区域热力图模式，当前模式:', heatmapStore.heatmapMode)
+// 连接按钮点击处理
+const handleConnectButtonClick = () => {
+  console.log('[ISIM] 连接按钮被点击')
+
+  if (isConnected.value) {
+    handleDisconnect()
   } else {
-    await connectToIsim()
+    updateTarget()
   }
 }
 
-
-
-const sendTestCommand = () => {
-  sendMessage({
-    type: 'test',
-    message: '测试指令',
-    timestamp: new Date().toISOString()
-  })
-}
-
-const exportFlightData = () => {
-  if (!flightPath.value.length) {
-    alert('没有可导出的飞行数据')
+// 更新目标地址和初始位置
+const updateTarget = async () => {
+  if (!config.value.host) {
     return
   }
-  
-  const dataStr = JSON.stringify(flightPath.value, null, 2)
-  const dataBlob = new Blob([dataStr], { type: 'application/json' })
-  
-  const url = URL.createObjectURL(dataBlob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `flight-path-${new Date().toISOString().slice(0, 10)}.json`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-  
-  alert('飞行数据已导出')
+
+  isUpdating.value = true
+
+  try {
+    const response = await fetch(`${baseUrl}/update-target`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config.value)
+    })
+    const result = await response.json()
+
+    if (result.success) {
+      await connect()
+
+      sendAircraftPosition({
+        longitude: config.value.longitude,
+        latitude: config.value.latitude,
+        altitude: config.value.altitude
+      })
+
+      sendingStatus.value = 'stopped'
+      sendStatusMessage.value = ''
+
+      heatmapStore.switchToCitywideMode()
+      console.log('[ISIM] 连接成功，已切换到全市热力图模式')
+    } else {
+      console.error('连接失败:', result.message)
+    }
+  } catch (error) {
+    console.error('连接失败:', error)
+  } finally {
+    isUpdating.value = false
+  }
 }
+
+// 断开连接
+const handleDisconnect = async () => {
+  try {
+    const response = await fetch(`${baseUrl}/disconnect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    const result = await response.json()
+
+    if (result.success) {
+      disconnect()
+      sendingStatus.value = 'stopped'
+      sendStatusMessage.value = ''
+      clearCesiumAircraft()
+
+      heatmapStore.resetToDefault()
+      console.log('[ISIM] 已断开连接，已恢复到默认热力图模式')
+    } else {
+      console.error('断开连接失败:', result.message)
+    }
+  } catch (error) {
+    console.error('断开连接失败:', error)
+  }
+}
+
+// 发送风分量（调试用）
+const sendBodyWind = async () => {
+  isSendingWind.value = true
+
+  try {
+    const params = new URLSearchParams({
+      u: wind.value.u,
+      v: wind.value.v,
+      w: wind.value.w
+    })
+
+    const response = await fetch(`${baseUrl}/send-body-wind?${params}`, {
+      method: 'POST'
+    })
+    const result = await response.json()
+
+    if (!result.success) {
+      console.error('发送失败:', result.message)
+    }
+  } catch (error) {
+    console.error('发送风分量失败:', error)
+  } finally {
+    isSendingWind.value = false
+  }
+}
+
+// 切换调试发送状态
+const toggleDebugSending = () => {
+  if (isDebugSending.value) {
+    stopDebugSending()
+  } else {
+    startDebugSending()
+  }
+}
+
+// 开始调试发送（持续发送）
+const startDebugSending = () => {
+  isDebugSending.value = true
+  sendBodyWind()
+
+  debugSendTimer = setInterval(() => {
+    sendBodyWind()
+  }, 1000)
+}
+
+// 停止调试发送
+const stopDebugSending = () => {
+  isDebugSending.value = false
+  if (debugSendTimer) {
+    clearInterval(debugSendTimer)
+    debugSendTimer = null
+  }
+}
+
+// 控制ISIM数据传输
+const controlIsim = async (command) => {
+  isControlling.value = true
+
+  try {
+    const response = await fetch(`${baseUrl}/control`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command })
+    })
+    const result = await response.json()
+
+    if (result.success) {
+      sendingStatus.value = result.data.status
+      sendStatusMessage.value = result.data.message
+
+      if (command === 'START_SENDING') {
+        activateIsim()
+        console.log('[ISIM] 已发送激活ISIM数据处理请求')
+      } else if (command === 'STOP_SENDING') {
+        stopDebugSending()
+        deactivateIsim()
+        console.log('[ISIM] 已发送停用ISIM数据处理请求')
+      }
+    } else {
+      console.error('命令执行失败:', result.message)
+    }
+  } catch (error) {
+    console.error('控制命令失败:', error)
+  } finally {
+    isControlling.value = false
+  }
+}
+
+
 
 /**
- * 聚焦到ISIM飞机并跟随
+ * 更新Cesium飞机位置和姿态
  */
-const focusOnIsimAircraft = () => {
-    // 聚焦到飞机
-    viewer.trackedEntity = planeEntity.value
- 
-}
-
-
-
-
-
-
-
-
 const updateCesiumAircraft = async () => {
   if (!simData.value || !planeModel.value) {
     return
   }
-  
-  // 调试：检查Cesium状态
-  console.log('[DEBUG] updateCesiumAircraft called', {
-    aircraftPos: [aircraftLon.value, aircraftLat.value, aircraftAlt.value],
-    aircraftAtt: [aircraftRoll.value, aircraftPitch.value, aircraftHeading.value],
-    simDataExists: !!simData.value,
-  })
-  
+
   try {
-    // 检查Cesium viewer是否存在且正常
-    let viewer = window.viewer
-    // 检查viewer是否可用
+    const viewer = window.viewer
     if (!viewer) {
-      console.error('[DEBUG] Cesium viewer not found in window.viewer')
+      console.error('[ISIM] Cesium viewer not found in window.viewer')
       return
     }
-    
-    // 获取飞机位置（Cartesian3）
+
     const position = Cesium.Cartesian3.fromDegrees(
       aircraftLon.value,
       aircraftLat.value,
       aircraftAlt.value
     )
-    
-    // 检查是否已存在飞机实体
+
     let existingEntity = viewer.entities.getById(isimPlaneId)
-    
+
     if (!existingEntity) {
-      console.log('[DEBUG] 创建新的ISIM飞机实体')
-      
-      // 使用PlaneModel创建飞机实体
+      console.log('[ISIM] 创建新的ISIM飞机实体')
+
       planeEntity.value = planeModel.value.createRoutePlane(
         isimPlaneId,
         position,
@@ -358,360 +412,340 @@ const updateCesiumAircraft = async () => {
           }),
           getAltitude: () => aircraftAlt.value,
           getFlightPath: () => flightPath.value,
-          getRecordFlightPath: () => recordFlightPath.value
+          getRecordFlightPath: () => isimStore.recordFlightPath
         }
       )
-      
-      // 聚焦到飞机并跟随
+
       setTimeout(() => {
         focusOnIsimAircraft()
       }, 100)
     } else {
-      // 更新现有实体的位置
       planeModel.value.updatePlanePosition(isimPlaneId, position)
-      console.log('[DEBUG] 更新ISIM飞机实体位置')
+      console.log('[ISIM] 更新ISIM飞机实体位置')
     }
   } catch (error) {
-    console.error('[DEBUG] 更新Cesium飞机模型失败:', error)
+    console.error('[ISIM] 更新Cesium飞机模型失败:', error)
   }
 }
 
-// 补全缺失的clearCesiumAircraft方法
+/**
+ * 清理Cesium飞机
+ */
 const clearCesiumAircraft = () => {
   if (planeModel.value) {
     planeModel.value.removePlane(isimPlaneId)
     planeEntity.value = null
+    console.log('[ISIM] 已清理Cesium飞机模型')
   }
 }
 
 // 监听simData变化更新飞机模型
 watch(simData, (newVal) => {
-  if (newVal && isWebSocketConnected.value) {
+  if (newVal && isConnected.value) {
     updateCesiumAircraft()
   }
 }, { deep: true })
 
-/**
- * 初始化Cesium飞机模型
- */
-const initCesiumPlane = async () => {
-  const maxRetries = 10
-  const retryInterval = 1000 // 1秒
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      // 获取全局Cesium viewer
-      const viewer = window.viewer
-      if (!viewer) {
-        console.warn(`Cesium viewer未找到 (尝试 ${attempt}/${maxRetries})，请确保地图已加载`)
-        if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, retryInterval))
-          continue
-        } else {
-          console.error('达到最大重试次数，Cesium viewer仍未就绪')
-          return false
-        }
-      }
-      
-      // 初始化PlaneModel，使用markRaw避免Vue将其包装为Proxy
-      planeModel.value = markRaw(new PlaneModel(viewer))
-      console.log('Cesium飞机模型管理器已初始化')
-      return true
-    } catch (error) {
-      console.error(`初始化Cesium飞机模型失败 (尝试 ${attempt}/${maxRetries}):`, error)
-      if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, retryInterval))
+// 聚焦到ISIM飞机
+const focusOnIsimAircraft = () => {
+  const viewer = window.viewer
+  if (!viewer) {
+    console.error('[ISIM] Cesium viewer not found')
+    return
+  }
+
+  try {
+    if (planeEntity.value) {
+      viewer.trackedEntity = planeEntity.value
+      console.log('[ISIM] 已聚焦到ISIM飞机并开始跟随')
+    } else {
+      const existingEntity = viewer.entities.getById(isimPlaneId)
+      if (existingEntity) {
+        viewer.trackedEntity = existingEntity
+        console.log('[ISIM] 已聚焦到ISIM飞机并开始跟随')
       } else {
-        console.error('达到最大重试次数，初始化失败')
-        return false
+        console.warn('[ISIM] 未找到ISIM飞机实体')
       }
     }
+  } catch (error) {
+    console.error('[ISIM] 聚焦飞机失败:', error)
   }
-  return false
+}
+
+// 处理位置数据更新（聚焦飞机）
+const handleIsimDataUpdate = (event) => {
+  const data = event.detail
+
+  if (data && (data.aircraftLon !== undefined || data.aircraftLat !== undefined)) {
+    console.log('[ISIM] 收到位置数据:', {
+      lon: data.aircraftLon,
+      lat: data.aircraftLat,
+      alt: data.aircraftAlt
+    })
+
+    const focusEvent = new CustomEvent('isim-focus-aircraft', {
+      detail: {
+        longitude: data.aircraftLon,
+        latitude: data.aircraftLat,
+        altitude: data.aircraftAlt || 1000
+      }
+    })
+    window.dispatchEvent(focusEvent)
+  }
 }
 
 // 初始化
 onMounted(async () => {
-  // 初始化PlaneModel
-  await initCesiumPlane()
+  console.log('[ISIM] 组件初始化')
+  window.addEventListener('isim-data-update', handleIsimDataUpdate)
+  planeModel.value = markRaw(new PlaneModel(viewer))
+
 })
 
-// 清理
 onUnmounted(() => {
-  if (isWebSocketConnected.value) {
-    disconnectWebSocket()
+  window.removeEventListener('isim-data-update', handleIsimDataUpdate)
+
+  if (debugSendTimer) {
+    clearInterval(debugSendTimer)
+    debugSendTimer = null
   }
+
   clearCesiumAircraft()
 })
 </script>
 
 <style scoped>
-/* 连接配置样式 */
-.connection-config {
-  padding: 16px;
+.isim-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.config-inputs {
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.main-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+
+
+.section {
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #334155;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin: 0 0 12px 0;
+}
+
+.section-header h3 {
+  margin-bottom: 0;
+}
+
+.status-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.status-badge {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.status-badge.connected {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.status-badge.disconnected {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.status-badge.sending {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.status-badge.idle {
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+}
+
+.form-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
-.input-group {
+.form-group {
   flex: 1;
-  min-width: 180px;
+  min-width: 100px;
 }
 
-.input-group label {
+.form-group label {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   color: #94a3b8;
   margin-bottom: 4px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-.input-group input {
+.input-field {
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 8px;
   border: 1px solid #334155;
   border-radius: 4px;
-  font-size: 14px;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+  font-size: 12px;
+  color: #f1f5f9;
+  background: rgba(0, 0, 0, 0.3);
 }
 
-.input-group input:focus {
+.input-field:focus {
   outline: none;
   border-color: #06b6d4;
   box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
 }
 
-.error-message {
-  color: #f87171;
-  font-size: 13px;
-  margin-top: 8px;
-  padding: 8px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 4px;
+.input-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-/* 容器样式 */
-.isim-animation-container {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+.divider {
+  height: 1px;
+  background: #334155;
+  margin: 12px 0;
 }
 
-.animation-container {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-
-/* 状态面板样式 */
-.status-panel {
-  padding: 12px;
-  border-top: 1px solid #334155;
-}
-
-.status-section {
-  margin-bottom: 16px;
-}
-
-.status-section.compact {
-  margin-bottom: 12px;
-}
-
-.section-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: #f1f5f9;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.section-title::before {
-  content: '';
-  width: 4px;
-  height: 16px;
-  background: #06b6d4;
-  border-radius: 2px;
-  box-shadow: 0 0 8px rgba(6, 182, 212, 0.5);
-}
-
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-}
-
-.status-grid.compact {
-  gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-}
-
-.status-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px;
-  background: #1e293b;
-  border-radius: 6px;
-  border: 1px solid #334155;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-.status-item.compact {
-  padding: 6px;
-  gap: 3px;
-}
-
-.status-label {
-  font-size: 11px;
-  color: #94a3b8;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.status-value {
-  font-size: 13px;
-  font-weight: 600;
-  color: #f1f5f9;
-  font-family: 'Courier New', monospace;
-  text-shadow: 0 0 4px rgba(6, 182, 212, 0.3);
-}
-
-/* 连接状态样式 */
-.connection-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.status-indicator {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  box-shadow: 0 0 6px currentColor;
-}
-
-.status-indicator.connected {
-  background: #10b981;
-  color: #10b981;
-}
-
-.status-indicator.connecting {
-  background: #f59e0b;
-  color: #f59e0b;
-  animation: pulse 2s infinite;
-}
-
-.status-indicator.disconnected {
-  background: #ef4444;
-  color: #ef4444;
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
-  }
-}
-
-.status-text {
-  font-size: 14px;
-  color: #f1f5f9;
-}
-
-.flight-info {
-  display: flex;
-  gap: 16px;
-  font-size: 14px;
-  color: #94a3b8;
-}
-
-.flight-info-value {
-  font-weight: 500;
-  color: #f1f5f9;
-  text-shadow: 0 0 4px rgba(6, 182, 212, 0.3);
-}
-
-/* 控制面板样式 */
-.control-panel {
-  padding: 12px;
-  border-top: 1px solid #334155;
-}
-
-.control-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-  align-items: center;
-}
-
-.control-button {
-  padding: 8px 16px;
+.btn {
+  padding: 7px 14px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
-  background: #06b6d4;
-  color: white;
-  box-shadow: 0 1px 3px rgba(6, 182, 212, 0.3);
+  font-size: 12px;
+  font-weight: 500;
   transition: all 0.2s ease;
 }
 
-.control-button:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(6, 182, 212, 0.5);
-}
-
-.control-button.secondary {
-  color: #f1f5f9;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-.control-button.secondary:hover {
-  box-shadow: 0 2px 6px rgba(6, 182, 212, 0.3);
-}
-
-.control-button:disabled {
-  cursor: not-allowed;
+.btn:disabled {
   opacity: 0.5;
-  box-shadow: none;
-  transform: none;
+  cursor: not-allowed;
 }
 
-.control-button.button-connected {
-  background: #10b981;
-  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);
+.btn-primary {
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  color: white;
 }
 
-.control-button.button-connected:hover {
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.5);
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.4);
 }
 
-.checkbox-label {
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+.btn-secondary {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #475569;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status-message {
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.status-message.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-message.info {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.debug-status {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  color: #f1f5f9;
-  cursor: pointer;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px;
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: 4px;
+  font-size: 12px;
+  color: #f59e0b;
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background: #f59e0b;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 </style>

@@ -93,8 +93,10 @@ export class PlaneModel {
               const latitude = Cesium.Math.toDegrees(cartographic.latitude).toFixed(4);
               const height = cartographic.height.toFixed(0);
               
-              // 获取实时风速
+              // 获取实时风速和风向
               let windSpeed = 0;
+              let windDirection = 0;
+              let windDirectionText = '';
 
               try {
                 // 尝试获取风场数据，但确保在风场数据未准备好时不会影响飞机显示
@@ -135,6 +137,12 @@ export class PlaneModel {
                   // 使用最接近的风场数据
                   if (closestWindData) {
                     windSpeed = closestWindData.interpolated.speed.toFixed(1);
+                    windDirection = closestWindData.interpolated.direction || 0;
+                    
+                    // 将风向角度转换为方向文本
+                    const directions = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+                    const index = Math.round(windDirection / 45) % 8;
+                    windDirectionText = directions[index];
                   }
                 }
               } catch (error) {
@@ -142,7 +150,8 @@ export class PlaneModel {
               }
 
               return `经：${longitude}° 纬：${latitude}°
-  高：${height}m 风速：${windSpeed}m/s`;
+  高：${height}m 风速：${windSpeed}m/s
+  风向：${windDirectionText}(${windDirection.toFixed(1)}°)`;
             }
             return '';
           }, false),
@@ -167,7 +176,9 @@ export class PlaneModel {
             glowPower: 0.2,
             color: Cesium.Color.fromBytes(59, 130, 246, 180) // 半透明蓝色
           }),
-          show: options.getRecordFlightPath ? options.getRecordFlightPath() : false,
+          show: new Cesium.CallbackProperty(() => {
+            return options.getRecordFlightPath ? options.getRecordFlightPath() : false
+          }, false),
           leadTime: 0,
           trailTime: 60, // 轨迹保留60秒
           zIndex: 1
