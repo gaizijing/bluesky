@@ -32,9 +32,9 @@
 export const WIND_LAYER_DEFAULTS = {
     particlesTextureSize: 200,  // 粒子数量
     particleHeight: 150,        // 粒子高度
-    lineWidth: { min: 1, max: 1 },  // 线宽
+    lineWidth: { min: 0, max: 0.5 },  // 线宽
     lineLength: { min:5, max: 10 },  // 线长
-    speedFactor: 0.3,           // 速度因子
+    speedFactor: 1,           // 速度因子
     dropRate: 0.003,            // 粒子消失率
     dropRateBump: 0.001,       // 粒子重置率
     colors: ['#050404', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF'],
@@ -43,29 +43,16 @@ export const WIND_LAYER_DEFAULTS = {
     dynamic: true,
     displayRange: {
       min: 0,
-      max: 10
+      max: 1000
     },
     domain: {
       min: 0,
       max: 30
     }
 };
-export const CAMERA_HEIGHT_THRESHOLD = 10000; // Show wind field only when camera is below 10000m
-
-// 预定义颜色方案
-export const COLOR_SCHEMES = {
-  rainbow: ['#FF0000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF'],
-  jet: ['#000080', '#0000FF', '#00FFFF', '#FFFF00', '#FF0000', '#800000'],
-  viridis: ['#440154', '#3B528B', '#21908C', '#5DC863', '#FDE725'],
-  white: ['white']
-};
-
+/** 低于此高度（米）视为「低空」：可显示风场等；与 {@link CAMERA_HEIGHT_WIND_OFF_HYSTERESIS_M} 配合避免阈值附近抖动 */
+export const CAMERA_HEIGHT_THRESHOLD = 10000
 /**
- * 获取颜色方案
- * @param {string} scheme - 颜色方案名称
- * @returns {string[]} 颜色数组
+ * 滞回：低空状态下相机需高于 (THRESHOLD + 该值) 才切换为高空逻辑，减少俯仰/地形导致高度在阈值两侧跳变时风场反复开关与粒子重置
  */
-export const getColorScheme = (scheme) => {
-  return COLOR_SCHEMES[scheme] || COLOR_SCHEMES.rainbow;
-};
-
+export const CAMERA_HEIGHT_WIND_OFF_HYSTERESIS_M = 800

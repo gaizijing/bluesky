@@ -1,7 +1,6 @@
 import { WeatherService } from './weatherService';
 import { useWeatherStore } from '@/store/modules/weather';
 import { useAreaStore } from '@/store/modules/area';
-import { getRoutes } from '@/api';
 import { fetchRouteRiskAnalysis } from './routeRiskService';
 import { useRouteStore } from '@/store/modules/routeStore';
 
@@ -45,25 +44,11 @@ class RouteService {
     }
   }
 
-  // 加载航路列表数据
+  // 航线规划为会话态不落库，不再拉取后端历史列表
   async loadRouteListData() {
     const routeStore = this.getRouteStore();
-
-    try {
-      const routeData = await getRoutes();
-
-      if (routeData && routeData.routes) {
-        routeStore.setRouteList(routeData.routes);
-      } else {
-        routeStore.clearRouteList();
-      }
-
-      return routeData;
-    } catch (error) {
-      routeStore.clearRouteList();
-      console.error('加载航路列表数据失败:', error);
-      throw error;
-    }
+    routeStore.clearRouteList();
+    return { routes: [], total: 0 };
   }
 
   // 加载航路分析详情数据

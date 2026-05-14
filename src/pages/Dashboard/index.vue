@@ -3,6 +3,7 @@
     <!-- 1. 全屏地图（底层） -->
     <div class="map-container" style="height: 100%;">
       <MapContainer id="cesiumContainer" class="cesium-container" />
+      <RouteVerticalProfile v-if="showRouteVerticalProfileDock" />
     </div>
 
     <!-- 2. 蒙版背景图（新增） -->
@@ -151,6 +152,7 @@
 import { watch, computed, ref } from "vue";
 import { DASHBOARD_MODULES, MODULE_LIST } from "@/config/constants.js";
 import { useModuleStore } from "@/store/modules/module";
+import { useRouteStore } from "@/store/modules/routeStore";
 import { DashboardService } from "../../services/dashboardService";
 // 在组件导入异步导入
 import { defineAsyncComponent } from "vue";
@@ -176,6 +178,9 @@ const RiskWarnings = defineAsyncComponent(() =>
 const RouteList = defineAsyncComponent(() =>
   import("@/components/business/RouteList/index.vue")
 );
+const RouteVerticalProfile = defineAsyncComponent(() =>
+  import("@/components/business/RouteVerticalProfile/index.vue")
+);
 const IsimAnimation = defineAsyncComponent(() =>
   import("@/components/business/IsimAnimation/index.vue")
 );
@@ -199,6 +204,22 @@ const currentModule = computed({
 
 // 航路分析Tab状态
 const flightAnalysisTab = ref('preview'); // preview: 航线预览, flight: 联机飞行
+
+const routeStore = useRouteStore();
+
+/** 底部垂直剖面：仅飞行分析-航线预览 Tab，且用户已点过「生成预览」、当前为会话航迹 */
+const showRouteVerticalProfileDock = computed(() => {
+  if (currentModule.value !== DASHBOARD_MODULES.FLIGHT_ANALYSIS) return false;
+  if (flightAnalysisTab.value !== "preview") return false;
+  if (!routeStore.verticalProfileAfterPreview || !routeStore.sessionPathOnMap) return false;
+  const r = routeStore.currentRoute;
+  return !!(
+    r &&
+    r.mode === "session" &&
+    Array.isArray(r.pathSamples) &&
+    r.pathSamples.length > 1
+  );
+});
 
 // 修改切换模块的方法
 const switchModule = (moduleKey) => {
@@ -225,6 +246,12 @@ watch(
   height: 100vh;
   position: relative;
   overflow: hidden;
+}
+
+.map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
 .mask-overlay {

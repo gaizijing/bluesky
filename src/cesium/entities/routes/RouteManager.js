@@ -5,6 +5,8 @@ import { RouteRenderer } from './RouteRenderer'
 import { PlaneModel } from './PlaneModel'
 import { CameraController } from './CameraController'
 import { RouteInteraction } from './RouteInteraction'
+import { SessionRouteLayer } from './SessionRouteLayer'
+import { RiskZoneManager } from '../riskZones/RiskZoneManager'
 
 class RouteManager {
   // 单例实例
@@ -20,6 +22,10 @@ class RouteManager {
   #planeModel;
   #cameraController;
   #routeInteraction;
+  #sessionLayer;
+  #riskZoneManager;
+  #dragUnsubs = [];
+  #dragIdx = null;
 
   // 私有构造函数，防止外部实例化
   constructor() {
@@ -52,8 +58,11 @@ class RouteManager {
     this.#planeModel = new PlaneModel(viewerInstance)
     this.#cameraController = new CameraController(viewerInstance)
     this.#routeInteraction = new RouteInteraction(viewerInstance, this)
-    
+    this.#sessionLayer = new SessionRouteLayer(viewerInstance)
+    this.#riskZoneManager = new RiskZoneManager(viewerInstance)
+
     this.#bindRouteEvents()
+    this.#bindSessionControlDrag()
   }
 
   /**
@@ -72,7 +81,33 @@ class RouteManager {
     // 设置当前激活的航线ID
     this.#activeRouteId = route.id
 
-    // 渲染航线
+    if (route.mode === 'session' && Array.isArray(route.pathSamples) && route.pathSamples.length >= 2) {
+      this.#sessionLayer.show(route)
+      const positions = route.pathSamples.map((p) =>
+        Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt)
+      )
+      this.#routeEntities.set(route.id, {
+        segments: [],
+        positions,
+        dangers: route.dangers || [],
+        info: route.info || {},
+        name: route.name || `${route.startName || '起点'} → ${route.endName || '终点'}`,
+        pathSamples: route.pathSamples,
+        windAlong: route.windAlong || [],
+        mode: 'session'
+      })
+      this.#cameraController.flyToRoute({
+        id: route.id,
+        waypoints: route.pathSamples.map((p) => ({
+          longitude: p.lon,
+          latitude: p.lat,
+          height: p.alt
+        }))
+      })
+      return route.id
+    }
+
+    // 渲染航线（后端/旧版数据结构）
     const { segments, positions } = this.#routeRenderer.renderRoute(route)
     
     // 存储航线信息
@@ -98,8 +133,11 @@ class RouteManager {
 
     const routeData = this.#routeEntities.get(routeId)
 
-    // 移除航线分段和飞机
-    this.#routeRenderer.removeRoute(routeId, routeData)
+    if (routeData?.mode === 'session') {
+      this.#sessionLayer.clear()
+    } else {
+      this.#routeRenderer.removeRoute(routeId, routeData)
+    }
 
     this.#routeEntities.delete(routeId)
   }
@@ -200,13 +238,19 @@ class RouteManager {
    * 完全销毁实例（清理资源）
    */
   destroy() {
+    this.#dragUnsubs.forEach((u) => u())
+    this.#dragUnsubs = []
+
     this.clearAllRoutes();
-    
+    this.#riskZoneManager?.clear();
+
     // 清理所有模块引用
     this.#routeRenderer = null;
     this.#planeModel = null;
     this.#cameraController = null;
     this.#routeInteraction = null;
+    this.#sessionLayer = null;
+    this.#riskZoneManager = null;
     
     this.#activeRouteId = null;
     this.#viewer = null;
@@ -236,6 +280,65 @@ class RouteManager {
 
   get routeEntities() {
     return this.#routeEntities;
+  }
+
+  get riskZoneManager() {
+    return this.#riskZoneManager;
+  }
+
+  /** 仅清除风险区实体（航线清屏时可保留或一并清除） */
+  clearRiskZones() {
+    this.#riskZoneManager?.clear();
+  }
+
+  setRiskZones(zones) {
+    this.#riskZoneManager?.setZones(zones || []);
+  }
+
+  #bindSessionControlDrag() {
+    const onDown = (payload) => {
+      const viewer = payload?.viewer || this.#viewer
+      const movement = payload?.movement
+      this.#dragIdx = null
+      if (!viewer || !movement?.position) return
+      const picked = viewer.scene.pick(movement.position)
+      const id = picked?.id
+      if (!id?.properties) return
+      const now = Cesium.JulianDate.now()
+      const isCtrl = id.properties.isRouteControl?.getValue
+        ? id.properties.isRouteControl.getValue(now)
+        : id.properties.isRouteControl
+      if (!isCtrl) return
+      const idx = id.properties.controlIndex?.getValue
+        ? id.properties.controlIndex.getValue(now)
+        : id.properties.controlIndex
+      if (idx == null || idx === undefined) return
+      this.#dragIdx = idx
+    }
+    const onMove = (payload) => {
+      if (this.#dragIdx == null) return
+      const viewer = payload?.viewer || this.#viewer
+      const movement = payload?.movement
+      if (!viewer || !movement?.endPosition) return
+      const c = viewer.scene.pickPosition(movement.endPosition)
+      if (!c) return
+      const cg = Cesium.Cartographic.fromCartesian(c)
+      window.dispatchEvent(
+        new CustomEvent('session-route-control-moved', {
+          detail: {
+            index: this.#dragIdx,
+            lon: Cesium.Math.toDegrees(cg.longitude),
+            lat: Cesium.Math.toDegrees(cg.latitude)
+          }
+        })
+      )
+    }
+    const onUp = () => {
+      this.#dragIdx = null
+    }
+    this.#dragUnsubs.push(eventManager.on('left-down', onDown))
+    this.#dragUnsubs.push(eventManager.on('mouse-move', onMove))
+    this.#dragUnsubs.push(eventManager.on('left-up', onUp))
   }
 }
 

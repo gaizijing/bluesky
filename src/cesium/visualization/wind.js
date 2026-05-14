@@ -60,7 +60,7 @@ export const initWind = async (viewer, layerSettingsStore) => {
         console.log('风场数据已获取，开始创建风场图层...', newData);
         newData.layers.forEach((layer, index) => {
           const { height, windData } = layer;
-
+          console.log('gzj，创建高度', height, '的风场图层...');
           const layerOptions = {
             ...windOptions,
             particleHeight: height,

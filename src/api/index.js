@@ -177,6 +177,34 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
 
 
 
+/**
+ * 按经纬度获取实时天气（起降点弹窗等）
+ * GET /weather/by-coords?lng=&lat=
+ * 响应经 axios 拦截器后一般为 { updateTime, location, data: { windSpeed, vis, ... } }
+ */
+export const getWeatherByCoords = async (lng, lat) => {
+  const lngN = Number(lng)
+  const latN = Number(lat)
+  if (!Number.isFinite(lngN) || !Number.isFinite(latN)) {
+    throw new Error('无效坐标')
+  }
+  const data = await request.get(
+    `/weather/by-coords?lng=${encodeURIComponent(lngN)}&lat=${encodeURIComponent(latN)}`
+  )
+  return data
+}
+
+/**
+ * 批量按经纬度获取实时天气（航迹风况剖面等）。
+ * POST /weather/by-coords/batch
+ * Body: { coordinates: [ { lng, lat }, ... ] }，最多 400 点；服务端对 4 位小数坐标去重。
+ * 成功时拦截器返回 data：{ updateTime, count, uniqueQueries, series }
+ */
+export const postWeatherByCoordsBatch = async (body) => {
+  const data = await request.post('/weather/by-coords/batch', body)
+  return data
+}
+
 // 主函数：获取当前监测点天气数据（调用后端接口）
 export const fetchCurrentPointWeather = async (pointId) => {
   try {
@@ -677,6 +705,17 @@ export const clearRoutes = async () => {
     return data;
   } catch (error) {
     console.error('清空航线失败:', error);
+    throw error;
+  }
+};
+
+/** 风险区列表（禁飞 / 谨慎圆柱） */
+export const getRiskZones = async () => {
+  try {
+    const data = await request.get('/risk-zones');
+    return data;
+  } catch (error) {
+    console.error('获取风险区失败:', error);
     throw error;
   }
 };

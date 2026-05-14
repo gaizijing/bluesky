@@ -1,178 +1,159 @@
 // src/cesium/entities/routes/RouteInteraction.js
 import * as Cesium from 'cesium'
 import eventManager from '@/cesium/core/eventManager'
-import { DangerLevel } from './DangerLevel'
+
+/**
+ * 将颠簸指数映射为文字描述
+ * @param {number} value - 颠簸指数（0-100）
+ * @returns {string} - 文字描述
+ */
+function getTurbulenceLevel(value) {
+  if (value < 10) return '平稳'
+  if (value < 25) return '轻微颠簸'
+  if (value < 40) return '中度颠簸'
+  if (value < 60) return '较强颠簸'
+  if (value < 80) return '强烈颠簸'
+  return '极端颠簸'
+}
+
+/**
+ * 将风速（km/h）映射为文字描述
+ * @param {number} value - 风速（km/h）
+ * @returns {string} - 文字描述
+ */
+function getWindLevel(value) {
+  if (value < 12) return '微风'
+  if (value < 20) return '轻风'
+  if (value < 29) return '和风'
+  if (value < 40) return '清风'
+  if (value < 52) return '强风'
+  if (value < 62) return '疾风'
+  if (value < 74) return '大风'
+  if (value < 88) return '烈风'
+  if (value < 102) return '狂风'
+  if (value < 118) return '暴风'
+  return '飓风'
+}
+
+function cartesianToLonLatHeight(cartesian) {
+  const c = Cesium.Cartographic.fromCartesian(cartesian)
+  if (!c) return null
+  return {
+    lon: Cesium.Math.toDegrees(c.longitude),
+    lat: Cesium.Math.toDegrees(c.latitude),
+    alt: c.height
+  }
+}
+
+function horizDistSq(a, b) {
+  const dLon = (a.lon - b.lon) * 111320 * Math.cos((a.lat * Math.PI) / 180)
+  const dLat = (a.lat - b.lat) * 111320
+  return dLon * dLon + dLat * dLat
+}
 
 export class RouteInteraction {
   constructor(viewer, routeManager) {
     this.viewer = viewer
     this.routeManager = routeManager
-    this.dangerLevel = new DangerLevel()
-    this.popup = null
-    this.popupTitle = null
-    this.popupContent = null
+    this.hoverEl = null
+    this.unMouse = null
   }
 
-  /**
-   * 绑定航线事件
-   */
   bindEvents() {
-    if (!this.viewer) return;
-
-    // 创建弹窗元素
-    this.#createPopupElements();
-
-    // 航线点击处理器函数
-    const routeClickHandler = (viewer, movement) => {
-      const pickedObject = viewer.scene.pick(movement.position);
-
-      if (Cesium.defined(pickedObject) && pickedObject.id?.properties?.isRouteSegment) {
-        const routeId = pickedObject.id.properties.routeId;
-        const segmentIndex = pickedObject.id.properties.segmentIndex;
-        const routeData = this.routeManager.routeEntities.get(routeId.getValue());
-
-        if (routeData && this.popup && this.popupTitle && this.popupContent) {
-          // 设置弹窗内容
-          this.popupTitle.textContent = `航线 ${routeData.name} - 第${segmentIndex + 1}段`;
-
-          // 根据危险等级设置样式类
-          const dangerValue = routeData.dangers[segmentIndex] || 0;
-          this.popup.className = '';
-          if (dangerValue < 30) {
-            this.popup.classList.add('popup-risk-low');
-          } else if (dangerValue < 70) {
-            this.popup.classList.add('popup-risk-medium');
-          } else {
-            this.popup.classList.add('popup-risk-high');
-          }
-
-          this.popupContent.innerHTML = `
-            <div style="margin-bottom: 8px;">
-              <span style="display: inline-block; font-weight: 500; min-width: 80px;">危险等级：</span>
-              <span style="color: ${dangerValue < 30 ? '#10b981' : dangerValue < 70 ? '#f59e0b' : '#ef4444'};">
-                ${this.dangerLevel.getDangerText(dangerValue)}
-              </span>
-            </div>
-            <div style="margin-bottom: 8px;">
-              <span style="display: inline-block; font-weight: 500; min-width: 80px;">天气提醒：</span>
-              <span>${this.dangerLevel.getWeatherTips(dangerValue)}</span>
-            </div>
-            <div style="margin-bottom: 8px;">
-              <span style="display: inline-block; font-weight: 500; min-width: 80px;">建议速度：</span>
-              <span>${this.dangerLevel.getSpeedSuggestion(dangerValue)}</span>
-            </div>
-            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af;">
-              点击其他区域可关闭弹窗
-            </div>
-          `;
-
-          // 计算航线分段中点的屏幕坐标
-          const midPoint = Cesium.Cartesian3.midpoint(
-            routeData.positions[segmentIndex],
-            routeData.positions[segmentIndex + 1],
-            new Cesium.Cartesian3()
-          );
-          const screenPos = viewer.scene.cartesianToCanvasCoordinates(midPoint);
-
-          if (screenPos) {
-            // 计算弹窗位置
-            const popupX = screenPos.x;
-            const popupY = screenPos.y + 10;
-
-            // 边界检查
-            const popupWidth = this.popup.offsetWidth || 300;
-            const popupHeight = this.popup.offsetHeight || 200;
-            const canvas = viewer.canvas;
-
-            const safeX = Math.max(10, Math.min(canvas.clientWidth - popupWidth - 10, popupX));
-            const safeY = Math.max(10, Math.min(canvas.clientHeight - popupHeight - 10, popupY));
-
-            // 设置弹窗位置
-            this.popup.style.left = `${safeX}px`;
-            this.popup.style.top = `${safeY}px`;
-            this.popup.style.bottom = 'auto';
-            this.popup.style.right = 'auto';
-            this.popup.style.opacity = '0';
-            this.popup.style.transform = 'translateY(10px)';
-            this.popup.style.display = 'block';
-
-            setTimeout(() => {
-              this.popup.style.opacity = '1';
-              this.popup.style.transform = 'translateY(0)';
-            }, 10);
-          }
-
-          return true;
-        }
-      } else if (this.popup) {
-        this.popup.style.display = 'none';
-      }
-
-      return false;
-    };
-
-    // 注册航线点击处理器
-    eventManager.registerClickHandler(routeClickHandler, 1);
+    if (!this.viewer) return
+    this.#ensureHoverEl()
+    if (this.unMouse) {
+      this.unMouse()
+      this.unMouse = null
+    }
+    this.unMouse = eventManager.on('mouse-move', (payload) => {
+      const movement = payload?.movement ?? payload
+      const viewer = payload?.viewer ?? this.viewer
+      this.#onHover(viewer, movement)
+    })
   }
 
-  /**
-   * 创建弹窗元素
-   */
-  #createPopupElements() {
-    // 辅助函数：安全获取DOM元素
-    const getSafeElement = (id) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      return el;
-    };
+  #ensureHoverEl() {
+    if (this.hoverEl) return
+    const el = document.createElement('div')
+    el.id = 'routeSessionHoverTip'
+    Object.assign(el.style, {
+      position: 'fixed',
+      zIndex: '2000',
+      display: 'none',
+      pointerEvents: 'none',
+      padding: '8px 10px',
+      background: 'rgba(15, 23, 42, 0.92)',
+      color: '#e2e8f0',
+      borderRadius: '8px',
+      fontSize: '12px',
+      lineHeight: '1.45',
+      maxWidth: '260px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+      border: '1px solid rgba(148,163,184,0.35)'
+    })
+    document.body.appendChild(el)
+    this.hoverEl = el
+  }
 
-    // 创建弹窗元素
-    this.popup = getSafeElement('routePopup') || document.createElement('div');
-    this.popup.id = 'routePopup';
-    this.popup.style.position = 'absolute';
-    this.popup.style.background = 'rgba(255, 255, 255, 0.95)';
-    this.popup.style.padding = '5px';
-    this.popup.style.borderRadius = '8px';
-    this.popup.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.15)';
-    this.popup.style.zIndex = '1000';
-    this.popup.style.display = 'none';
-    this.popup.style.minWidth = '280px';
-    this.popup.style.maxWidth = '400px';
-    this.popup.style.border = '1px solid rgba(229, 231, 235, 1)';
-    this.popup.style.animation = 'fadeIn 0.3s ease-out';
-    this.popup.style.transition = 'all 0.2s ease';
-    this.popup.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    document.body.appendChild(this.popup);
-
-    // 添加动画样式
-    if (!document.getElementById('popupAnimationStyle')) {
-      const style = document.createElement('style');
-      style.id = 'popupAnimationStyle';
-      style.textContent = `
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .popup-risk-low { border-left: 4px solid #10b981; }
-        .popup-risk-medium { border-left: 4px solid #f59e0b; }
-        .popup-risk-high { border-left: 4px solid #ef4444; }
-      `;
-      document.head.appendChild(style);
+  #onHover(viewer, movement) {
+    if (!this.hoverEl || !viewer) return
+    const routeId = this.routeManager.activeRouteId
+    const routeData = routeId ? this.routeManager.routeEntities.get(routeId) : null
+    const samples = routeData?.pathSamples
+    const windAlong = routeData?.windAlong
+    if (!samples?.length || !movement?.endPosition) {
+      this.hoverEl.style.display = 'none'
+      return
     }
 
-    this.popupTitle = getSafeElement('popupTitle') || document.createElement('div');
-    this.popupTitle.id = 'popupTitle';
-    this.popupTitle.style.fontWeight = '600';
-    this.popupTitle.style.fontSize = '16px';
-    this.popupTitle.style.marginBottom = '12px';
-    this.popupTitle.style.color = '#1f2937';
-    this.popup.appendChild(this.popupTitle);
+    const cart = viewer.scene.pickPosition(movement.endPosition)
+    if (!cart) {
+      this.hoverEl.style.display = 'none'
+      return
+    }
+    const cur = cartesianToLonLatHeight(cart)
+    if (!cur) {
+      this.hoverEl.style.display = 'none'
+      return
+    }
 
-    this.popupContent = getSafeElement('popupContent') || document.createElement('div');
-    this.popupContent.id = 'popupContent';
-    this.popupContent.style.color = '#4b5563';
-    this.popupContent.style.lineHeight = '1.5';
-    this.popupContent.style.fontSize = '14px';
-    this.popup.appendChild(this.popupContent);
+    let bestI = 0
+    let bestD = Infinity
+    for (let i = 0; i < samples.length; i++) {
+      const p = samples[i]
+      const d = horizDistSq(cur, p) + Math.pow((cur.alt - p.alt) * 0.02, 2)
+      if (d < bestD) {
+        bestD = d
+        bestI = i
+      }
+    }
+    const thrM = 350 * 350
+    if (bestD > thrM) {
+      this.hoverEl.style.display = 'none'
+      return
+    }
+
+    const w = windAlong?.[bestI] || {}
+    
+    // 颠簸指数映射为文字描述
+    const bumpValue = w.bumpiness != null ? w.bumpiness * 100 : null
+    const bumpText = bumpValue !== null ? getTurbulenceLevel(bumpValue) : '—'
+    
+    // 风速映射为文字描述
+    const wsValue = w.windSpeed != null ? w.windSpeed : null
+    const wsText = wsValue !== null ? getWindLevel(wsValue) : '—'
+    
+    const wd = w.windDir != null ? `${w.windDir.toFixed(0)}°` : '—'
+
+    this.hoverEl.innerHTML = `
+      <div style="font-weight:600;margin-bottom:4px;color:#93c5fd">航迹采样</div>
+      <div>颠簸指数: <strong>${bumpText}</strong></div>
+      <div>风速: <strong>${wsText}</strong></div>
+      <div>风向: <strong>${wd}</strong></div>
+    `
+    this.hoverEl.style.left = `${movement.endPosition.x + 14}px`
+    this.hoverEl.style.top = `${movement.endPosition.y + 14}px`
+    this.hoverEl.style.display = 'block'
   }
 }

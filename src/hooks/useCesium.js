@@ -20,10 +20,10 @@ import { routeManager } from '@/cesium/entities/routes'
 import { useRouteStore } from '@/store/modules/routeStore'
 import eventManager from '@/cesium/core/eventManager' 
 import { SkyBoxManager } from '@/cesium/volumeCloud/SkyBoxManager' 
-import { CAMERA_HEIGHT_THRESHOLD } from '../config/windLayerDefaults'
+import { CAMERA_HEIGHT_THRESHOLD, CAMERA_HEIGHT_WIND_OFF_HYSTERESIS_M } from '../config/windLayerDefaults'
 import Cloud from '@/cesium/visualization/cloud'
 import { useHeatmapStore } from '@/store/modules/heatmap'
-import { getCitywideHeatmap, getWeatherHeatmapGeo } from '@/api'
+import { getCitywideHeatmap, getWeatherHeatmapGeo, getRiskZones } from '@/api'
 export function useCesium(containerId) {
   // 说明
   const windStore = useWindStore()
@@ -51,7 +51,9 @@ export function useCesium(containerId) {
     cameraHeightWatcher: null,
     skyBoxManager: null,
     cameraPrintKeydownHandler: null,
-    cloud: null
+    cloud: null,
+    /** 根据当前相机高度与会话航线状态刷新风场/云层等 */
+    refreshCameraHeightLayerVisibility: null
   })
 
   // 说明
@@ -210,64 +212,93 @@ export function useCesium(containerId) {
    * 功能说明
    */
   const setupCameraHeightWatcher = () => {
-    if (!viewer.value) return;
+    if (!viewer.value) return
 
-    const cameraPosition = viewer.value.camera.positionCartographic;
-    const initialHeight = cameraPosition ? cameraPosition.height : Infinity;
-    const initialIsBelowThreshold = initialHeight <= CAMERA_HEIGHT_THRESHOLD;
+    if (resources.value.cameraHeightWatcher) {
+      resources.value.cameraHeightWatcher()
+      resources.value.cameraHeightWatcher = null
+    }
 
-    const updateVisibility = (isBelowThreshold) => {
+    const cameraPosition = viewer.value.camera.positionCartographic
+    const initialHeight = cameraPosition ? cameraPosition.height : Infinity
+    /** 滞回：避免相机高度在 10km 附近抖动时风场反复 show/hide（粒子会重置，疏密突变） */
+    let lowAltitudeBand =
+      Number.isFinite(initialHeight) && initialHeight <= CAMERA_HEIGHT_THRESHOLD
+
+    const applyLowAltitudeLayers = (isBelowThreshold) => {
       if (isBelowThreshold) {
-        const isWindEnabled = layerSettingsStore.layers.wind.visible;
-        if (resources.value.windLayer && resources.value.windLayer.length > 0 && isWindEnabled) {
+        const isWindEnabled = layerSettingsStore.layers.wind.visible
+        /** 仅云层在会话航迹低空时抑制；风场不再随会话强制关闭，避免与高度逻辑叠加后「一会有一会无」 */
+        const suppressCloudForSession =
+          routeStore.sessionPathOnMap && routeStore.currentRoute?.mode === 'session'
+
+        if (resources.value.windLayer && resources.value.windLayer.length > 0) {
           if (Array.isArray(resources.value.windLayer)) {
-            resources.value.windLayer.forEach(layer => {
-              layer.show = true;
-            });
+            resources.value.windLayer.forEach((layer) => {
+              if (layer) layer.show = isWindEnabled
+            })
           } else {
-            resources.value.windLayer.show = true;
+            resources.value.windLayer.show = isWindEnabled
           }
         }
         if (resources.value.areaManager) {
-          resources.value.areaManager.setAreasVisibility(false);
+          resources.value.areaManager.setAreasVisibility(false)
         }
         if (resources.value.cloud) {
-          const isCloudEnabled = layerSettingsStore.layers.cloud.visible;
-          if (isCloudEnabled) {
-            resources.value.cloud.show();
-            resources.value.cloud.setVisible(true);
-            console.log('云层已显示');
+          const isCloudEnabled = layerSettingsStore.layers.cloud.visible
+          if (isCloudEnabled && !suppressCloudForSession) {
+            resources.value.cloud.show()
+            resources.value.cloud.setVisible(true)
           }
         }
       } else {
         if (resources.value.windLayer && resources.value.windLayer.length > 0) {
           if (Array.isArray(resources.value.windLayer)) {
-            resources.value.windLayer.forEach(layer => {
-              layer.show = false;
-            });
+            resources.value.windLayer.forEach((layer) => {
+              if (layer) layer.show = false
+            })
           } else {
-            resources.value.windLayer.show = false;
+            resources.value.windLayer.show = false
           }
         }
         if (resources.value.cloud) {
-          resources.value.cloud.destroy();
+          resources.value.cloud.destroy()
         }
         if (resources.value.areaManager) {
-          resources.value.areaManager.setAreasVisibility(true);
+          resources.value.areaManager.setAreasVisibility(true)
         }
       }
-    };
+    }
 
-    updateVisibility(initialIsBelowThreshold);
+    const syncFromCameraHeight = (heightM) => {
+      if (!Number.isFinite(heightM)) return
+      if (lowAltitudeBand) {
+        if (heightM > CAMERA_HEIGHT_THRESHOLD + CAMERA_HEIGHT_WIND_OFF_HYSTERESIS_M) {
+          lowAltitudeBand = false
+        }
+      } else if (heightM <= CAMERA_HEIGHT_THRESHOLD) {
+        lowAltitudeBand = true
+      }
+      applyLowAltitudeLayers(lowAltitudeBand)
+    }
+
+    syncFromCameraHeight(initialHeight)
+
+    resources.value.refreshCameraHeightLayerVisibility = () => {
+      if (!viewer.value) return
+      const c = viewer.value.camera.positionCartographic
+      if (!Cesium.defined(c)) return
+      syncFromCameraHeight(c.height)
+    }
 
     resources.value.cameraHeightWatcher = watchCameraHeight(
       viewer.value,
       CAMERA_HEIGHT_THRESHOLD,
-      (height, isBelowThreshold) => {
-        updateVisibility(isBelowThreshold);
+      (height) => {
+        syncFromCameraHeight(height)
       }
-    );
-  };
+    )
+  }
 
   /**
    * 功能说明
@@ -347,8 +378,34 @@ export function useCesium(containerId) {
       console.log('[Cesium] 5.5 初始化航线管理器...')
       routeManager.init(viewer.value)
       console.log('[Cesium] 航线管理器初始化完成')
+      try {
+        const rz = await getRiskZones()
+        routeManager.setRiskZones(rz?.zones || [])
+      } catch (rzErr) {
+        console.warn('[Cesium] 风险区加载失败', rzErr)
+      }
     } catch (error) {
       console.warn('[Cesium] 航线管理器初始化失败:', error)
+    }
+
+    if (!window.__routeVerticalFlytoBound) {
+      window.__routeVerticalFlytoBound = true
+      window.addEventListener('route-vertical-flyto', (e) => {
+        const v = viewer.value
+        if (!v) return
+        const { lon, lat, height } = e.detail || {}
+        if (lon == null || lat == null) return
+        const dest = Cesium.Cartesian3.fromDegrees(lon, lat, (height || 300) + 220)
+        v.camera.flyTo({
+          destination: dest,
+          orientation: {
+            heading: Cesium.Math.toRadians(0),
+            pitch: Cesium.Math.toRadians(-28),
+            roll: 0
+          },
+          duration: 1.6
+        })
+      })
     }
     
     // 说明
@@ -426,28 +483,21 @@ export function useCesium(containerId) {
       console.warn('[Cesium] 风场初始化失败:', error)
     }
 
-    // 说明
+    // 说明：风场数据可能晚于 Viewer 就绪，但高度分层逻辑（风/云/监测点）必须在首帧就注册一次
     if (!windStore.windData) {
       const unwatch = watch(
         () => windStore.windData,
         (newData) => {
           if (newData) {
             unwatch();
-            setupCameraHeightWatcher();
+            setupCameraHeightWatcher()
           }
         }
-      );
-    } else {
-      setupCameraHeightWatcher();
+      )
     }
+    setupCameraHeightWatcher()
 
-    // 说明
-    try {
-      setupCameraHeightWatcher()
-      console.log('[Cesium] 相机高度监听设置完成')
-    } catch (error) {
-      console.warn('[Cesium] 相机高度监听设置失败:', error)
-    }
+    console.log('[Cesium] 相机高度监听设置完成')
   }
 
 
@@ -522,9 +572,18 @@ export function useCesium(containerId) {
             setTimelineVisible(false)
           }
         } else {
-          // 说明
           setTimelineVisible(false)
+          routeManager.clearAllRoutes()
         }
+        resources.value.refreshCameraHeightLayerVisibility?.()
+      },
+      { deep: true, immediate: true }
+    )
+
+    watch(
+      () => routeStore.sessionPathOnMap,
+      () => {
+        resources.value.refreshCameraHeightLayerVisibility?.()
       }
     )
 
@@ -607,6 +666,7 @@ export function useCesium(containerId) {
       resources.value.cameraHeightWatcher()
       resources.value.cameraHeightWatcher = null
     }
+    resources.value.refreshCameraHeightLayerVisibility = null
 
     if (viewer.value) {
       // 说明
@@ -701,29 +761,28 @@ export function useCesium(containerId) {
    * 功能说明
    */
   const updateWindVisibilityBasedOnConditions = () => {
-    if (!resources.value.windLayer) return;
-
-    // 说明
-    const cameraPosition = viewer.value.camera.positionCartographic;
-    const cameraHeight = cameraPosition.height;
-
-    // 说明
-    const isWindEnabled = layerSettingsStore.layers.wind.visible;
-
-    // 说明
-
-    // 说明
-    const shouldBeVisible = isWindEnabled && cameraHeight <= CAMERA_HEIGHT_THRESHOLD;
-
-    // 说明
-    if (Array.isArray(resources.value.windLayer)) {
-      resources.value.windLayer.forEach(layer => {
-        layer.show = shouldBeVisible;
-      });
-    } else {
-      resources.value.windLayer.show = shouldBeVisible;
+    if (!resources.value.windLayer) return
+    if (resources.value.refreshCameraHeightLayerVisibility) {
+      resources.value.refreshCameraHeightLayerVisibility()
+      return
     }
-  };
+    if (!viewer.value) return
+
+    const cameraPosition = viewer.value.camera.positionCartographic
+    const cameraHeight = cameraPosition.height
+
+    const isWindEnabled = layerSettingsStore.layers.wind.visible
+
+    const shouldBeVisible = isWindEnabled && cameraHeight <= CAMERA_HEIGHT_THRESHOLD
+
+    if (Array.isArray(resources.value.windLayer)) {
+      resources.value.windLayer.forEach((layer) => {
+        if (layer) layer.show = shouldBeVisible
+      })
+    } else {
+      resources.value.windLayer.show = shouldBeVisible
+    }
+  }
 
 
   /**

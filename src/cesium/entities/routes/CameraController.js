@@ -13,19 +13,48 @@ export class CameraController {
   flyToRoute(route) {
     if (!this.viewer || !route.waypoints || route.waypoints.length === 0) return
 
-    // 调整相机视角
-    const boundingSphere = Cesium.BoundingSphere.fromPoints(
-      route.waypoints.map(wp =>
-        Cesium.Cartesian3.fromDegrees(wp.longitude, wp.latitude)
-      ));
+    const positions = route.waypoints
+      .map((wp) => {
+        const lon = Number(wp.longitude)
+        const lat = Number(wp.latitude)
+        const h = Number(wp.height ?? wp.altitude ?? 0)
+        if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null
+        return Cesium.Cartesian3.fromDegrees(lon, lat, Number.isFinite(h) ? h : 0)
+      })
+      .filter((p) => p != null)
+
+    if (positions.length === 0) return
+
+    const boundingSphere = Cesium.BoundingSphere.fromPoints(positions)
+    if (
+      !boundingSphere ||
+      !Number.isFinite(boundingSphere.radius) ||
+      !Cesium.defined(boundingSphere.center) ||
+      !Number.isFinite(boundingSphere.center.x)
+    ) {
+      console.warn('[CameraController] flyToRoute: invalid bounding sphere, skipped')
+      return
+    }
+
+    const r = Math.max(boundingSphere.radius || 0, 350)
+    const range = Math.min(120000, Math.max(1800, r * 2.6))
+
     this.viewer.camera.flyToBoundingSphere(boundingSphere, {
-      duration: 1,
+      duration: 1.25,
       offset: new Cesium.HeadingPitchRange(
         0,
-        Cesium.Math.toRadians(-10),
-        boundingSphere.radius * 5 // 提高相机高度，从3倍半径增加到5倍
-      )
-    });
+        Cesium.Math.toRadians(-36),
+        range
+      ),
+      complete: () => {
+        try {
+          // 不在此处调用 viewer.resize()：异步布局下 canvas 可能短暂为 0 宽高，resize 会导致底图/瓦片不再绘制
+          this.viewer.scene.requestRender()
+        } catch {
+          /* noop */
+        }
+      }
+    })
   }
 
   /**

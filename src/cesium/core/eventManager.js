@@ -226,7 +226,7 @@ class EventManager {
 
   handleMouseMove(viewer, movement) {
     if (!this.rectangleDrawing || !this.startPosition) {
-      this.emit('mouse-move', movement);
+      this.emit('mouse-move', { viewer, movement });
       return;
     }
 
@@ -240,6 +240,7 @@ class EventManager {
    * @param {Object} movement - 鼠标按下信息
    */
   handleLeftDown(viewer, movement) {
+    this.emit('left-down', { viewer, movement });
     if (!this.rectangleDrawing) {
       return;
     }
@@ -253,6 +254,7 @@ class EventManager {
    * @param {Object} movement - 鼠标释放信息
    */
   handleLeftUp(viewer, movement) {
+    this.emit('left-up', { viewer, movement });
     if (!this.rectangleDrawing || !this.startPosition) {
       return;
     }

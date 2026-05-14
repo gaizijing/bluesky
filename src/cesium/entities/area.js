@@ -124,7 +124,8 @@ class AreaManager {
 
     eventManager.registerClickHandler((viewer, movement) => this._clusterClickHandler(movement), 3)
 
-    this._mouseMoveUnregister = eventManager.on('mouse-move', (movement) => {
+    this._mouseMoveUnregister = eventManager.on('mouse-move', (payload) => {
+      const movement = payload?.movement ?? payload
       this._handleMouseMove(movement)
     })
   }
