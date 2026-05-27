@@ -25,7 +25,7 @@ export function setupRouterGuard(router) {
     const isAuthenticated = !!localStorage.getItem('token') // 假设token存在表示已登录
     const userRole = localStorage.getItem('userRole') || 'user' // 假设用户角色存储在localStorage中
     
-    if (to.path === '/login') {
+    if (to.path === '/login' || to.path.startsWith('/demos')) {
       next()
     } else if (!isAuthenticated) {
       // 未登录跳转登录页
