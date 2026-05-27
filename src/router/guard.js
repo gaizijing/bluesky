@@ -34,13 +34,13 @@ export function setupRouterGuard(router) {
     } else if (to.path === '/' || to.path === '') {
       // 已登录且访问根路径，根据角色跳转到不同首页
       if (userRole === 'admin') {
-        next('/admin')
+        next('/setting')
       } else {
         next('/dashboard')
       }
-    } else if (to.path.startsWith('/admin') && userRole !== 'admin') {
-      // 非管理员访问后台管理页面
-      ElMessage.warning('权限不足，无法访问后台管理页面')
+    } else if (to.path.startsWith('/setting') && userRole !== 'admin') {
+      // 非管理员访问系统设置页面
+      ElMessage.warning('权限不足，无法访问系统设置页面')
       next('/dashboard')
     } else {
       next()
@@ -48,27 +48,30 @@ export function setupRouterGuard(router) {
    })
 
   // 全局后置守卫
-  router.afterEach((to, from) => {
-    // 页面切换后滚动到顶部
+  router.afterEach((to) => {
     window.scrollTo(0, 0)
-    sessionStorage.removeItem(ROUTE_RELOAD_FLAG)
+    if (sessionStorage.getItem(ROUTE_RELOAD_FLAG) === to.fullPath) {
+      sessionStorage.removeItem(ROUTE_RELOAD_FLAG)
+    }
   })
 
-  // 路由错误处理
+  // 路由错误处理：动态 import 失败时整页刷新（仅重试一次，避免相同 hash 不触发 reload）
   router.onError((error, to) => {
     console.error('路由错误:', error)
 
     if (isDynamicImportError(error)) {
-      const targetPath = to?.fullPath || window.location.hash || '/'
+      const targetPath = to?.fullPath || '/'
       const reloadedPath = sessionStorage.getItem(ROUTE_RELOAD_FLAG)
 
       if (reloadedPath !== targetPath) {
         sessionStorage.setItem(ROUTE_RELOAD_FLAG, targetPath)
-        window.location.assign(targetPath.startsWith('#') ? targetPath : `#${targetPath}`)
+        window.location.reload()
         return
       }
+
+      sessionStorage.removeItem(ROUTE_RELOAD_FLAG)
     }
 
-    ElMessage.error('页面加载失败，请刷新重试')
+    ElMessage.error('页面加载失败，请重启开发服务后刷新页面')
   })
 }

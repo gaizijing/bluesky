@@ -1,6 +1,25 @@
 import { defineStore } from 'pinia'
 import { WIND_LAYER_DEFAULTS } from '@/config/windLayerDefaults'
 
+/** 图层控制面板支持的图层（仅合并白名单内键，忽略历史 localStorage 中的废弃项如 isosurface） */
+export const DEFAULT_LAYERS = {
+  model: { visible: true, name: '3D模型' },
+  temperature: { visible: true, name: '风险图层' },
+  wind: { visible: true, name: '风场图层' },
+  cloud: { visible: true, name: '云雾图层' },
+  areaPoints: { visible: true, name: '重点关注区域' }
+}
+
+const mergeLayerSettings = (savedLayers = {}) => {
+  const merged = { ...DEFAULT_LAYERS }
+  for (const key of Object.keys(DEFAULT_LAYERS)) {
+    if (savedLayers[key]) {
+      merged[key] = { ...merged[key], ...savedLayers[key] }
+    }
+  }
+  return merged
+}
+
 /**
  * 图层设置Store
  * 管理地图图层的显示状态和配置参数
@@ -8,13 +27,7 @@ import { WIND_LAYER_DEFAULTS } from '@/config/windLayerDefaults'
 export const useLayerSettingsStore = defineStore('layerSettings', {
   state: () => ({
     // 图层显示状态
-    layers: {
-      model: { visible: true, name: '3D模型' },
-      temperature: { visible: true, name: '风险图层' },
-      wind: { visible: true, name: '风场图层' },
-      cloud: { visible: true, name: '云雾图层' },
-      areaPoints: { visible: true, name: '重点关注区域' }
-    },
+    layers: { ...DEFAULT_LAYERS },
     show: false,
 
     // 风场配置参数 - 与WindLayerOptions接口完全匹配
@@ -101,7 +114,7 @@ export const useLayerSettingsStore = defineStore('layerSettings', {
         const savedSettings = localStorage.getItem(this.STORAGE_KEY)
         if (savedSettings) {
           const { layers, windOptions } = JSON.parse(savedSettings)
-          this.layers = { ...this.layers, ...layers }
+          this.layers = mergeLayerSettings(layers)
 
           // 处理对象类型的配置合并
           const mergedWindOptions = { ...this.windOptions, ...windOptions }

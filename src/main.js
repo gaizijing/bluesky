@@ -39,7 +39,7 @@ const pollingService = new PollingService();
 
 const shouldEnablePolling = (route) => {
   const path = route?.path || '';
-  return !path.startsWith('/admin') && path !== '/login';
+  return !path.startsWith('/setting') && path !== '/login';
 };
 
 const syncPollingByRoute = (route) => {

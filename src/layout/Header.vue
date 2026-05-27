@@ -66,9 +66,9 @@
               <span v-if="!showLayerDialog">显示控制</span>
               <span v-else>隐藏控制</span>
             </el-dropdown-item>
-            <el-dropdown-item v-if="isAdmin" @click="handleAdmin">
+            <el-dropdown-item v-if="isAdmin" @click="handleSettingPage">
               <el-icon class="custom-icon"><Management /></el-icon>
-              <span>后台管理</span>
+              <span>系统设置</span>
             </el-dropdown-item>
             <el-dropdown-item @click="handleLogout">
               <img src="@/assets/icons/ic_exit.png" class="custom-icon" />
@@ -104,7 +104,7 @@ const CreateAreaForm = defineAsyncComponent(() =>
 );
 // 导入阈值管理组件
 const ThresholdManagement = defineAsyncComponent(() =>
-  import("@/pages/Setting/views/ThresholdManagement.vue")
+  import("@/pages/Admin/ThresholdManagement.vue")
 );
 import { useWeatherStore } from "@/store/modules/weather";
 import { useLayerSettingsStore } from "@/store/modules/layerSettings";
@@ -175,9 +175,9 @@ const toggleMode = () => {
   eventManager.emit('modeChange', newMode);
 };
 
-// 跳转到后台管理页面
-const handleAdmin = () => {
-  router.push('/admin');
+// 跳转到系统设置页面
+const handleSettingPage = () => {
+  router.push('/setting');
 };
 // 切换区域列表弹窗显示
 const toggleAreaSelector = () => {

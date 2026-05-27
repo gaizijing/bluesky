@@ -99,7 +99,7 @@ const handleLogin = async () => {
       ElMessage.success('登录成功')
       // 根据角色跳转不同页面
       if (userRole === 'admin') {
-        router.push('/admin')
+        router.push('/setting')
       } else {
         router.push('/dashboard')
       }
