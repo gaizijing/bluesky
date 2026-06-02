@@ -100,8 +100,8 @@ const menuItems = [
     icon: Histogram
   },
   {
-    path: '/setting/monitoring-point',
-    title: '监测点管理',
+    path: '/setting/landing-points',
+    title: '起降点管理',
     description: '站点坐标、类型状态与业务覆盖',
     icon: LocationInformation
   },
@@ -118,8 +118,8 @@ const menuItems = [
     icon: VideoCamera
   },
   {
-    path: '/setting/region-config',
-    title: '地区配置管理',
+    path: '/setting/regions',
+    title: '区域管理',
     description: '区域配置、边界定义与数据同步',
     icon: LocationInformation
   }
@@ -129,7 +129,7 @@ const routeDescriptions = {
   '/setting/threshold': '维护飞行限制基线，让适飞分析和风险预警拥有一致的判断口径。',
   '/setting/user': '集中维护用户资料、角色权限和账号状态，保证后台访问边界清晰可控。',
   '/setting/aircraft': '统一整理飞行器型号与性能档案，为业务匹配提供可追踪资产台账。',
-  '/setting/monitoring-point': '编排业务监测点网络，确保站点坐标、类型与运行状态始终可控。',
+  '/setting/landing-points': '编排业务起降点网络，确保站点坐标、类型与运行状态始终可控。',
   '/setting/device': '管理设备台账、在线状态和监测点关联关系，保证感知链路稳定可追踪。',
   '/setting/camera': '维护摄像头部署、实时预览和启用状态，确保视频监控链路清晰可控。'
 }

@@ -598,6 +598,24 @@ export function useCesium(containerId) {
       { deep: true }
     )
 
+    // Region / mapLift 就绪后自动飞到默认视角（与 switchToOverviewMode 相同逻辑）
+    let regionOverviewApplied = false
+    watch(
+      () => [regionStore.getMapLift, regionStore.getRegionBounds, viewer.value],
+      ([mapLift, bounds, v]) => {
+        if (regionOverviewApplied || !v) return
+        if (!mapLift && !bounds) return
+        regionOverviewApplied = true
+        console.log('[Dashboard/Camera] 自动应用 Region 视角', {
+          regionId: regionStore.regionId,
+          hasMapLift: !!mapLift,
+          hasBounds: !!bounds,
+        })
+        flyToRegionOverview(v)
+      },
+      { immediate: true, deep: true }
+    )
+
     // 说明
     resources.value.cameraPrintKeydownHandler = setupCameraPrintKeydown(viewer.value)
   }

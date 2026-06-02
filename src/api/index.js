@@ -1,69 +1,200 @@
 import request from '../utils/request';
 import { fetchWeatherApi } from "openmeteo";
+import { getStorage, setStorage, removeStorage } from '../utils/storageUtils';
 
+const REGION_ID_KEY = 'currentRegionId';
+const SELECTED_LANDING_POINT_KEY = 'selectedLandingPointId';
+const LEGACY_REGION_ID_KEY = 'v2_regionId';
+const LEGACY_SELECTED_KEY = 'v2_selectedLandingPointId';
 
-
-// 获取重点关注区域列表
-export const fetchAreaList = async () => {
-
-  const data = await request.get('/monitoring-points');
-  return data;
-
-}
-
-// 获取当前选中的重点关注区域
-export const fetchCurrentSelectedArea = async () => {
-
-  const data = await request.get('/monitoring-points/selected');
-  return data;
-
-}
-
-// 更新选中的重点关注区域
-export const updateSelectedArea = async (area) => {
-  try {
-    const data = await request.post('/monitoring-points/selected', { pointId: area.id });
-    return data;
-  } catch (error) {
-    console.error('保存重点关注区域切换信息失败:', error);
-    throw error;
+function readRegionIdFromStorage() {
+  const current = getStorage(REGION_ID_KEY);
+  if (current && String(current).trim()) return String(current).trim();
+  const legacy = getStorage(LEGACY_REGION_ID_KEY);
+  if (legacy && String(legacy).trim()) {
+    setStorage(REGION_ID_KEY, String(legacy).trim());
+    return String(legacy).trim();
   }
+  return null;
 }
 
-// 添加新的重点关注区域
+function readSelectedLandingPointId() {
+  const current = getStorage(SELECTED_LANDING_POINT_KEY);
+  if (current && String(current).trim()) return String(current).trim();
+  const legacy = getStorage(LEGACY_SELECTED_KEY);
+  if (legacy && String(legacy).trim()) {
+    setStorage(SELECTED_LANDING_POINT_KEY, String(legacy).trim());
+    return String(legacy).trim();
+  }
+  return null;
+}
+
+const mapLandingPointToLegacyArea = (point) => {
+  if (!point) return null;
+  const id = point.landingPointId || point.id;
+  return {
+    ...point,
+    id,
+    landingPointId: id,
+    location: point.address || point.location || '',
+    status: point.enabled === false ? 'unavailable' : 'available',
+    bboxMinLng: point.bboxMinLng,
+    bboxMinLat: point.bboxMinLat,
+    bboxMaxLng: point.bboxMaxLng,
+    bboxMaxLat: point.bboxMaxLat,
+  };
+};
+
+const mapRegionToLegacyConfig = (region) => {
+  if (!region) return null;
+  return {
+    ...region,
+    id: region.regionId || region.id,
+    regionId: region.regionId || region.id,
+  };
+};
+
+async function resolveRegionId(regionId) {
+  const normalized = typeof regionId === 'string' ? regionId.trim() : regionId;
+  if (normalized) return normalized;
+  const stored = readRegionIdFromStorage();
+  if (stored) return stored;
+  const def = await request.get('/regions/default');
+  const id = def?.regionId || def?.id;
+  if (!id) {
+    throw new Error('未找到默认区域，请先配置 Region');
+  }
+  setStorage(REGION_ID_KEY, id);
+  return id;
+}
+
+// ==================== Region ====================
+
+export const fetchRegions = async () => {
+  const data = await request.get('/regions');
+  return (Array.isArray(data) ? data : []).map(mapRegionToLegacyConfig);
+};
+
+export const fetchDefaultRegion = async () => {
+  const data = await request.get('/regions/default');
+  return mapRegionToLegacyConfig(data);
+};
+
+export const setCurrentRegionId = async (regionId) => {
+  setStorage(REGION_ID_KEY, regionId);
+  removeStorage(SELECTED_LANDING_POINT_KEY);
+  return regionId;
+};
+
+// ==================== 起降点（兼容旧 area 命名） ====================
+
+export const fetchAreaList = async (regionId) => {
+  const rid = await resolveRegionId(regionId);
+  const data = await request.get('/landing-points', { regionId: rid });
+  return (Array.isArray(data) ? data : []).map(mapLandingPointToLegacyArea);
+};
+
+export const fetchCurrentSelectedArea = async () => {
+  const selectedId = readSelectedLandingPointId();
+  if (selectedId) {
+    try {
+      const point = await request.get(`/landing-points/${selectedId}`);
+      return mapLandingPointToLegacyArea(point);
+    } catch {
+      removeStorage(SELECTED_LANDING_POINT_KEY);
+      removeStorage(LEGACY_SELECTED_KEY);
+    }
+  }
+
+  const list = await fetchAreaList();
+  if (list.length) {
+    setStorage(SELECTED_LANDING_POINT_KEY, list[0].id);
+    return list[0];
+  }
+  return null;
+};
+
+export const updateSelectedArea = async (area) => {
+  const id = area?.id || area?.landingPointId;
+  if (id) {
+    setStorage(SELECTED_LANDING_POINT_KEY, id);
+  }
+  return { pointId: id };
+};
+
 export const addNewArea = async (areaData) => {
   try {
-    const data = await request.post('/monitoring-points', areaData);
-    return data;
+    const regionId = await resolveRegionId(areaData.regionId);
+    const payload = {
+      regionId,
+      name: areaData.name,
+      code: areaData.code,
+      type: areaData.type,
+      address: areaData.location || areaData.address,
+      longitude: areaData.longitude,
+      latitude: areaData.latitude,
+      altitude: areaData.altitude,
+      bboxMinLng: areaData.bboxMinLng ?? areaData.bbox?.west,
+      bboxMinLat: areaData.bboxMinLat ?? areaData.bbox?.south,
+      bboxMaxLng: areaData.bboxMaxLng ?? areaData.bbox?.east,
+      bboxMaxLat: areaData.bboxMaxLat ?? areaData.bbox?.north,
+      enabled: areaData.enabled !== false && areaData.status !== 'unavailable',
+    };
+    const data = await request.post('/landing-points', payload);
+    return mapLandingPointToLegacyArea(data);
   } catch (error) {
-    console.error('添加重点关注区域失败:', error);
+    console.error('添加起降点失败:', error);
     throw error;
   }
 };
 
-// 更新指定的监测点
 export const updateMonitoringPoint = async (id, areaData) => {
   try {
-    const data = await request.put(`/monitoring-points/${id}`, areaData);
-    return data;
+    const regionId = await resolveRegionId(areaData.regionId);
+    const payload = {
+      regionId,
+      name: areaData.name,
+      code: areaData.code,
+      type: areaData.type,
+      address: areaData.location || areaData.address,
+      longitude: areaData.longitude,
+      latitude: areaData.latitude,
+      altitude: areaData.altitude,
+      bboxMinLng: areaData.bboxMinLng,
+      bboxMinLat: areaData.bboxMinLat,
+      bboxMaxLng: areaData.bboxMaxLng,
+      bboxMaxLat: areaData.bboxMaxLat,
+      enabled: areaData.enabled !== false && areaData.status !== 'unavailable',
+    };
+    const data = await request.put(`/landing-points/${id}`, payload);
+    return mapLandingPointToLegacyArea(data);
   } catch (error) {
-    console.error('更新监测点失败:', error);
+    console.error('更新起降点失败:', error);
     throw error;
   }
 };
 
-// 删除指定的监测点
-export const deleteMonitoringPoint = async (id) => {
+export const deleteLandingPoint = async (id) => {
   try {
-    const data = await request.delete(`/monitoring-points/${id}`);
-    return data;
+    await request.delete(`/landing-points/${id}`);
+    const selectedId = readSelectedLandingPointId();
+    if (selectedId === id) {
+      removeStorage(SELECTED_LANDING_POINT_KEY);
+    }
+    return true;
   } catch (error) {
-    console.error('删除监测点失败:', error);
+    console.error('删除起降点失败:', error);
     throw error;
   }
 };
 
-// 获取单点适飞指数分析数据
+export const fetchLandingPoints = async (regionId) => fetchAreaList(regionId);
+
+export const createLandingPoint = async (areaData) => addNewArea(areaData);
+
+export const updateLandingPoint = async (id, areaData) => updateMonitoringPoint(id, areaData);
+
+export const deleteMonitoringPoint = deleteLandingPoint;
 export const getWeatherSuitability = async (params = {}) => {
 
   const {
@@ -354,87 +485,127 @@ export const getWindData = async () => {
 
 // ==================== 地区配置管理接口 ====================
 
-// 获取地区配置信息（兼容旧接口）
+// 获取地区配置信息（默认 Region）
 export const getRegionConfig = async () => {
   try {
-    const response = await request.get('/weather/region-config');
-    if (response) {
-      return response;
-    }
-    throw new Error('API返回数据为空');
+    const region = await fetchDefaultRegion();
+    return {
+      regionId: region.regionId,
+      defaultName: region.name,
+      name: region.name,
+      modelUrl: region.modelUrl,
+      mapLift: region.mapLift,
+      bounds: {
+        west: region.west,
+        east: region.east,
+        south: region.south,
+        north: region.north,
+      },
+    };
   } catch (error) {
-    console.error('获取地区配置信息失败:', error);
+    console.error('获取 Region 配置失败:', error);
     throw error;
   }
 };
 
-// 获取所有地区配置
+// 获取所有 Region（兼容旧 region-config 命名）
 export const getAllRegionConfigs = async () => {
   try {
-    const response = await request.get('/region-config/list');
-    return response;
+    return await fetchRegions();
   } catch (error) {
-    console.error('获取地区配置列表失败:', error);
+    console.error('获取 Region 列表失败:', error);
     throw error;
   }
 };
 
-// 获取默认地区配置
+// 获取默认 Region
 export const getDefaultRegionConfig = async () => {
   try {
-    const response = await request.get('/region-config/default');
-    return response;
+    return await fetchDefaultRegion();
   } catch (error) {
-    console.error('获取默认地区配置失败:', error);
+    console.error('获取默认 Region 失败:', error);
     throw error;
   }
 };
 
-// 根据ID获取地区配置
+// 根据 ID 获取 Region
 export const getRegionConfigById = async (id) => {
   try {
-    const response = await request.get(`/region-config/${id}`);
-    return response;
+    const response = await request.get(`/regions/${id}`);
+    return mapRegionToLegacyConfig(response);
   } catch (error) {
-    console.error('获取地区配置详情失败:', error);
+    console.error('获取 Region 详情失败:', error);
     throw error;
   }
 };
 
-// 添加地区配置
+// 创建 Region
 export const addRegionConfig = async (data) => {
   try {
-    const response = await request.post('/region-config', data);
-    return response;
+    const payload = {
+      name: data.name,
+      west: data.west,
+      east: data.east,
+      south: data.south,
+      north: data.north,
+      centerLng: data.centerLng ?? (data.west + data.east) / 2,
+      centerLat: data.centerLat ?? (data.south + data.north) / 2,
+      modelUrl: data.modelUrl,
+      enabled: data.enabled !== false,
+      isDefault: Boolean(data.isDefault),
+    };
+    const response = await request.post('/regions', payload);
+    return mapRegionToLegacyConfig(response);
   } catch (error) {
-    console.error('添加地区配置失败:', error);
+    console.error('添加 Region 失败:', error);
     throw error;
   }
 };
 
-// 更新地区配置
+// 设为默认 Region（专用接口，避免 PUT 全量更新失败）
+export const setRegionDefault = async (regionId) => {
+  const data = await request.put(`/regions/${regionId}/default`);
+  return mapRegionToLegacyConfig(data);
+};
+
+// 更新 Region
 export const updateRegionConfig = async (data) => {
   try {
-    const response = await request.put('/region-config', data);
-    return response;
+    const regionId = data.regionId || data.id;
+    const west = Number(data.west);
+    const east = Number(data.east);
+    const south = Number(data.south);
+    const north = Number(data.north);
+    const payload = {
+      name: data.name,
+      west,
+      east,
+      south,
+      north,
+      centerLng: data.centerLng ?? (west + east) / 2,
+      centerLat: data.centerLat ?? (south + north) / 2,
+      modelUrl: data.modelUrl,
+      enabled: data.enabled !== false,
+      isDefault: Boolean(data.isDefault),
+    };
+    const response = await request.put(`/regions/${regionId}`, payload);
+    return mapRegionToLegacyConfig(response);
   } catch (error) {
-    console.error('更新地区配置失败:', error);
+    console.error('更新 Region 失败:', error);
     throw error;
   }
 };
 
-// 删除地区配置
+// 删除 Region
 export const deleteRegionConfig = async (id) => {
   try {
-    const response = await request.delete(`/region-config/${id}`);
-    return response;
+    await request.delete(`/regions/${id}`);
+    return true;
   } catch (error) {
-    console.error('删除地区配置失败:', error);
+    console.error('删除 Region 失败:', error);
     throw error;
   }
 };
-
-
 
 // ==================== 设备监测接口 ====================
 
@@ -654,38 +825,43 @@ export const updateCameraActive = async (id, active) => {
 // ==================== 航路分析接口 ====================
 
 // 获取航路列表
-export const getRoutes = async () => {
-  try {
-    const data = await request.get('/routes');
-    return data;
-  } catch (error) {
-    console.error('获取航路列表失败:', error);
-    throw error;
-  }
-}
+export const getRoutes = async (regionId) => fetchRoutes(regionId);
+
+// 获取航路列表
+export const fetchRoutes = async (regionId, page = 1, size = 20) => {
+  const rid = await resolveRegionId(regionId);
+  return request.get('/routes', { regionId: rid, page, size });
+};
 
 // 获取航路详情
-export const getRouteDetail = async (routeId) => {
+export const getRouteDetail = async (routeId, routeVersionId) => {
   try {
-    
-    const data = await request.get(`/routes/${routeId}`);
+    const params = routeVersionId ? { routeVersionId } : {};
+    const data = await request.get(`/routes/${routeId}`, params);
     return data;
   } catch (error) {
     console.error('获取航路详情失败:', error);
     throw error;
   }
-}
+};
 
 // 创建新航线
-export const createRoute = async (routeData) => {
+export const createRoute = async (routeData, regionId) => {
   try {
-    const data = await request.post('/routes', routeData);
+    const rid = await resolveRegionId(regionId || routeData?.regionId);
+    const data = await request.post('/routes', routeData, { params: { regionId: rid } });
     return data;
   } catch (error) {
     console.error('创建航线失败:', error);
     throw error;
   }
-}
+};
+
+// 导入 GeoJSON 航路
+export const importRoute = async (regionId, geoJson) => {
+  const rid = await resolveRegionId(regionId);
+  return request.post('/routes/import', geoJson, { params: { regionId: rid } });
+};
 
 // 分析航线风险
 export const analyzeRouteRisk = async (routeId, params = {}) => {
@@ -698,11 +874,12 @@ export const analyzeRouteRisk = async (routeId, params = {}) => {
   }
 };
 
-// 清空所有航线
-export const clearRoutes = async () => {
+// 按 Region 清空航线
+export const clearRoutes = async (regionId) => {
   try {
-    const data = await request.delete('/routes/clear-history');
-    return data;
+    const rid = await resolveRegionId(regionId);
+    await request.delete('/routes', { regionId: rid });
+    return true;
   } catch (error) {
     console.error('清空航线失败:', error);
     throw error;
@@ -883,7 +1060,7 @@ export const deleteAircraftModel = async (id) => {
 // 获取用户列表
 export const getUserList = async () => {
   try {
-    const data = await request.get('/api/users/list');
+    const data = await request.get('/users/list');
     return data;
   } catch (error) {
     console.error('获取用户列表失败:', error);
@@ -894,7 +1071,7 @@ export const getUserList = async () => {
 // 根据 ID 获取用户详情
 export const getUserById = async (id) => {
   try {
-    const data = await request.get(`/api/users/${id}`);
+    const data = await request.get(`/users/${id}`);
     return data;
   } catch (error) {
     console.error('获取用户详情失败:', error);
@@ -905,7 +1082,7 @@ export const getUserById = async (id) => {
 // 创建用户
 export const createUser = async (data) => {
   try {
-    const response = await request.post('/api/users', data);
+    const response = await request.post('/users', data);
     return response;
   } catch (error) {
     console.error('创建用户失败:', error);
@@ -916,7 +1093,7 @@ export const createUser = async (data) => {
 // 注册用户
 export const registerUser = async (data) => {
   try {
-    const response = await request.post('/api/users/register', data);
+    const response = await request.post('/users/register', data);
     return response;
   } catch (error) {
     console.error('注册用户失败:', error);
@@ -927,7 +1104,7 @@ export const registerUser = async (data) => {
 // 更新用户
 export const updateUser = async (id, data) => {
   try {
-    const response = await request.put(`/api/users/${id}`, data);
+    const response = await request.put(`/users/${id}`, data);
     return response;
   } catch (error) {
     console.error('更新用户失败:', error);
@@ -938,7 +1115,7 @@ export const updateUser = async (id, data) => {
 // 删除用户
 export const deleteUser = async (id) => {
   try {
-    const response = await request.delete(`/api/users/${id}`);
+    const response = await request.delete(`/users/${id}`);
     return response;
   } catch (error) {
     console.error('删除用户失败:', error);
@@ -949,7 +1126,7 @@ export const deleteUser = async (id) => {
 // 更新用户状态
 export const updateUserStatus = async (id, status) => {
   try {
-    const response = await request.put(`/api/users/${id}/status`, null, {
+    const response = await request.put(`/users/${id}/status`, null, {
       params: {
         status
       }
@@ -965,7 +1142,7 @@ export const updateUserStatus = async (id, status) => {
 export const changeUserPassword = async (oldPassword, newPassword) => {
   try {
     const response = await request.put(
-      '/api/users/change-password',
+      '/users/change-password',
       {},
       {
         params: {

@@ -114,6 +114,7 @@ import { Management } from '@element-plus/icons-vue'
 import DialogContainer from '@/components/common/DialogContainer.vue'
 import { InitializationService } from '@/services/initialization'
 import { userLogout } from '@/api/auth'
+import { canAccessSettingFromStorage } from '@/utils/roleUtils'
 
 // 创建初始化服务实例
 const initializationService = new InitializationService();
@@ -152,7 +153,7 @@ const areaStore = useAreaStore();
 const currentMode = ref('overview'); // 默认概览模式
 
 // 检查用户是否为管理员
-const isAdmin = ref(localStorage.getItem('userRole') === 'admin');
+const isAdmin = ref(canAccessSettingFromStorage());
 
 // 切换模式函数
 const toggleMode = () => {

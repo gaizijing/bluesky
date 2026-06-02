@@ -1,20 +1,35 @@
 import * as Cesium from 'cesium'
 import { useRegionStore } from '@/store/modules/region'
 
-// 获取地区配置
+const LOG_PREFIX = '[Dashboard/Camera]';
+
+// 获取地区配置（含 mapLift 相机参数）
 export const getRegionConfig = () => {
   const regionStore = useRegionStore();
   const bounds = regionStore.getRegionBounds;
+  const mapLift = regionStore.getMapLift;
+  const center = regionStore.getRegionCenter;
+  console.log(LOG_PREFIX, 'getRegionConfig', {
+    regionId: regionStore.regionId,
+    regionName: regionStore.getRegionName,
+    bounds,
+    mapLift,
+    center,
+  });
   return {
     name: regionStore.getRegionName,
-    center: regionStore.getRegionCenter,
-    rectangle: Cesium.Rectangle.fromDegrees(
+    center,
+    mapLift,
+    rectangle: bounds ? Cesium.Rectangle.fromDegrees(
       bounds.west,
       bounds.south,
       bounds.east,
       bounds.north
-    ),
-    defaultHeight: 18000
+    ) : null,
+    defaultHeight: mapLift?.height ?? 18000,
+    heading: mapLift?.heading ?? 0,
+    pitch: mapLift?.pitch ?? -45,
+    terrainExaggeration: mapLift?.terrainExaggeration ?? 1,
   };
 };
 
@@ -97,15 +112,48 @@ export const getFlyToOptions = (options) => ({
  * @param {Cesium.Viewer} viewer - Cesium viewer实例
  */
 export const flyToRegionOverview = (viewer) => {
-  if (!viewer) return;
-  
+  if (!viewer) {
+    console.warn(LOG_PREFIX, 'flyToRegionOverview 跳过: viewer 未初始化');
+    return;
+  }
+
   const regionConfig = getRegionConfig();
-  
+  const mapLift = regionConfig.mapLift;
+
+  if (mapLift?.longitude != null && mapLift?.latitude != null) {
+    const dest = {
+      longitude: mapLift.longitude,
+      latitude: mapLift.latitude,
+      height: mapLift.height ?? regionConfig.defaultHeight,
+      heading: mapLift.heading ?? regionConfig.heading ?? 0,
+      pitch: mapLift.pitch ?? regionConfig.pitch ?? -45,
+    };
+    console.log(LOG_PREFIX, 'flyToRegionOverview 使用 mapLift', dest);
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(dest.longitude, dest.latitude, dest.height),
+      orientation: {
+        heading: Cesium.Math.toRadians(dest.heading),
+        pitch: Cesium.Math.toRadians(dest.pitch),
+        roll: 0,
+      },
+      duration: 2,
+      easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT,
+    });
+    return;
+  }
+
+  if (!regionConfig.rectangle) {
+    console.warn(LOG_PREFIX, 'flyToRegionOverview 跳过: 无 mapLift 且无 bounds.rectangle');
+    return;
+  }
+
+  console.log(LOG_PREFIX, 'flyToRegionOverview 回退到 rectangle 范围', {
+    regionName: regionConfig.name,
+  });
   viewer.camera.flyTo({
     destination: regionConfig.rectangle,
     orientation: {
       heading: 0,
-     // pitch: Cesium.Math.toRadians(-45),
       roll: 0
     },
     duration: 2,
@@ -190,6 +238,7 @@ export const limitCameraRange = (viewer) => {
 
     // 获取最新的地区配置
     const regionConfig = getRegionConfig();
+    if (!regionConfig.rectangle) return;
     
     // 范围限制
     const clampedLongitude = Cesium.Math.clamp(
@@ -234,8 +283,7 @@ export const limitCameraRange = (viewer) => {
  */
 export const switchToOverviewMode = (viewer) => {
   if (!viewer) return;
-  
-  // 使用新的概览飞行函数
+  console.log(LOG_PREFIX, 'switchToOverviewMode 触发');
   flyToRegionOverview(viewer);
 };
 

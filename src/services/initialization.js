@@ -46,11 +46,8 @@ export class InitializationService {
         console.warn('地区配置初始化失败，使用默认配置:', error);
       }
 
-      // 2. 并行初始化其他基础数据
-      const [areasInitialized] = await Promise.all([
-        this.areaService.loadAreaList(),
-        this.areaService.loadCurrentSelectedArea(),
-      ]);
+      // 2. 区域就绪后再加载起降点（依赖 regionId）
+      await this.areaService.loadLandingPoints(regionStore.regionId);
 
       // 3. 初始化区域天气数据
       await this.initializeAreaWeatherData();

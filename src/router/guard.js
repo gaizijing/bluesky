@@ -1,5 +1,6 @@
 
 import { ElMessage } from 'element-plus'
+import { canAccessSettingFromStorage } from '@/utils/roleUtils'
 
 const ROUTE_RELOAD_FLAG = '__admin_route_reload__'
 const DYNAMIC_IMPORT_ERROR_PATTERNS = [
@@ -22,24 +23,17 @@ export function setupRouterGuard(router) {
     document.title = `${to.meta.title || '气象服务系统'} - ${import.meta.env.VITE_APP_TITLE}`
     
     // 简单的权限控制示例（实际项目可扩展）
-    const isAuthenticated = !!localStorage.getItem('token') // 假设token存在表示已登录
-    const userRole = localStorage.getItem('userRole') || 'user' // 假设用户角色存储在localStorage中
+    const isAuthenticated = !!localStorage.getItem('token')
+    const canManageSettings = canAccessSettingFromStorage()
     
     if (to.path === '/login') {
       next()
     } else if (!isAuthenticated) {
-      // 未登录跳转登录页
       ElMessage.warning('请先登录')
       next('/login')
     } else if (to.path === '/' || to.path === '') {
-      // 已登录且访问根路径，根据角色跳转到不同首页
-      if (userRole === 'admin') {
-        next('/setting')
-      } else {
-        next('/dashboard')
-      }
-    } else if (to.path.startsWith('/setting') && userRole !== 'admin') {
-      // 非管理员访问系统设置页面
+      next('/dashboard')
+    } else if (to.path.startsWith('/setting') && !canManageSettings) {
       ElMessage.warning('权限不足，无法访问系统设置页面')
       next('/dashboard')
     } else {

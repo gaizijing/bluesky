@@ -44,35 +44,29 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { fetchCurrentSelectedArea, getCameras } from '@/api'
-import { useAreaStore } from '@/store/modules/area'
+import { getCameras } from '@/api'
+import { useRegionLandingStore } from '@/store/modules/regionLanding'
 import { extractList } from '@/utils/admin'
 
-const areaStore = useAreaStore()
+const landingStore = useRegionLandingStore()
 const selectedCameraIndex = ref(0)
 const cameras = ref([])
 const loading = ref(false)
 
 const selectedPointId = computed(() => {
-  const area = areaStore.selectedArea
-  if (!area) {
+  const point = landingStore.selectedLandingPoint
+  if (!point) {
     return ''
   }
-  return String(area.id || area.pointId || '').trim()
+  return String(point.id || point.landingPointId || '').trim()
 })
 
 const loadSelectedArea = async () => {
-  if (selectedPointId.value) {
-    return
-  }
-
-  try {
-    const currentArea = await fetchCurrentSelectedArea()
-    if (currentArea) {
-      areaStore.setSelectedArea(currentArea)
+  if (selectedPointId.value || landingStore.landingPoints.length) {
+    if (!landingStore.selectedLandingPoint && landingStore.landingPoints.length) {
+      landingStore.setSelectedLandingPoint(landingStore.landingPoints[0])
     }
-  } catch (error) {
-    console.error('加载当前监测点失败:', error)
+    return
   }
 }
 

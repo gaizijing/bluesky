@@ -4,7 +4,7 @@
     <section class="admin-panel">
       <div class="admin-panel__header">
         <div>
-          <h2 class="admin-panel__title">地区配置管理</h2>
+          <h2 class="admin-panel__title">区域管理</h2>
         </div>
         <div class="admin-toolbar">
           <el-button class="admin-secondary-button" :loading="loading" @click="loadRegionConfigs">
@@ -127,7 +127,7 @@
 
     <el-drawer v-model="drawerVisible" :with-header="false" size="760px" class="admin-editor-drawer" destroy-on-close>
       <div class="admin-drawer__header">
-        <p class="admin-page__eyebrow">{{ isEditing ? 'Edit Region' : 'Create Region' }}</p>
+        <p class="admin-page__eyebrow">{{ isEditing ? '编辑区域' : '新增区域' }}</p>
         <h3>{{ isEditing ? '编辑地区配置' : '新增地区配置' }}</h3>
         <p>维护地区名称和边界坐标，确保系统正常运行。</p>
       </div>
@@ -193,7 +193,8 @@ import {
   getAllRegionConfigs,
   addRegionConfig,
   updateRegionConfig,
-  deleteRegionConfig
+  deleteRegionConfig,
+  setRegionDefault
 } from '@/api'
 import { useRegionStore } from '@/store/modules/region';
 import { InitializationService } from '@/services/initialization';
@@ -211,6 +212,7 @@ const formSnapshot = ref(null)
 const searchKeyword = ref('')
 
 const createRegionForm = () => ({
+  regionId: null,
   id: null,
   name: '',
   west: 120.0,
@@ -253,7 +255,7 @@ const visibleRegionConfigs = computed(() => {
   return regionConfigs.value.filter((item) => {
     const matchesKeyword =
       !keyword ||
-      [item.id, item.name]
+      [item.regionId, item.id, item.name]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(keyword))
 
@@ -276,7 +278,11 @@ const loadRegionConfigs = async () => {
     console.log('获取地区配置列表:', response)
 
 
-    regionConfigs.value = response
+    regionConfigs.value = (Array.isArray(response) ? response : []).map((item) => ({
+      ...item,
+      id: item.regionId || item.id,
+      regionId: item.regionId || item.id,
+    }))
 
   } catch (error) {
     console.error('加载地区配置列表失败:', error)
@@ -366,10 +372,8 @@ const setAsDefault = async (row) => {
   }
 
   try {
-    const payload = { ...row, isDefault: true }
-    const response = await updateRegionConfig(payload)
-
-  
+    const regionId = row.regionId || row.id
+    await setRegionDefault(regionId)
     ElMessage.success('默认地区配置已设置')
     await loadRegionConfigs()
     // 重新获取地区配置并更新到 store
@@ -395,7 +399,7 @@ const handleDelete = async (row) => {
   }
 
   try {
-    const response = await deleteRegionConfig(row.id)
+    const response = await deleteRegionConfig(row.regionId || row.id)
 
 
     ElMessage.success('地区配置已删除')

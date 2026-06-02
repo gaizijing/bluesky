@@ -8,7 +8,15 @@
        
         </div>
         <div class="admin-toolbar">
-          <el-button class="admin-secondary-button" :loading="loading" @click="loadMonitoringPoints">
+          <el-select v-model="selectedRegionId" placeholder="选择区域" style="width: 180px" @change="handleRegionChange">
+            <el-option
+              v-for="item in regionOptions"
+              :key="item.regionId"
+              :label="item.name"
+              :value="item.regionId"
+            />
+          </el-select>
+          <el-button class="admin-secondary-button" :loading="loading" @click="loadLandingPoints">
             <el-icon><Refresh /></el-icon>
             刷新列表
           </el-button>
@@ -18,7 +26,7 @@
           </el-button>
           <el-button class="admin-primary-button" @click="openCreate">
             <el-icon><Plus /></el-icon>
-            新增监测点
+            新增起降点
           </el-button>
           <el-input
             v-model="searchKeyword"
@@ -146,8 +154,8 @@
     >
       <div class="admin-drawer__header">
         <p class="admin-page__eyebrow">{{ isEditing ? 'Edit Point' : 'Create Point' }}</p>
-        <h3>{{ isEditing ? '编辑监测点' : '新增监测点' }}</h3>
-        <p>维护点位名称、坐标、海拔和运行状态，保证业务地图和后台数据一致。</p>
+        <h3>{{ isEditing ? '编辑起降点' : '新增起降点' }}</h3>
+        <p>维护起降点名称、坐标、海拔和运行状态，保证业务地图和后台数据一致。</p>
       </div>
 
       <el-form ref="formRef" :model="formModel" :rules="formRules" label-position="top">
@@ -159,7 +167,8 @@
             </el-form-item>
 
             <el-form-item label="编码" prop="code">
-              <el-input v-model="formModel.code" placeholder="如：QD-AIRPORT" />
+              <el-input v-model="formModel.code" placeholder="如：NH-01（同区域内不可重复）" />
+              <div class="admin-form-hint">编码为业务编号，可修改；系统唯一标识为「点位ID」。</div>
             </el-form-item>
 
             <el-form-item label="类型" prop="type">
@@ -287,13 +296,16 @@
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  addNewArea,
-  deleteMonitoringPoint,
-  fetchAreaList,
-  fetchCurrentSelectedArea,
-  updateMonitoringPoint,
-  updateSelectedArea
+  createLandingPoint,
+  deleteLandingPoint,
+  fetchLandingPoints,
+  fetchRegions,
+  updateLandingPoint,
+  updateSelectedArea,
 } from '@/api'
+import { useRegionStore } from '@/store/modules/region'
+import { useRegionLandingStore } from '@/store/modules/regionLanding'
+import { getStorage } from '@/utils/storageUtils'
 import {
   extractList,
   normalizeBoolean,
@@ -307,7 +319,28 @@ const isEditing = ref(false)
 const searchKeyword = ref('')
 const showActiveOnly = ref(false)
 const formRef = ref(null)
-const monitoringPoints = ref([])
+const regionStore = useRegionStore()
+const landingStore = useRegionLandingStore()
+
+const readSelectedPointId = () => {
+  return getStorage('selectedLandingPointId')
+    || getStorage('v2_selectedLandingPointId')
+    || ''
+}
+
+const applySelectionState = (list) => {
+  let selectedId = readSelectedPointId()
+  if (!selectedId && list.length) {
+    selectedId = list[0].id
+  }
+  return list.map((item) => ({
+    ...item,
+    isSelected: item.id === selectedId,
+  }))
+}
+const selectedRegionId = ref('')
+const regionOptions = ref([])
+const landingPoints = ref([])
 const formSnapshot = ref(null)
 
 // 监测点类型中英文映射关系
@@ -425,7 +458,7 @@ const normalizePoint = (item, index = 0) => {
   }
 
   return {
-    id: item?.id ?? item?.pointId ?? item?.code ?? `MP-${String(index + 1).padStart(3, '0')}`,
+    id: item?.landingPointId ?? item?.id ?? item?.pointId ?? `LP-${String(index + 1).padStart(3, '0')}`,
     name: item?.name ?? item?.pointName ?? `监测点-${index + 1}`,
     longitude: normalizeNumber(item?.longitude ?? item?.lng, 120.3895),
     latitude: normalizeNumber(item?.latitude ?? item?.lat, 36.2747),
@@ -494,7 +527,7 @@ const serializePoint = (item) => {
 const visiblePoints = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
 
-  return monitoringPoints.value.filter((item) => {
+  return landingPoints.value.filter((item) => {
     const matchesKeyword =
       !keyword ||
       [item.id, item.name, item.type, item.description]
@@ -507,20 +540,36 @@ const visiblePoints = computed(() => {
   })
 })
 
-const loadMonitoringPoints = async () => {
+const loadLandingPoints = async () => {
   loading.value = true
 
   try {
-    const payload = await fetchAreaList()
+    if (!selectedRegionId.value) {
+      await loadRegionOptions()
+    }
+    const payload = await fetchLandingPoints(selectedRegionId.value)
     const remoteList = extractList(payload).map((item, index) => normalizePoint(item, index))
-    monitoringPoints.value = remoteList
+    landingPoints.value = applySelectionState(remoteList)
   } catch (error) {
-    monitoringPoints.value = []
-    ElMessage.error(error.message || '加载监测点列表失败，请稍后重试')
-    console.error('加载监测点列表失败:', error)
+    landingPoints.value = []
+    ElMessage.error(error.message || '加载起降点列表失败，请稍后重试')
+    console.error('加载起降点列表失败:', error)
   } finally {
     loading.value = false
   }
+}
+
+const loadRegionOptions = async () => {
+  const regions = await fetchRegions()
+  regionOptions.value = regions
+  if (!selectedRegionId.value && regions.length) {
+    selectedRegionId.value = regionStore.regionId || regions.find((item) => item.isDefault)?.regionId || regions[0].regionId
+  }
+}
+
+const handleRegionChange = async () => {
+  regionStore.setRegionId(selectedRegionId.value)
+  await loadLandingPoints()
 }
 
 const applyFormModel = (payload) => {
@@ -554,17 +603,18 @@ const handleSave = async () => {
   saving.value = true
 
   const payload = serializePoint(formModel)
+  payload.regionId = selectedRegionId.value
 
   try {
     if (isEditing.value) {
-      await updateMonitoringPoint(payload.id, payload)
+      await updateLandingPoint(payload.id, payload)
     } else {
-      await addNewArea(payload)
+      await createLandingPoint(payload)
     }
 
-    ElMessage.success(isEditing.value ? '监测点已更新' : '监测点已新增')
+    ElMessage.success(isEditing.value ? '起降点已更新' : '起降点已新增')
     drawerVisible.value = false
-    await loadMonitoringPoints()
+    await loadLandingPoints()
   } catch (error) {
     console.error('保存监测点失败:', error)
     ElMessage.error(error.message || '保存监测点失败，请稍后重试')
@@ -575,19 +625,19 @@ const handleSave = async () => {
 }
 
 const handleSelect = async (row) => {
-  try {
-    await updateSelectedArea(row)
-    await loadMonitoringPoints()
-    ElMessage.success('监测点选中状态已更新')
-  } catch (error) {
-    console.error('更新监测点选中状态失败:', error)
-    ElMessage.error(error.message || '更新监测点选中状态失败，请稍后重试')
-  }
+  regionStore.setRegionId(selectedRegionId.value)
+  await updateSelectedArea(row)
+  landingStore.selectLandingPoint(row)
+  landingPoints.value = landingPoints.value.map((item) => ({
+    ...item,
+    isSelected: item.id === row.id,
+  }))
+  ElMessage.success(`已设为默认起降点：${row.name}`)
 }
 
 const handleDelete = async (row) => {
   try {
-    await ElMessageBox.confirm(`确认删除监测点「${row.name}」吗？`, '删除确认', {
+    await ElMessageBox.confirm(`确认删除起降点「${row.name}」吗？`, '删除确认', {
       confirmButtonText: '确认删除',
       cancelButtonText: '取消',
       type: 'warning'
@@ -597,9 +647,9 @@ const handleDelete = async (row) => {
   }
 
   try {
-    await deleteMonitoringPoint(row.id)
-    ElMessage.success('监测点已删除')
-    await loadMonitoringPoints()
+    await deleteLandingPoint(row.id)
+    ElMessage.success('起降点已删除')
+    await loadLandingPoints()
   } catch (error) {
     console.error('删除监测点失败:', error)
     ElMessage.error(error.message || '删除监测点失败，请稍后重试')
@@ -623,16 +673,8 @@ const clearFilters = () => {
 }
 
 onMounted(async () => {
-  await loadMonitoringPoints()
-  try {
-    const selectedArea = await fetchCurrentSelectedArea()
-    if (selectedArea && selectedArea.id) {
-      // 刷新数据以确保选中状态正确显示
-      await loadMonitoringPoints()
-    }
-  } catch (error) {
-    console.error('获取当前选中监测点失败:', error)
-  }
+  await loadRegionOptions()
+  await loadLandingPoints()
 })
 </script>
 

@@ -106,22 +106,37 @@ service.interceptors.response.use(
   }
 )
 
+/** 统一 query 参数：request.get(url, { regionId }) 而非 axios 风格的 { params: { regionId } } */
+function normalizeQueryParams(params) {
+  if (params == null) return {};
+  if (
+    typeof params === 'object' &&
+    !Array.isArray(params) &&
+    params.params &&
+    typeof params.params === 'object' &&
+    !Array.isArray(params.params)
+  ) {
+    return params.params;
+  }
+  return params;
+}
+
 // 封装请求方法
 const request = {
   get(url, params = {}, config = {}) {
-    return service.get(url, { params, ...config })
+    return service.get(url, { ...config, params: normalizeQueryParams(params) });
   },
 
   post(url, data = {}, config = {}) {
-    return service.post(url, data, config)
+    return service.post(url, data, config);
   },
 
   put(url, data = {}, config = {}) {
-    return service.put(url, data, config)
+    return service.put(url, data, config);
   },
 
   delete(url, params = {}, config = {}) {
-    return service.delete(url, { params, ...config })
+    return service.delete(url, { ...config, params: normalizeQueryParams(params) });
   },
 
   // 上传文件
