@@ -539,27 +539,16 @@ function stopMapSelection() {
 
 function formatLandingWeatherFromApi(payload) {
   if (!payload || typeof payload !== 'object') return null
-  const inner = payload.data
-  const d =
-    inner && typeof inner === 'object' && ('windSpeed' in inner || 'vis' in inner)
-      ? inner
-      : 'windSpeed' in payload || 'vis' in payload
-        ? payload
-        : null
-  if (!d) return null
-  const kmh = Number(d.windSpeed)
-  const mps = Number.isFinite(kmh) ? kmh / 3.6 : NaN
+  const mps = Number(payload.windSpeed)
+  const kmh = Number.isFinite(mps) ? mps * 3.6 : NaN
   const windSpeed =
-    Number.isFinite(mps) && Number.isFinite(kmh)
-      ? `${mps.toFixed(1)} m/s（${kmh} km/h）`
+    Number.isFinite(mps)
+      ? `${mps.toFixed(1)} m/s（${kmh.toFixed(1)} km/h）`
       : '—'
-  const dir = (d.windDir && String(d.windDir).trim()) || '—'
-  const scale = d.windScale != null && d.windScale !== '' ? `${d.windScale} 级` : ''
-  const windDirScale = [dir, scale].filter(Boolean).join(' ')
-  const visRaw = d.vis
-  const visNum = Number(visRaw)
-  const visibility = Number.isFinite(visNum) ? `${visNum} km` : visRaw != null ? String(visRaw) : '—'
-  return { windSpeed, windDirScale: windDirScale || '—', visibility }
+  const dir = payload.windDirection != null ? String(payload.windDirection) : '—'
+  const visNum = Number(payload.visibility)
+  const visibility = Number.isFinite(visNum) ? `${visNum} km` : '—'
+  return { windSpeed, windDirScale: dir, visibility }
 }
 
 async function openLandingCard(lon, lat) {

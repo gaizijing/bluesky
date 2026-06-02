@@ -1,11 +1,11 @@
 
 import { getRiskWarnings } from "@/api";
 import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
-import { SuitabilityService } from './suitabilityService';
+import { FlyabilityService } from './flyabilityService';
 
 class DashboardWeatherService {
     constructor() {
-        this.suitabilityService = new SuitabilityService();
+        this.flyabilityService = new FlyabilityService();
     }
 
     getDashboardWeatherStore() {
@@ -37,32 +37,16 @@ class DashboardWeatherService {
         }
     }
     async loadFlightSuitableAnalysisPanel(currentPoint) {
-        await this.suitabilityService.loadFlightSuitableAnalysisPanel(currentPoint);
+        await this.flyabilityService.loadFlightSuitableAnalysisPanel(currentPoint);
     }
     async loadRiskWarnings() {
-        console.log("获取风险预警数据...");
-
         try {
             const result = await getRiskWarnings();
-
-            const data = result.warnings.map((w) => ({
-                ...w,
-                targetType:
-                    w.targetType ||
-                    ["takeoff", "route", "airspace"][Math.floor(Math.random() * 3)],
-                detail:
-                    w.detail ||
-                    `${w.area ? `【${w.area}】` : ""}${w.riskReason || "飞行存在严重风险"
-                    }`,
-            }));
-            console.log("风险预警数据:", data);
-
+            const data = result?.warnings || [];
             this.getDashboardWeatherStore().setRiskWarningsData(data);
-
         } catch (err) {
             console.error("获取风险预警数据失败：", err);
-        } finally {
-
+            this.getDashboardWeatherStore().setRiskWarningsData([]);
         }
     }
 

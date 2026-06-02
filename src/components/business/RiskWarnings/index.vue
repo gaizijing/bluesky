@@ -56,6 +56,20 @@
             }}</span>
             <!-- 具体预警内容（截图核心展示） -->
             <span class="warning-content">{{ warning.detail }}</span>
+            <button
+              v-if="warning.status === 'NEW' && warning.warningId"
+              class="status-badge unhandled"
+              @click.stop="onAck(warning)"
+            >
+              确认
+            </button>
+            <span
+              v-else-if="warning.status"
+              class="status-badge"
+              :class="warning.status === 'CLOSED' ? 'handled' : 'unhandled'"
+            >
+              {{ warning.status }}
+            </span>
           </div>
         </div>
       </div>
@@ -69,8 +83,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, defineAsyncComponent, watch } from "vue";
+import { ref, computed, defineAsyncComponent } from "vue";
 import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
+import { ackWarning } from "@/api";
+import { ElMessage } from "element-plus";
 import DialogContainer from '@/components/common/DialogContainer.vue'
 
 const dashboardWeatherStore = useDashboardWeatherStore();
@@ -80,7 +96,6 @@ const WeatherWarnings = defineAsyncComponent(() =>
 const warnings = computed(() => {
   return dashboardWeatherStore.riskWarningsData || [];
 });
-console.log(warnings);
 // 响应式数据
 const selectedLevel = ref("all");
 const showHistory = ref(false);
@@ -148,6 +163,16 @@ const openHistoryDialog = (e) => {
 const closeHistoryDialog = () => {
   showHistory.value = false;
 };
+
+async function onAck(warning) {
+  try {
+    await ackWarning(warning.warningId, '大屏确认');
+    ElMessage.success('已确认预警');
+    warning.status = 'ACKNOWLEDGED';
+  } catch (e) {
+    ElMessage.error(e?.message || '确认失败');
+  }
+}
 
 </script>
 

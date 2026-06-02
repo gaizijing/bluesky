@@ -19,11 +19,11 @@ import { ref, watch, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import * as echarts from 'echarts'
 import { useRouteStore } from '@/store/modules/routeStore'
-import { useThresholdsStore } from '@/store/modules/thresholds'
+/** 与默认适飞规则 windSpeedMs.yellow 一致，用于剖面图风速高亮 */
+const DEFAULT_WIND_SPEED_YELLOW_MS = 8
 
 const routeStore = useRouteStore()
 const { verticalProfileAfterPreview, sessionPathOnMap, currentRoute } = storeToRefs(routeStore)
-const thresholdsStore = useThresholdsStore()
 
 const chartRef = ref(null)
 let chart
@@ -45,7 +45,7 @@ function buildOption(route) {
   const samples = route.pathSamples || []
   const dist = route.distKm || []
   const wind = route.windAlong || []
-  const thr = Number(thresholdsStore.aircraftSuitabilityThresholds?.windSpeed) || 8
+  const thr = DEFAULT_WIND_SPEED_YELLOW_MS
   const vmax = Math.max(thr, ...wind.map((w) => w.windSpeed || 0), 0.1)
 
   const data = samples.map((p, i) => [
@@ -130,7 +130,7 @@ function onChartClick(params) {
   const idx = params?.dataIndex
   if (idx == null || idx < 0) return
   const ws = route.windAlong?.[idx]?.windSpeed ?? 0
-  const thr = Number(thresholdsStore.aircraftSuitabilityThresholds?.windSpeed) || 8
+  const thr = DEFAULT_WIND_SPEED_YELLOW_MS
   if (ws < thr) return
   const p = route.pathSamples[idx]
   if (!p) return
@@ -142,7 +142,6 @@ function onChartClick(params) {
 }
 
 onMounted(async () => {
-  thresholdsStore.fetchAllThresholds?.()
   await nextTick()
   if (chartRef.value && !chart) {
     chart = echarts.init(chartRef.value)

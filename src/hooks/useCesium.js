@@ -12,9 +12,8 @@ import { addWhiteModel } from '@/cesium/layers/model3d'
 import { AreaManager } from '@/cesium/entities/area.js'
 import { initWind } from '@/cesium/visualization/wind'
 //3d
+import { MAP_HEATMAP_ENABLED } from '@/config/featureFlags'
 import { initHeatVolume, createReactiveHeatmapBridge } from '@/cesium/visualization/heatmap-grid'
-//2d
-// import { initHeatVolume, createReactiveHeatmapBridge } from '@/cesium/visualization/heatmap'
 
 import { routeManager } from '@/cesium/entities/routes' 
 import { useRouteStore } from '@/store/modules/routeStore'
@@ -23,7 +22,8 @@ import { SkyBoxManager } from '@/cesium/volumeCloud/SkyBoxManager'
 import { CAMERA_HEIGHT_THRESHOLD, CAMERA_HEIGHT_WIND_OFF_HYSTERESIS_M } from '../config/windLayerDefaults'
 import Cloud from '@/cesium/visualization/cloud'
 import { useHeatmapStore } from '@/store/modules/heatmap'
-import { getCitywideHeatmap, getWeatherHeatmapGeo, getRiskZones } from '@/api'
+import { getRiskZones } from '@/api'
+import { loadMapHeatmapPayload } from '@/services/mapHeatmapService'
 export function useCesium(containerId) {
   // 说明
   const windStore = useWindStore()
@@ -350,28 +350,27 @@ export function useCesium(containerId) {
     }
 
 
-    try {
-      console.log('[Cesium] 5.4 初始化热力图...')
-      resources.value.heatMapManager = await initHeatVolume(viewer.value)
-      resources.value.heatMapBridge = createReactiveHeatmapBridge({
-        heatmapManager: resources.value.heatMapManager,
-        heatmapStore,
-        layerSettingsStore,
-        areaStore,
-        getCurrentTime: () => {
-          if (!viewer.value?.clock?.currentTime) return new Date()
-          return Cesium.JulianDate.toDate(viewer.value.clock.currentTime)
-        }
-      })
-      heatmapStore.setHeatmapLayer(resources.value.heatMapManager)
-      console.log('[Cesium] 热力图初始化完成')
-
-      // 由 heatMapBridge 内部 watch(immediate) 触发首刷，避免初始化阶段重复请求
-      if (areaStore.selectedArea) {
-        console.log('当前选中区域:', areaStore.selectedArea.id)
+    if (MAP_HEATMAP_ENABLED) {
+      try {
+        console.log('[Cesium] 5.4 初始化热力图...')
+        resources.value.heatMapManager = await initHeatVolume(viewer.value)
+        resources.value.heatMapBridge = createReactiveHeatmapBridge({
+          heatmapManager: resources.value.heatMapManager,
+          heatmapStore,
+          layerSettingsStore,
+          areaStore,
+          getCurrentTime: () => {
+            if (!viewer.value?.clock?.currentTime) return new Date()
+            return Cesium.JulianDate.toDate(viewer.value.clock.currentTime)
+          }
+        })
+        heatmapStore.setHeatmapLayer(resources.value.heatMapManager)
+        console.log('[Cesium] 热力图初始化完成')
+      } catch (error) {
+        console.warn('[Cesium] 热力图初始化失败:', error)
       }
-    } catch (error) {
-      console.warn('[Cesium] 热力图初始化失败:', error)
+    } else {
+      console.info('[Cesium] 地图热力已关闭（待气象可视化重构），跳过 heatmap 初始化')
     }
 
     try {
@@ -874,28 +873,15 @@ export function useCesium(containerId) {
     }
 
     try {
-      let heatmapData = null
-
-      if (heatmapStore.heatmapMode === 'citywide') {
-        heatmapData = await getCitywideHeatmap()
-      } else {
-        const currentArea = areaStore.selectedArea
-        console.log(currentArea);
-        
-        const pointId = heatmapStore.currentPointId || currentArea?.id || currentArea?.pointId
-        if (!pointId) {
-          return
-        }
-
-        heatmapData = await getWeatherHeatmapGeo({
-          time,
-          pointId
-        })
-
-        heatmapStore.setCurrentPointId(pointId)
-      }
+      const mode = heatmapStore.heatmapMode === 'citywide' ? 'citywide' : 'area'
+      const currentArea = areaStore.selectedArea
+      const pointId = heatmapStore.currentPointId || currentArea?.id || currentArea?.pointId
+      const layerType = heatmapStore.mapLayerType === 'risk' ? 'risk' : 'temperature'
+      const heatmapData = await loadMapHeatmapPayload({ mode, layerType, pointId, time })
+      if (pointId) heatmapStore.setCurrentPointId(pointId)
       heatmapStore.setHeatmapData(heatmapData)
-      const visible = layerSettingsStore.layers.temperature?.visible !== false
+      const layers = layerSettingsStore.layers || {}
+      const visible = layers.temperature?.visible !== false || layers.riskField?.visible === true
       resources.value.heatMapManager.setData(heatmapData)
       resources.value.heatMapManager.setVisible(visible)
     } catch (error) {
@@ -944,6 +930,14 @@ export function useCesium(containerId) {
     setWindVisibility,
     setAreasVisibility,
     setTemperatureVisibility,
+    setHeatmapLayerType: async (type) => {
+      if (resources.value.heatMapBridge?.setLayerType) {
+        await resources.value.heatMapBridge.setLayerType(type);
+      } else {
+        heatmapStore.setMapLayerType(type);
+        await updateHeatmapTime();
+      }
+    },
     setCloudVisibility,
     // 说明
     updateHeatmapTime,

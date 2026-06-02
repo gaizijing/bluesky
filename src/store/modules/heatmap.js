@@ -11,12 +11,26 @@ export const useHeatmapStore = defineStore('heatmap', {
     heatmapLayer: null,
     // 热力图显示模式：'area' - 区域热力图，'citywide' - 全市热力图
     heatmapMode: 'area',
+    /** 地图热力数据源：temperature=P2 grid-field，risk=/risk/heatmap */
+    mapLayerType: 'temperature',
+    mapHeatmapStale: false,
     // 当前选中的区域ID（用于区域模式）
     currentPointId: null,
   }), 
   actions: {
+    setMapLayerType(type) {
+      if (type === 'risk' || type === 'temperature') {
+        this.mapLayerType = type;
+      }
+    },
+    setMapHeatmapStale(stale) {
+      this.mapHeatmapStale = Boolean(stale);
+    },
     setHeatmapData(heatmapData) {
       this.heatmapData = heatmapData;
+      if (heatmapData && typeof heatmapData.isStale === 'boolean') {
+        this.mapHeatmapStale = heatmapData.isStale;
+      }
       // 如果当前是区域模式，存储数据到lastAreaHeatmapData
       if (this.heatmapMode === 'area') {
         this.lastAreaHeatmapData = heatmapData;

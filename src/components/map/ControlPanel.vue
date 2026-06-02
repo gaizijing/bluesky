@@ -145,7 +145,6 @@ const emit = defineEmits<{
 /* ================= store ================= */
 
 const layerSettingsStore = useLayerSettingsStore()
-
 /* ================= panel ================= */
 
 const expandedSections = reactive({
@@ -299,6 +298,16 @@ const resetToDefaults = () => {
 }
 
 /* 图层项样式 */
+.map-stale-hint {
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border-radius: 6px;
+}
+
 .layer-item {
   margin-bottom: 10px;
   padding: 8px 0;

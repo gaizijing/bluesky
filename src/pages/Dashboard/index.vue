@@ -117,7 +117,7 @@
           </div>
           <div class="main-panel left_bg">
             <div class="panel-header">
-              <span class="panel-title">3H适飞分析</span>
+              <span class="panel-title">1H适飞分析</span>
             </div>
 
             <div class="panel-content">

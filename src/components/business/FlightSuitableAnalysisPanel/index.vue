@@ -1,5 +1,13 @@
 <template>
   <div class="suitability-chart-container">
+    <el-alert
+      v-if="showStaleHint"
+      class="stale-hint"
+      type="warning"
+      :closable="false"
+      show-icon
+      title="部分时段数据尚未由调度缓存生成，展示为实时估算值"
+    />
     <div ref="chartRef" class="chart-wrapper"></div>
   </div>
 </template>
@@ -19,6 +27,8 @@ let chartInstance = null;
 const flightSuitableAnalysisPanelData = computed(() => {
   return dashboardWeatherStore.getFlightSuitableAnalysisPanelData();
 });
+
+const showStaleHint = computed(() => Boolean(flightSuitableAnalysisPanelData.value?.isStale));
 
 const FACTOR_ORDER = ["综合", "风", "风切变", "颠簸指数", "湍流", "降水", "能见度"];
 
@@ -260,6 +270,10 @@ onUnmounted(() => {
 <style scoped>
 .suitability-chart-container {
   position: relative;
+}
+
+.stale-hint {
+  margin-bottom: 8px;
 }
 
 .chart-wrapper {

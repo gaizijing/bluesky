@@ -36,13 +36,6 @@
         :reselect-area-callback="handleReselectArea" />
     </DialogContainer>
 
-    <!-- 阈值管理弹窗 -->
-    <DialogContainer title="风险阈值设置" :visible="showThresholdDialog" @close="showThresholdDialog = false">
-      <ThresholdManagement />
-    </DialogContainer>
-
-
-
     <div class="logo-text">{{ appTitle }}</div>
 
     <div class="header-right">
@@ -102,10 +95,6 @@ const AreaList = defineAsyncComponent(() =>
 const CreateAreaForm = defineAsyncComponent(() =>
   import("@/components/business/AreaList/CreateAreaForm.vue")
 );
-// 导入阈值管理组件
-const ThresholdManagement = defineAsyncComponent(() =>
-  import("@/pages/Admin/ThresholdManagement.vue")
-);
 import { useWeatherStore } from "@/store/modules/weather";
 import { useLayerSettingsStore } from "@/store/modules/layerSettings";
 import { useAreaStore } from '@/store/modules/area'
@@ -126,7 +115,6 @@ const appTitle = import.meta.env.VITE_APP_TITLE;
 
 const showAreaSelector = ref(false);
 const createAreaFormRef = ref(null);
-const showThresholdDialog = ref(false);
 const showLayerDialog = ref(false);
 const showCreateForm = ref(false);
 
@@ -242,11 +230,6 @@ const handleAreaCreated = () => {
   showCreateForm.value = false;
   // 重新显示区域选择器弹窗
   showAreaSelector.value = true;
-};
-
-// 显示阈值管理弹窗
-const handleSetting = () => {
-  showThresholdDialog.value = true;
 };
 
 // 处理创建表单关闭事件（保留接口兼容性）

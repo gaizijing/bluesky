@@ -3,7 +3,7 @@ import h337 from 'heatmap.js';
 import { useHeatmapStore } from '@/store/modules/heatmap';
 import { useLayerSettingsStore } from '@/store/modules/layerSettings';
 import { watch } from 'vue';
-import { getCitywideHeatmap, getWeatherHeatmapGeo } from '@/api';
+import { loadMapHeatmapPayload } from '@/services/mapHeatmapService';
 import warningIcon from '@/assets/icons/ic_warning.png';
 
 const HEATMAP_COLOR_GRADIENT = {
@@ -455,10 +455,14 @@ export const initHeatVolume = (viewer) => {
 //  桥接层
 // ============================================================
 
-const fetchByMode = async ({ mode, pointId, time }) => {
-  if (mode === 'citywide') return normalizeApiPayload(await getCitywideHeatmap());
-  if (!pointId) return { points: [] };
-  return await getWeatherHeatmapGeo({ pointId, time });
+const fetchByMode = async ({ mode, pointId, time, layerType }) => {
+  const raw = await loadMapHeatmapPayload({
+    mode,
+    layerType: layerType || 'temperature',
+    pointId,
+    time,
+  });
+  return { ...normalizeApiPayload(raw), isStale: raw.isStale, source: raw.source };
 };
 
 export const createReactiveHeatmapBridge = ({ heatmapManager, heatmapStore, layerSettingsStore, areaStore, getCurrentTime }) => {
@@ -468,15 +472,21 @@ export const createReactiveHeatmapBridge = ({ heatmapManager, heatmapStore, laye
   let reqToken = 0;
   let applying = false;
 
-  const applyVis = () => heatmapManager.setVisible(layerSettingsStore.layers.temperature?.visible !== false);
+  const applyVis = () => {
+    const layers = layerSettingsStore.layers || {};
+    const visible = layers.temperature?.visible !== false || layers.riskField?.visible === true;
+    heatmapManager.setVisible(visible);
+  };
 
   const refresh = async (ti) => {
     const tok = ++reqToken;
     const mode = heatmapStore.heatmapMode === 'citywide' ? 'citywide' : 'area';
     const pid = areaStore?.selectedArea?.id;
     const t = ti || (typeof getCurrentTime === 'function' ? getCurrentTime() : new Date());
-    const payload = await fetchByMode({ mode, pointId: pid, time: t });
+    const layerType = heatmapStore.mapLayerType === 'risk' ? 'risk' : 'temperature';
+    const rawPayload = await loadMapHeatmapPayload({ mode, layerType, pointId: pid, time: t });
     if (tok !== reqToken) return null;
+    const payload = { ...normalizeApiPayload(rawPayload), isStale: rawPayload.isStale, source: rawPayload.source };
     if (mode === 'area' && pid) heatmapStore.setCurrentPointId(pid);
     applying = true;
     heatmapStore.setHeatmapData(payload);
@@ -487,6 +497,18 @@ export const createReactiveHeatmapBridge = ({ heatmapManager, heatmapStore, laye
   };
 
   unwatchers.push(watch(() => layerSettingsStore.layers.temperature?.visible, () => applyVis()));
+  unwatchers.push(watch(() => layerSettingsStore.layers.riskField?.visible, () => applyVis()));
+  unwatchers.push(watch(
+    () => [
+      layerSettingsStore.layers.temperature?.visible,
+      layerSettingsStore.layers.riskField?.visible,
+    ],
+    ([tempOn, riskOn]) => {
+      if (riskOn) heatmapStore.setMapLayerType('risk');
+      else if (tempOn) heatmapStore.setMapLayerType('temperature');
+      refresh().catch(() => {});
+    }
+  ));
   unwatchers.push(watch(() => heatmapStore.heatmapMode, async () => { try { await refresh(); } catch {} }));
   unwatchers.push(watch(
     () => areaStore?.selectedArea?.id,
@@ -524,6 +546,10 @@ export const createReactiveHeatmapBridge = ({ heatmapManager, heatmapStore, laye
       return refresh(ti);
     },
     setVisible: (v) => heatmapManager.setVisible(v),
+    setLayerType: async (type) => {
+      heatmapStore.setMapLayerType(type);
+      return refresh();
+    },
     destroy() { unwatchers.forEach(u => u()); unwatchers.length = 0; },
   };
 };

@@ -1,33 +1,25 @@
 import request from '../utils/request';
 import { fetchWeatherApi } from "openmeteo";
 import { getStorage, setStorage, removeStorage } from '../utils/storageUtils';
+import {
+  resolveRegionId,
+  setCurrentRegionId as setRegionIdInStorage,
+  readSelectedLandingPointId,
+  readRegionIdFromStorage,
+} from './regionContext';
+import { fetchLandingMatrixChart } from './flyability';
+import { fetchWeatherPoint, fetchForecastTrend, toRealtimePanelFields } from './weather';
+import { noFlyZonesToCesium } from '@/utils/noFlyZoneCesium';
+import { toWarningDisplay } from '@/utils/warningDisplay';
+
+export { resolveRegionId } from './regionContext';
+export { fetchLandingMatrix, fetchLandingMatrixChart } from './flyability';
+export { fetchWeatherPoint, fetchWeatherRealtime, fetchForecastTrend, toRealtimePanelFields } from './weather';
 
 const REGION_ID_KEY = 'currentRegionId';
 const SELECTED_LANDING_POINT_KEY = 'selectedLandingPointId';
 const LEGACY_REGION_ID_KEY = 'v2_regionId';
 const LEGACY_SELECTED_KEY = 'v2_selectedLandingPointId';
-
-function readRegionIdFromStorage() {
-  const current = getStorage(REGION_ID_KEY);
-  if (current && String(current).trim()) return String(current).trim();
-  const legacy = getStorage(LEGACY_REGION_ID_KEY);
-  if (legacy && String(legacy).trim()) {
-    setStorage(REGION_ID_KEY, String(legacy).trim());
-    return String(legacy).trim();
-  }
-  return null;
-}
-
-function readSelectedLandingPointId() {
-  const current = getStorage(SELECTED_LANDING_POINT_KEY);
-  if (current && String(current).trim()) return String(current).trim();
-  const legacy = getStorage(LEGACY_SELECTED_KEY);
-  if (legacy && String(legacy).trim()) {
-    setStorage(SELECTED_LANDING_POINT_KEY, String(legacy).trim());
-    return String(legacy).trim();
-  }
-  return null;
-}
 
 const mapLandingPointToLegacyArea = (point) => {
   if (!point) return null;
@@ -54,19 +46,7 @@ const mapRegionToLegacyConfig = (region) => {
   };
 };
 
-async function resolveRegionId(regionId) {
-  const normalized = typeof regionId === 'string' ? regionId.trim() : regionId;
-  if (normalized) return normalized;
-  const stored = readRegionIdFromStorage();
-  if (stored) return stored;
-  const def = await request.get('/regions/default');
-  const id = def?.regionId || def?.id;
-  if (!id) {
-    throw new Error('未找到默认区域，请先配置 Region');
-  }
-  setStorage(REGION_ID_KEY, id);
-  return id;
-}
+// resolveRegionId → api/regionContext.js
 
 // ==================== Region ====================
 
@@ -80,11 +60,7 @@ export const fetchDefaultRegion = async () => {
   return mapRegionToLegacyConfig(data);
 };
 
-export const setCurrentRegionId = async (regionId) => {
-  setStorage(REGION_ID_KEY, regionId);
-  removeStorage(SELECTED_LANDING_POINT_KEY);
-  return regionId;
-};
+export const setCurrentRegionId = async (regionId) => setRegionIdInStorage(regionId);
 
 // ==================== 起降点（兼容旧 area 命名） ====================
 
@@ -195,65 +171,8 @@ export const createLandingPoint = async (areaData) => addNewArea(areaData);
 export const updateLandingPoint = async (id, areaData) => updateMonitoringPoint(id, areaData);
 
 export const deleteMonitoringPoint = deleteLandingPoint;
-export const getWeatherSuitability = async (params = {}) => {
 
-  const {
-    currentPoint,
-    timestamp = new Date(),
-    timeRange = '3h',
-    includeThresholds = true
-  } = params;
-
-  // 获取点ID
-  let pointId = null;
-  if (currentPoint) {
-    pointId = currentPoint.id || currentPoint.pointId;
-  }
-
-  // 构建API请求参数
-  const queryParams = new URLSearchParams();
-  if (pointId) queryParams.append('pointId', pointId);
-  queryParams.append('timestamp', timestamp.toISOString());
-  queryParams.append('timeRange', timeRange);
-  if (includeThresholds) queryParams.append('includeThresholds', 'true');
-
-  // 尝试调用真实API - 注意：后端路径是 /suitability/status
-  // 使用提取的pointId，而不是currentPoint对象
-  const url = `/suitability/status?pointId=${encodeURIComponent(pointId || 'area-1')}&totalHours=3`;
-
-  const response = await request.get(url);
-  return response
-
-
-}
-
-
-export const getWeatherForecastTrend = async (pointId) => {
-  try {
-  
-    
-    if (!pointId) {
-      throw new Error('未提供重点关注区域ID');
-    }
-    
-    // 构建API请求参数
-    const url = `/weather/forecast-trend?pointId=${pointId}`;
-    
-    // 调用后端接口
-    const response = await request.get(url);
-    
-    // 检查返回数据格式
-    if (response && response.data) {
-      console.log("\nMinutely15 data:\n", response.data);
-      return response.data;
-    }
-    
-    throw new Error('API返回数据格式错误');
-  } catch (error) {
-    console.error('获取天气趋势数据失败:', error);
-    throw error;
-  }
-}
+export const getWeatherForecastTrend = fetchForecastTrend;
 /**
  * 遵循和风天气API规范，获取实时天气数据
  * 核心规范：HTTPS协议 + 请求头传API Key + Gzip解压 + 专属Host
@@ -313,17 +232,7 @@ export const fetchBasicWeatherDataFromAPI = async (currentPoint) => {
  * GET /weather/by-coords?lng=&lat=
  * 响应经 axios 拦截器后一般为 { updateTime, location, data: { windSpeed, vis, ... } }
  */
-export const getWeatherByCoords = async (lng, lat) => {
-  const lngN = Number(lng)
-  const latN = Number(lat)
-  if (!Number.isFinite(lngN) || !Number.isFinite(latN)) {
-    throw new Error('无效坐标')
-  }
-  const data = await request.get(
-    `/weather/by-coords?lng=${encodeURIComponent(lngN)}&lat=${encodeURIComponent(latN)}`
-  )
-  return data
-}
+export const getWeatherByCoords = fetchWeatherPoint
 
 /**
  * 批量按经纬度获取实时天气（航迹风况剖面等）。
@@ -338,41 +247,8 @@ export const postWeatherByCoordsBatch = async (body) => {
 
 // 主函数：获取当前监测点天气数据（调用后端接口）
 export const fetchCurrentPointWeather = async (pointId) => {
-  try {
-
-    // 调用后端实时天气接口
-    const data = await request.get(`/weather/realtime?pointId=${pointId}`);
-    // 适配前端期望的格式
-    if (data) {
-      const weatherData = data;
-      return {
-        temp: weatherData.temp?.toString() || '25',
-        feelsLike: weatherData.feelsLike?.toString() || '24',
-        icon: weatherData.icon?.toString() || '100',
-        text: weatherData.text || '晴',
-        wind360: weatherData.wind360?.toString() || '45',
-        windDir: weatherData.windDir || '东北风',
-        windScale: weatherData.windScale?.toString() || '3',
-        windSpeed: weatherData.windSpeed?.toString() || '12',
-        humidity: weatherData.humidity?.toString() || '68',
-        precip: weatherData.precip?.toString() || '0.0',
-        pressure: weatherData.pressure?.toString() || '1013',
-        vis: weatherData.vis?.toString() || '10',
-        cloud: weatherData.cloud?.toString() || '25',
-        dew: weatherData.dew?.toString() || '18',
-        windShearLevel: weatherData.windShearLevel || 'low',
-        stabilityIndex: weatherData.stabilityIndex || 'C',
-        obsTime: weatherData.obsTime || new Date().toISOString()
-      };
-    }
-
-    // 如果后端没有数据，抛出错误
-    throw new Error('后端返回数据为空');
-
-  } catch (error) {
-    console.error('获取当前重点关注区域天气数据失败:', error);
-    throw error; // 不返回模拟数据，直接抛出错误
-  }
+  const data = await request.get('/weather/realtime', { pointId });
+  return toRealtimePanelFields(data);
 }
 // 获取区域飞行风险热力图数据
 /**
@@ -422,23 +298,13 @@ export const getCitywideHeatmap = async () => {
 // 获取风险预警数据
 export const getRiskWarnings = async (params = {}) => {
   try {
-    const { pointId, timeRange } = params;
-    let url = '/weather/risk/report';
-    const queryParams = [];
-    if (pointId) queryParams.push(`pointId=${pointId}`);
-    if (timeRange) {
-      queryParams.push(`timeRange=${timeRange}`);
-    } else {
-      // 如果未提供timeRange，使用2026年3月份整个范围作为默认值
-      const defaultTimeRange = `2026-03-01 00:00:00,2026-03-31 23:59:59`;
-      queryParams.push(`timeRange=${encodeURIComponent(defaultTimeRange)}`);
-    }
-    
-    if (queryParams.length > 0) {
-      url += '?' + queryParams.join('&');
-    }
-    const data = await request.get(url);
-    return data;
+    const regionId = await resolveRegionId(params.regionId);
+    const query = { regionId };
+    if (params.statuses) query.statuses = params.statuses;
+    if (params.types) query.types = params.types;
+    const data = await request.get('/warnings', query);
+    const list = Array.isArray(data) ? data : [];
+    return { warnings: list.map(toWarningDisplay) };
   } catch (error) {
     console.error('获取风险预警数据失败：', error);
     throw error;
@@ -446,35 +312,9 @@ export const getRiskWarnings = async (params = {}) => {
 }
 
 
-export const getWeatherHeatmapGeo = async (params = {}) => {
-  try {
-    const {
-      time,
-      pointId
-    } = params;
-    if (!pointId) {
-      throw new Error('监测点ID参数(pointId)是必需的');
-    }
-
-    // 构建API请求参数
-    const queryParams = new URLSearchParams();
-    queryParams.append('pointId', pointId);
-    // if (time) queryParams.append('time', time.toISOString ? time.toISOString() : time);
-
-    const url = `/weather/heatmap/geo?${queryParams.toString()}`;
-    console.log('调用地理空间热力图API:', url);
-
-    const response = await request.get(url);
-    if (response && response.data) {
-      console.log('地理空间热力图API调用成功');
-      return response.data;
-    } else {
-      throw new Error('API返回数据格式错误');
-    }
-  } catch (error) {
-    console.error('获取地理空间热力图数据失败:', error);
-    throw error;
-  }
+/** @deprecated V2 已移除 /weather/heatmap/geo，请使用 grid-field 或关闭 MAP_HEATMAP_ENABLED */
+export const getWeatherHeatmapGeo = async () => {
+  throw new Error('地理空间热力图接口已下线，请使用 /weather/grid-field 或等待气象可视化重构');
 }
 
 // 获取风场数据
@@ -886,103 +726,15 @@ export const clearRoutes = async (regionId) => {
   }
 };
 
-/** 风险区列表（禁飞 / 谨慎圆柱） */
-export const getRiskZones = async () => {
+/** 禁飞区列表（P1：/no-fly-zones，适配为旧 risk-zones 圆柱格式） */
+export const getRiskZones = async (regionId) => {
   try {
-    const data = await request.get('/risk-zones');
-    return data;
+    const rid = await resolveRegionId(regionId);
+    const data = await request.get('/no-fly-zones', { regionId: rid });
+    const zones = noFlyZonesToCesium(Array.isArray(data) ? data : []);
+    return { zones };
   } catch (error) {
-    console.error('获取风险区失败:', error);
-    throw error;
-  }
-};
-
-// ==================== 阈值管理接口 ====================
-
-// 获取所有阈值配置
-export const getAllThresholds = async () => {
-  try {
-    const data = await request.get('/aircraft-limits/list');
-    return data;
-  } catch (error) {
-    console.error('获取阈值配置失败:', error);
-    throw error;
-  }
-};
-
-// 根据ID获取阈值配置
-export const getThresholdById = async (id) => {
-  try {
-    const data = await request.get(`/aircraft-limits/${id}`);
-    return data;
-  } catch (error) {
-    console.error('获取阈值配置失败:', error);
-    throw error;
-  }
-};
-
-// 根据飞行器ID获取阈值配置
-export const getThresholdByAircraftId = async (aircraftId) => {
-  try {
-    const data = await request.get(`/aircraft-limits/aircraft/${aircraftId}`);
-    return data;
-  } catch (error) {
-    console.error('获取飞行器阈值配置失败:', error);
-    throw error;
-  }
-};
-
-// 获取默认阈值配置
-export const getDefaultThreshold = async () => {
-  try {
-    const data = await request.get('/aircraft-limits/default');
-    return data;
-  } catch (error) {
-    console.error('获取默认阈值配置失败:', error);
-    throw error;
-  }
-};
-
-// 更新默认阈值配置
-export const updateDefaultThreshold = async (data) => {
-  try {
-    const response = await request.put('/aircraft-limits/default', data);
-    return response;
-  } catch (error) {
-    console.error('更新默认阈值配置失败:', error);
-    throw error;
-  }
-};
-
-// 添加阈值配置
-export const addThreshold = async (data) => {
-  try {
-    const response = await request.post('/aircraft-limits', data);
-    return response;
-  } catch (error) {
-    console.error('添加阈值配置失败:', error);
-    throw error;
-  }
-};
-
-// 更新阈值配置
-export const updateThreshold = async (data) => {
-  try {
-    const response = await request.put('/aircraft-limits', data);
-    return response;
-  } catch (error) {
-    console.error('更新阈值配置失败:', error);
-    throw error;
-  }
-};
-
-// 删除阈值配置
-export const deleteThreshold = async (id) => {
-  try {
-    const response = await request.delete(`/aircraft-limits/${id}`);
-    return response;
-  } catch (error) {
-    console.error('删除阈值配置失败:', error);
+    console.error('获取禁飞区失败:', error);
     throw error;
   }
 };
@@ -1156,4 +908,40 @@ export const changeUserPassword = async (oldPassword, newPassword) => {
     console.error('修改用户密码失败:', error);
     throw error;
   }
+};
+
+// ==================== P1 适飞规则集 ====================
+
+export const fetchFlyabilityRuleSets = async () => {
+  const data = await request.get('/flyability-rule-sets');
+  return Array.isArray(data) ? data : [];
+};
+
+export const createFlyabilityRuleSet = async (body) =>
+  request.post('/flyability-rule-sets', body);
+
+export const updateFlyabilityRuleSet = async (id, body) =>
+  request.put(`/flyability-rule-sets/${id}`, body);
+
+export const publishFlyabilityRuleSet = async (id) =>
+  request.post(`/flyability-rule-sets/${id}/publish`);
+
+export const deleteFlyabilityRuleSet = async (id) =>
+  request.delete(`/flyability-rule-sets/${id}`);
+
+// ==================== P1 预警操作 ====================
+
+export const ackWarning = async (warningId, remark = '') => {
+  const q = remark ? `?remark=${encodeURIComponent(remark)}` : '';
+  return request.post(`/warnings/${warningId}/ack${q}`);
+};
+
+export const handleWarning = async (warningId, remark = '') => {
+  const q = remark ? `?remark=${encodeURIComponent(remark)}` : '';
+  return request.post(`/warnings/${warningId}/handle${q}`);
+};
+
+export const closeWarning = async (warningId, remark = '') => {
+  const q = remark ? `?remark=${encodeURIComponent(remark)}` : '';
+  return request.post(`/warnings/${warningId}/close${q}`);
 };

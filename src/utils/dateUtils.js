@@ -19,22 +19,8 @@
  * SSS - 毫秒（000-999）
  */
 export const formatDate = (date, format = 'yyyy-MM-dd HH:mm:ss') => {
-  // 处理输入：转换为Date对象
-  if (!date) return '';
-  let targetDate;
-  if (date instanceof Date) {
-    targetDate = date;
-  } else if (typeof date === 'string' || typeof date === 'number') {
-    targetDate = new Date(date);
-  } else {
-    return ''; // 无效类型
-  }
-
-  // 检查日期是否有效
-  if (isNaN(targetDate.getTime())) {
-    console.error('无效的日期:', date);
-    return '';
-  }
+  const targetDate = parseApiDateTime(date);
+  if (!targetDate) return '';
 
   // 提取日期部分
   const year = targetDate.getFullYear();
@@ -54,6 +40,32 @@ export const formatDate = (date, format = 'yyyy-MM-dd HH:mm:ss') => {
     .replace('mm', padZero(minutes))
     .replace('ss', padZero(seconds))
     .replace('SSS', padZero(milliseconds, 3));
+};
+
+/**
+ * 解析后端返回的时间（支持 ISO、yyyy-MM-dd HH:mm:ss、时间戳、数组）
+ */
+export const parseApiDateTime = (value) => {
+  if (value == null || value === '') return null;
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+  if (Array.isArray(value)) {
+    const [y, mo, d, h = 0, mi = 0, s = 0] = value;
+    const dt = new Date(y, mo - 1, d, h, mi, s);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  if (typeof value === 'number') {
+    const dt = new Date(value);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const normalized = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
+    const dt = new Date(normalized);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  return null;
 };
 
 /**

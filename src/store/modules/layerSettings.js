@@ -4,7 +4,6 @@ import { WIND_LAYER_DEFAULTS } from '@/config/windLayerDefaults'
 /** 图层控制面板支持的图层（仅合并白名单内键，忽略历史 localStorage 中的废弃项如 isosurface） */
 export const DEFAULT_LAYERS = {
   model: { visible: true, name: '3D模型' },
-  temperature: { visible: true, name: '风险图层' },
   wind: { visible: true, name: '风场图层' },
   cloud: { visible: true, name: '云雾图层' },
   areaPoints: { visible: true, name: '重点关注区域' }

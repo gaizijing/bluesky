@@ -82,10 +82,16 @@ const now = ref(new Date())
 
 const menuItems = [
   {
-    path: '/setting/threshold',
-    title: '阈值管理',
-    description: '适飞阈值、默认策略与机型配置',
+    path: '/setting/flyability-rules',
+    title: '适飞规则集',
+    description: 'P1 适飞规则 JSON 与发布管理',
     icon: DataAnalysis
+  },
+  {
+    path: '/setting/scheduler',
+    title: '调度运维',
+    description: 'P2 缓存重算、清理与健康检查',
+    icon: Cpu
   },
   {
     path: '/setting/user',
@@ -126,7 +132,6 @@ const menuItems = [
 ]
 
 const routeDescriptions = {
-  '/setting/threshold': '维护飞行限制基线，让适飞分析和风险预警拥有一致的判断口径。',
   '/setting/user': '集中维护用户资料、角色权限和账号状态，保证后台访问边界清晰可控。',
   '/setting/aircraft': '统一整理飞行器型号与性能档案，为业务匹配提供可追踪资产台账。',
   '/setting/landing-points': '编排业务起降点网络，确保站点坐标、类型与运行状态始终可控。',

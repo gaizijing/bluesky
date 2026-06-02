@@ -31,14 +31,14 @@ export const routes = [
     redirect: (to) => {
       const raw = to.params.pathMatch
       const suffix = Array.isArray(raw) ? raw.filter(Boolean).join('/') : String(raw || '')
-      return suffix ? `/setting/${suffix}` : '/setting/threshold'
+      return suffix ? `/setting/${suffix}` : '/setting/flyability-rules'
     }
   },
   {
     path: '/setting',
     name: 'Setting',
     component: () => import('@/layout/AdminLayout.vue'),
-    redirect: '/setting/threshold',
+    redirect: '/setting/flyability-rules',
     meta: {
       title: '系统设置',
       icon: 'setting',
@@ -47,10 +47,22 @@ export const routes = [
     children: [
       {
         path: '/setting/threshold',
-        name: 'ThresholdManagement',
-        component: () => import('@/pages/Admin/ThresholdManagement.vue'),
+        redirect: '/setting/flyability-rules'
+      },
+      {
+        path: '/setting/flyability-rules',
+        name: 'FlyabilityRuleManagement',
+        component: () => import('@/pages/Admin/FlyabilityRuleManagement.vue'),
         meta: {
-          title: '阈值管理'
+          title: '适飞规则集'
+        }
+      },
+      {
+        path: '/setting/scheduler',
+        name: 'SchedulerMaintenance',
+        component: () => import('@/pages/Admin/SchedulerMaintenance.vue'),
+        meta: {
+          title: '调度运维'
         }
       },
       {
