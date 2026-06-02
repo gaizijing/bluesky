@@ -48,6 +48,7 @@ export default defineConfig(({ mode }) => {
         '@assets': resolve(__dirname, './src/assets'),
         '@components': resolve(__dirname, './src/components'),
         '@utils': resolve(__dirname, './src/utils'),
+        '@demos': resolve(__dirname, './demos'),
         '@zip.js/zip.js/lib/zip-no-worker.js': resolve(__dirname, './src/utils/zipNoWorkerStub.js')
       }
     },
