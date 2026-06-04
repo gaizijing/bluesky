@@ -103,38 +103,20 @@ export class PlaneModel {
                 const windStore = useWindStore();
                 const windLayers = windStore.windLayer;
 
-                if (windLayers && Array.isArray(windLayers) && windLayers.length > 0) {
-                  // 获取当前位置的经纬度（转换为数字类型）
+                const windLayer = Array.isArray(windLayers) ? windLayers[0] : windLayers;
+                if (windLayer && typeof windLayer.getDataAtLonLat === 'function') {
                   const lonNum = parseFloat(longitude);
                   const latNum = parseFloat(latitude);
-
-                  // 遍历所有风场图层，获取最接近当前高度的风场数据
                   let closestWindData = null;
-                  let minHeightDiff = Infinity;
-
-                  for (const windLayer of windLayers) {
-                    if (windLayer && typeof windLayer.getDataAtLonLat === 'function') {
-                      try {
-                        const windData = windLayer.getDataAtLonLat(lonNum, latNum);
-                        if (windData && typeof windData.interpolated.speed === 'number') {
-                          // 获取当前图层的高度
-                          const layerIndex = windLayers.indexOf(windLayer);
-                          const layerHeight = windStore.windData?.layers?.[layerIndex]?.height || 0;
-                          const heightDiff = Math.abs(parseFloat(height) - layerHeight);
-
-                          // 找到最接近当前高度的风场数据
-                          if (heightDiff < minHeightDiff) {
-                            minHeightDiff = heightDiff;
-                            closestWindData = windData;
-                          }
-                        }
-                      } catch (error) {
-                        // 忽略风场数据获取错误，确保飞机正常显示
-                      }
+                  try {
+                    const windData = windLayer.getDataAtLonLat(lonNum, latNum);
+                    if (windData && typeof windData.interpolated.speed === 'number') {
+                      closestWindData = windData;
                     }
+                  } catch (error) {
+                    // 忽略风场数据获取错误，确保飞机正常显示
                   }
 
-                  // 使用最接近的风场数据
                   if (closestWindData) {
                     windSpeed = closestWindData.interpolated.speed.toFixed(1);
                     windDirection = closestWindData.interpolated.direction || 0;

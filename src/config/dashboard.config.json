@@ -1,0 +1,221 @@
+{
+  "header": {
+    "height": 88,
+    "visible": true,
+    "component": "components/dashboard/header/Header.vue"
+  },
+  "toolbar": {
+    "visible": true,
+    "items": ["hide", "home", "legend", "pick", "simFlight"]
+  },
+  "main": {
+    "map": {
+      "visible": false
+    },
+    "timeline": {
+      "visible": true,
+      "height": 48,
+      "showBackToNow": true
+    },
+    "views": {
+      "home": {
+        "modules": [
+          {
+            "id": "home-left",
+            "module": "overviewLanding",
+            "region": "left",
+            "width": "25%",
+            "panels": [
+              {
+                "id": "landingList",
+                "title": "此刻起降场风险情况",
+                "visible": true,
+                "height": "50%",
+                "order": 1,
+                "component": "components/dashboard/panels/home/LandingListPanel.vue"
+              },
+              {
+                "id": "routeList",
+                "title": "航路天气适航性预测",
+                "visible": true,
+                "height": "50%",
+                "order": 2,
+                "component": "components/dashboard/panels/home/RouteListPanel.vue"
+              }
+            ]
+          },
+          {
+            "id": "home-right",
+            "module": "warningSummary",
+            "region": "right",
+            "width": "25%",
+            "panels": [
+              {
+                "id": "warningSummary",
+                "title": "预警摘要",
+                "visible": true,
+                "height": "100%",
+                "order": 1,
+                "component": "components/dashboard/panels/home/WarningSummaryPanel.vue"
+              }
+            ]
+          }
+        ]
+      },
+      "drillLanding": {
+        "modules": [
+          {
+            "id": "drill-landing-left",
+            "module": "landingWeather",
+            "region": "left",
+            "width": "25%",
+            "panels": [
+              {
+                "id": "liveWeather",
+                "title": "实时风象",
+                "visible": true,
+                "height": "32%",
+                "order": 1,
+                "component": "components/dashboard/panels/drillLanding/LiveWeatherPanel.vue"
+              },
+              {
+                "id": "weatherForecast",
+                "title": "3H气象预报",
+                "visible": true,
+                "height": "33%",
+                "order": 2,
+                "component": "components/dashboard/panels/drillLanding/DrillWeatherForecastPanel.vue"
+              },
+              {
+                "id": "flyabilityMatrix",
+                "title": "1H适飞分析",
+                "visible": true,
+                "height": "35%",
+                "order": 3,
+                "component": "components/dashboard/panels/drillLanding/FlyabilityMatrixPanel.vue"
+              }
+            ]
+          },
+          {
+            "id": "drill-landing-right",
+            "module": "landingProfile",
+            "region": "right",
+            "width": "25%",
+            "panels": [
+              {
+                "id": "windVerticalProfile",
+                "title": "垂直剖面",
+                "visible": true,
+                "height": "50%",
+                "order": 1,
+                "component": "components/dashboard/panels/drillLanding/WindVerticalProfilePanel.vue"
+              },
+              {
+                "id": "surveillanceFootage",
+                "title": "实时监控",
+                "visible": true,
+                "height": "50%",
+                "order": 2,
+                "component": "components/dashboard/panels/drillLanding/SurveillanceFootagePanel.vue"
+              }
+            ]
+          }
+        ]
+      },
+      "drillRoute": {
+        "modules": [
+          {
+            "id": "drill-route-left",
+            "module": "routeAnalysis",
+            "region": "left",
+            "width": "25%",
+            "panels": [
+              {
+                "id": "waypointCards",
+                "title": "航点卡片",
+                "visible": true,
+                "height": "100%",
+                "order": 1,
+                "component": "components/dashboard/panels/drillRoute/WaypointCardsPanel.vue"
+              }
+            ]
+          },
+          {
+            "id": "drill-route-right",
+            "module": "routeAvoidance",
+            "region": "right",
+            "width": "25%",
+            "panels": [
+              {
+                "id": "avoidanceInfo",
+                "title": "规避建议",
+                "visible": true,
+                "height": "50%",
+                "order": 1,
+                "component": "components/dashboard/panels/drillRoute/AvoidanceInfoPanel.vue"
+              },
+              {
+                "id": "routeWarnings",
+                "title": "航路预警",
+                "visible": true,
+                "height": "50%",
+                "order": 2,
+                "component": "components/dashboard/panels/drillRoute/RouteWarningsPanel.vue"
+              }
+            ]
+          }
+        ]
+      },
+      "simFlight": {
+        "modules": [
+          {
+            "id": "sim-mini",
+            "module": "simFlightHud",
+            "region": "float-top-right",
+            "width": "300px",
+            "height": "220px",
+            "hideTitleBar": true,
+            "panels": [
+              {
+                "id": "simMinimap",
+                "title": "小地图",
+                "visible": true,
+                "height": "100%",
+                "order": 1,
+                "hideTitleBar": true,
+                "component": "components/dashboard/panels/simFlight/SimMinimapPanel.vue"
+              }
+            ]
+          },
+          {
+            "id": "sim-dash",
+            "module": "simFlightHud",
+            "region": "bottom-full",
+            "height": "220px",
+            "hideTitleBar": true,
+            "panels": [
+              {
+                "id": "simDashboard",
+                "title": "联飞仪表盘",
+                "visible": true,
+                "height": "100%",
+                "order": 1,
+                "hideTitleBar": true,
+                "component": "components/dashboard/panels/simFlight/SimDashboardPanel.vue"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "legend": {
+    "groups": ["noFly", "flyability"]
+  },
+  "metViz": {
+    "enabled": false,
+    "defaultProduct": "temperature",
+    "products": ["wind", "temperature", "precipitation", "visibility", "humidity", "cloud", "pressure"],
+    "heightLevelsM": [100, 300, 500, 1000, 2000]
+  }
+}

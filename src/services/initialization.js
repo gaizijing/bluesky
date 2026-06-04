@@ -1,28 +1,18 @@
 import { WeatherService } from './weatherService';
-import { DashboardService } from './dashboardService';
 import { AreaService } from './areaService';
 import { useAreaStore } from '@/store/modules/area';
-import { useModuleStore } from '@/store/modules/module';
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import { useRegionStore } from '@/store/modules/region';
+import { getToken } from '@/utils/storageUtils';
 export class InitializationService {
   constructor() {
     this.weatherService = new WeatherService();
-    this.dashboardService = new DashboardService();
     this.areaService = new AreaService();
   }
 
   // 获取store实例
   getAreaStore() {
     return useAreaStore();
-  }
-
-  getWeatherStore() {
-    return useWeatherStore();
-  }
-
-  getModuleStore() {
-    return useModuleStore();
   }
 
   getLayerSettingsStore() {
@@ -36,24 +26,29 @@ export class InitializationService {
    * 应用初始化，区域列表、当前区域、区域气象数据、地图模拟气象数据
    */
   async initialize() {
+    if (!getToken()) {
+      return false;
+    }
     try {
-      // 1. 首先初始化地区配置（最基本的配置）
       const regionStore = this.getRegionStore();
+      let regionReady = false;
       try {
         await regionStore.fetchRegionConfig();
+        regionReady = true;
         console.log('地区配置初始化成功');
       } catch (error) {
-        console.warn('地区配置初始化失败，使用默认配置:', error);
+        console.warn('地区配置初始化失败，跳过后续依赖 Region 的数据加载:', error);
       }
 
-      // 2. 区域就绪后再加载起降点（依赖 regionId）
-      await this.areaService.loadLandingPoints(regionStore.regionId);
+      if (regionReady && regionStore.regionId) {
+        try {
+          await this.areaService.loadLandingPoints(regionStore.regionId);
+        } catch (error) {
+          console.warn('起降点加载失败:', error);
+        }
+      }
 
-      // 3. 初始化区域天气数据
       await this.initializeAreaWeatherData();
-
-      // 4. 加载地图天气图层
-      await this.initializeMapWeatherLayer()
 
       return true;
     } catch (error) {
@@ -79,28 +74,9 @@ export class InitializationService {
     }
   }
   /**
-   * 初始化地图气象图层
+   * @deprecated 风场由 MetViz WindParticleLayer 拉取 /wind-field，此处不再加载
    */
-
   async initializeMapWeatherLayer() {
-   // if (this.getLayerSettingsStore().layers.wind.visible) {
-      await this.weatherService.loadWindData()
-   // }
-  
+    return true;
   }
-
-  async initializeModuleData() {
-    const moduleStore = this.getModuleStore();
-    if (moduleStore.currentModule) {
-      try {
-        await this.dashboardService.loadModuleData(moduleStore.currentModule);
-        return true;
-      } catch (error) {
-        console.error('初始化模块数据失败:', error);
-        return false;
-      }
-    }
-    return false;
-  }
-
 }

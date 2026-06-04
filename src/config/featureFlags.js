@@ -1,5 +1,8 @@
-/**
- * 地图格点热力（旧 heatmap.js / heatmap/geo）已下线，后续 P3+ 气象可视化重构后再启用。
- * 启用前请实现新的可视化管线，勿再调用 /weather/heatmap/geo。
- */
+/** 旧地图热力图（heatmap/geo）已移除，气象填色由 MetViz GridFieldSliceLayer 负责 */
 export const MAP_HEATMAP_ENABLED = false;
+
+/** MetViz 总开关（独立气象页等） */
+export const MET_VIZ_ENABLED = true;
+
+/** 主大屏 Dashboard 是否启用 MetViz（false = 隐藏工具栏且不挂载引擎，减轻卡顿） */
+export const MET_VIZ_ON_DASHBOARD = false;

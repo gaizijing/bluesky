@@ -21,7 +21,17 @@ export const routes = [
         component: () => import('@/pages/Dashboard/index.vue'),
         meta: {
           title: '气象大屏',
-          icon: 'dashboard'
+          icon: 'dashboard',
+          fullscreen: true
+        }
+      },
+      {
+        path: '/meteorology-viz',
+        name: 'MeteorologyViz',
+        component: () => import('@/pages/MeteorologyViz/index.vue'),
+        meta: {
+          title: '气象可视化',
+          fullscreen: true
         }
       }
     ]
@@ -31,14 +41,14 @@ export const routes = [
     redirect: (to) => {
       const raw = to.params.pathMatch
       const suffix = Array.isArray(raw) ? raw.filter(Boolean).join('/') : String(raw || '')
-      return suffix ? `/setting/${suffix}` : '/setting/flyability-rules'
+      return suffix ? `/setting/${suffix}` : '/setting/regions'
     }
   },
   {
     path: '/setting',
     name: 'Setting',
     component: () => import('@/layout/AdminLayout.vue'),
-    redirect: '/setting/flyability-rules',
+    redirect: '/setting/regions',
     meta: {
       title: '系统设置',
       icon: 'setting',
@@ -55,6 +65,38 @@ export const routes = [
         component: () => import('@/pages/Admin/FlyabilityRuleManagement.vue'),
         meta: {
           title: '适飞规则集'
+        }
+      },
+      {
+        path: '/setting/risk-rules',
+        name: 'RiskRuleManagement',
+        component: () => import('@/pages/Admin/RiskRuleManagement.vue'),
+        meta: {
+          title: 'R_met 规则集'
+        }
+      },
+      {
+        path: '/setting/warning-rules',
+        name: 'WarningRuleManagement',
+        component: () => import('@/pages/Admin/WarningRuleManagement.vue'),
+        meta: {
+          title: '预警规则集'
+        }
+      },
+      {
+        path: '/setting/no-fly-zones',
+        name: 'NoFlyZoneManagement',
+        component: () => import('@/pages/Admin/NoFlyZoneManagement.vue'),
+        meta: {
+          title: '禁飞区管理'
+        }
+      },
+      {
+        path: '/setting/route-import',
+        name: 'RouteImport',
+        component: () => import('@/pages/Admin/RouteImport.vue'),
+        meta: {
+          title: '航路导入'
         }
       },
       {
@@ -99,6 +141,14 @@ export const routes = [
         component: () => import('@/pages/Admin/DeviceManagement.vue'),
         meta: {
           title: '设备管理'
+        }
+      },
+      {
+        path: '/setting/device-monitoring',
+        name: 'DeviceMonitoring',
+        component: () => import('@/pages/Admin/DeviceMonitoring.vue'),
+        meta: {
+          title: '设备监测看板'
         }
       },
       {

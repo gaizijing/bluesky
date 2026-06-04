@@ -32,38 +32,30 @@ app.use(ElementPlus)
 app.mount('#app')
 
 import { InitializationService } from './services/initialization'
-import { PollingService } from './services/polling'
+import { getToken } from './utils/storageUtils'
 
 const initializationService = new InitializationService();
-const pollingService = new PollingService();
-
-const shouldEnablePolling = (route) => {
-  const path = route?.path || '';
-  return !path.startsWith('/setting') && path !== '/login';
-};
-
-const syncPollingByRoute = (route) => {
-  if (shouldEnablePolling(route)) {
-    pollingService.start();
-    return;
-  }
-
-  pollingService.stop();
-};
 
 async function initializeApp() {
+  const route = router.currentRoute.value
+  if (!getToken() || route.path === '/login') {
+    return
+  }
   try {
-    await initializationService.initialize();
-    syncPollingByRoute(router.currentRoute.value);
+    await initializationService.initialize()
   } catch (error) {
-    console.error('App initialization failed:', error);
+    console.error('App initialization failed:', error)
   }
 }
 
 router.isReady().then(() => {
-  initializeApp();
+  initializeApp()
 
-  router.afterEach((to) => {
-    syncPollingByRoute(to);
-  });
-});
+  router.afterEach((to, from) => {
+    if (getToken() && from.path === '/login' && to.path !== '/login') {
+      initializationService.initialize().catch((err) => {
+        console.warn('登录后初始化失败:', err)
+      })
+    }
+  })
+})

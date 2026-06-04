@@ -93,7 +93,13 @@ const handleLogin = async () => {
       }
 
       ElMessage.success('登录成功')
-      router.push('/dashboard')
+      router.push('/dashboard').then(() => {
+        import('@/services/initialization').then(({ InitializationService }) => {
+          new InitializationService().initialize().catch((err) => {
+            console.warn('登录后初始化失败:', err)
+          })
+        })
+      })
     } else {
       // 登录失败
       ElMessage.error(response.message || '登录失败，请检查用户名和密码')

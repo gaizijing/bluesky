@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { fetchDefaultRegion, fetchRegions, setCurrentRegionId } from '@/api';
+import { fetchDefaultRegion, fetchRegions, getRegionConfigById, setCurrentRegionId } from '@/api';
 import { getStorage, setStorage } from '@/utils/storageUtils';
 
 const REGION_ID_KEY = 'currentRegionId';
@@ -21,7 +21,17 @@ export const useRegionStore = defineStore('region', {
   },
 
   getters: {
-    getModelUrl: (state) => state.regionConfig?.modelUrl,
+    /** V1 白膜：仅 3D Tileset（tileset.json）；优先 DB/API 的 modelUrl，否则按 regionId 映射静态资源 */
+    getModelUrl: (state) => {
+      const fromApi = state.regionConfig?.modelUrl;
+      if (typeof fromApi === 'string' && fromApi.trim()) {
+        return fromApi.trim();
+      }
+      const rid = state.regionId || state.regionConfig?.regionId;
+      if (rid === 'R1') return '/cesium/model/tianjin/tileset.json';
+      if (rid === 'R2') return '/cesium/model/qingdaoshi/tileset.json';
+      return null;
+    },
     getRegionName: (state) => state.regionConfig?.defaultName || state.regionConfig?.name || '',
     getRegionBounds: (state) => state.regionConfig?.bounds,
     getMapLift: (state) => state.regionConfig?.mapLift,
@@ -88,8 +98,8 @@ export const useRegionStore = defineStore('region', {
         const data = await fetchDefaultRegion();
         return this.applyRegionVo(data);
       } catch (error) {
-        this.error = error.message;
-        console.error('获取 Region 配置失败:', error);
+        this.error = error?.message || '获取 Region 配置失败';
+        console.warn('获取 Region 配置失败:', error);
         throw error;
       } finally {
         this.isLoading = false;
@@ -99,8 +109,15 @@ export const useRegionStore = defineStore('region', {
     async switchRegion(regionId) {
       await setCurrentRegionId(regionId);
       this.setRegionId(regionId);
-      const region = this.regions.find((item) => (item.regionId || item.id) === regionId)
-        || await fetchDefaultRegion();
+      let region = this.regions.find((item) => (item.regionId || item.id) === regionId);
+      if (!region) {
+        try {
+          region = await getRegionConfigById(regionId);
+        } catch (err) {
+          console.warn('[region] 按 id 拉取区域失败，回退默认区域', regionId, err);
+          region = await fetchDefaultRegion();
+        }
+      }
       this.applyRegionVo(region);
     },
   },

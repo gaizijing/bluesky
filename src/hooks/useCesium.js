@@ -6,14 +6,12 @@ import { useAreaStore } from '@/store/modules/area'
 import { useRegionStore } from '@/store/modules/region'
 import { createViewer, destroyViewer } from '@/cesium/core/viewer'
 import { handleCameraMove, getCurrentCameraParams, flyToRegion, flyToRectangle, limitCameraRange, switchToOverviewMode, switchToFocusMode, flyToRegionOverview, setupCameraPrintKeydown, watchCameraHeight } from '@/cesium/core/camera'
-import { addTiandituLayer, addTiandituWithGaodeOverlay } from '@/cesium/layers/tianditu'
+import { addTiandituLayerOld, addTiandituWithGaodeOverlay } from '@/cesium/layers/tianditu'
 import { loadTerrain } from '@/cesium/layers/terrain'
-import { addWhiteModel } from '@/cesium/layers/model3d'
+import { addWhiteModel, removeWhiteModel } from '@/cesium/layers/model3d'
 import { AreaManager } from '@/cesium/entities/area.js'
 import { initWind } from '@/cesium/visualization/wind'
 //3d
-import { MAP_HEATMAP_ENABLED } from '@/config/featureFlags'
-import { initHeatVolume, createReactiveHeatmapBridge } from '@/cesium/visualization/heatmap-grid'
 
 import { routeManager } from '@/cesium/entities/routes' 
 import { useRouteStore } from '@/store/modules/routeStore'
@@ -21,17 +19,22 @@ import eventManager from '@/cesium/core/eventManager'
 import { SkyBoxManager } from '@/cesium/volumeCloud/SkyBoxManager' 
 import { CAMERA_HEIGHT_THRESHOLD, CAMERA_HEIGHT_WIND_OFF_HYSTERESIS_M } from '../config/windLayerDefaults'
 import Cloud from '@/cesium/visualization/cloud'
-import { useHeatmapStore } from '@/store/modules/heatmap'
-import { getRiskZones } from '@/api'
-import { loadMapHeatmapPayload } from '@/services/mapHeatmapService'
+import { getRiskZones } from '@/api/v2/risk'
+import { useAppDashboardStore } from '@/store/modules/appDashboard'
+import { useMetVizStore } from '@/store/modules/metViz'
+import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus'
+import { isMetVizEnabledOnDashboard } from '@/config/metVizRuntime'
+
 export function useCesium(containerId) {
   // 说明
   const windStore = useWindStore()
-  const heatmapStore = useHeatmapStore()
+  const metVizStore = useMetVizStore()
   const areaStore = useAreaStore()
   const layerSettingsStore = useLayerSettingsStore()
   const routeStore = useRouteStore()
   const regionStore = useRegionStore()
+  const appStore = useAppDashboardStore()
+  const metVizOnDashboard = isMetVizEnabledOnDashboard()
 
   // 说明
   const viewer = ref(null)
@@ -53,7 +56,9 @@ export function useCesium(containerId) {
     cameraPrintKeydownHandler: null,
     cloud: null,
     /** 根据当前相机高度与会话航线状态刷新风场/云层等 */
-    refreshCameraHeightLayerVisibility: null
+    refreshCameraHeightLayerVisibility: null,
+    /** @type {(() => void) | null} */
+    regionChangedUnsub: null,
   })
 
   // 说明
@@ -62,30 +67,7 @@ export function useCesium(containerId) {
   // 说明
   watch(
     () => areaStore.selectedArea,
-    (newArea, oldArea) => {
-
-      
-      // 记录区域切换，但不立即更新热力图
-      // 热力图更新会在Cesium初始化后通过其他机制触发
-      console.log('区域已切换，热力图将在适当时机更新')
-      
-      // 如果当前有热力图实例且viewer已初始化，可以尝试更新
-      // 但通常热力图更新会由时间轴或其他机制触发
-      if (resources.value.heatMapInstance && viewer.value && newArea) {
-        console.log('尝试立即更新热力图...')
-        const currentTime = viewer.value.clock.currentTime
-        if (currentTime) {
-          const jsDate = Cesium.JulianDate.toDate(currentTime)
-          console.log('使用Viewer时间更新热力图:', jsDate)
-          updateHeatmapTime(jsDate)
-        } else {
-          console.log('使用当前时间更新热力图')
-          updateHeatmapTime(new Date())
-        }
-      } else {
-        console.log('热力图暂不更新，等待初始化完成')
-      }
-    },
+    () => {},
     { deep: true }
   )
 
@@ -97,14 +79,22 @@ export function useCesium(containerId) {
     try {
       viewer.value = createViewer(containerId)
       viewer.value.cesiumWidget.creditContainer.style.display = 'none'
-     // viewer.value.scene.globe.depthTestAgainstTerrain = false
-      // 说明
       window.viewer = viewer.value
-        resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
-          cameraHeightThreshold: 240000
-        })
-      viewer.value.shadows = true;
-      viewer.value.terrainShadows = Cesium.ShadowMode.ENABLED;
+
+      const scene = viewer.value.scene
+      scene.globe.depthTestAgainstTerrain = true
+      scene.fog.enabled = true
+      scene.requestRenderMode = true
+      scene.maximumRenderTimeChange = 0.5
+      scene.fxaa = false
+
+      viewer.value.shadows = false
+      viewer.value.terrainShadows = Cesium.ShadowMode.DISABLED
+      viewer.value.resolutionScale = Math.min(window.devicePixelRatio || 1, 1.25)
+
+      resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
+        cameraHeightThreshold: 240000,
+      })
       console.log('[Cesium] Viewer 基础配置完成')
     } catch (error) {
       console.error('[Cesium] 初始化 Viewer 失败:', error)
@@ -208,6 +198,67 @@ export function useCesium(containerId) {
     resources.value.cameraMoveHandler = handleCameraMove(viewer.value)
   };
 
+  const applyAreaPointsVisibility = () => {
+    const visible = layerSettingsStore.layers.areaPoints?.visible !== false
+    resources.value.areaManager?.setAreasVisibility(visible)
+  }
+
+  const ensureLandingPointsRendered = async () => {
+    if (!resources.value.areaManager || !viewer.value) return
+    let points = areaList.value || []
+    const rid = appStore.regionId || regionStore.regionId
+    if (!points.length && rid) {
+      try {
+        await areaStore.loadLandingPoints(rid)
+        points = areaStore.areaList || []
+      } catch (err) {
+        console.warn('[Cesium] 起降点加载失败', err)
+      }
+    }
+    resources.value.areaManager.render(points, {
+      visible: layerSettingsStore.layers.areaPoints?.visible !== false,
+    })
+  }
+
+  /** MetViz 开启风场时不受 10km 相机高度限制（区域概览 ~120km 也能看） */
+  const shouldShowWindLayers = () => {
+    if (layerSettingsStore.layers.wind?.visible === false) return false
+    if (metVizOnDashboard && metVizStore.enabled?.wind) return true
+    if (!viewer.value) return false
+    const c = viewer.value.camera.positionCartographic
+    if (!Cesium.defined(c)) return false
+    return c.height <= CAMERA_HEIGHT_THRESHOLD
+  }
+
+  const getWindLayerInstances = () => {
+    const list = windStore.windLayer || resources.value.windLayer
+    if (!list) return []
+    return Array.isArray(list) ? list.filter(Boolean) : [list]
+  }
+
+  const syncSceneRenderMode = () => {
+    if (!viewer.value?.scene) return
+    const windAnimating =
+      metVizOnDashboard &&
+      metVizStore.enabled?.wind &&
+      layerSettingsStore.layers.wind?.visible !== false &&
+      getWindLayerInstances().length > 0
+    viewer.value.scene.requestRenderMode = !windAnimating
+    viewer.value.scene.maximumRenderTimeChange = windAnimating ? 0 : 0.5
+    if (!windAnimating) {
+      viewer.value.scene.requestRender()
+    }
+  }
+
+  const applyWindLayerVisibility = () => {
+    const showWind = shouldShowWindLayers()
+    const layers = getWindLayerInstances()
+    layers.forEach((layer) => {
+      if (layer?.show !== undefined) layer.show = showWind
+    })
+    syncSceneRenderMode()
+  }
+
   /**
    * 功能说明
    */
@@ -226,48 +277,25 @@ export function useCesium(containerId) {
       Number.isFinite(initialHeight) && initialHeight <= CAMERA_HEIGHT_THRESHOLD
 
     const applyLowAltitudeLayers = (isBelowThreshold) => {
-      if (isBelowThreshold) {
-        const isWindEnabled = layerSettingsStore.layers.wind.visible
-        /** 仅云层在会话航迹低空时抑制；风场不再随会话强制关闭，避免与高度逻辑叠加后「一会有一会无」 */
-        const suppressCloudForSession =
-          routeStore.sessionPathOnMap && routeStore.currentRoute?.mode === 'session'
+      applyWindLayerVisibility()
 
-        if (resources.value.windLayer && resources.value.windLayer.length > 0) {
-          if (Array.isArray(resources.value.windLayer)) {
-            resources.value.windLayer.forEach((layer) => {
-              if (layer) layer.show = isWindEnabled
-            })
-          } else {
-            resources.value.windLayer.show = isWindEnabled
-          }
-        }
-        if (resources.value.areaManager) {
-          resources.value.areaManager.setAreasVisibility(false)
-        }
+      if (isBelowThreshold) {
+        const suppressCloudForSession =
+          routeStore.sessionPathOnMap && routeStore.currentRoute?.mode === 'session';
+
         if (resources.value.cloud) {
-          const isCloudEnabled = layerSettingsStore.layers.cloud.visible
+          const isCloudEnabled = layerSettingsStore.layers.cloud.visible;
           if (isCloudEnabled && !suppressCloudForSession) {
-            resources.value.cloud.show()
-            resources.value.cloud.setVisible(true)
+            resources.value.cloud.show();
+            resources.value.cloud.setVisible(true);
           }
         }
       } else {
-        if (resources.value.windLayer && resources.value.windLayer.length > 0) {
-          if (Array.isArray(resources.value.windLayer)) {
-            resources.value.windLayer.forEach((layer) => {
-              if (layer) layer.show = false
-            })
-          } else {
-            resources.value.windLayer.show = false
-          }
-        }
         if (resources.value.cloud) {
-          resources.value.cloud.destroy()
-        }
-        if (resources.value.areaManager) {
-          resources.value.areaManager.setAreasVisibility(true)
+          resources.value.cloud.destroy();
         }
       }
+      applyAreaPointsVisibility()
     }
 
     const syncFromCameraHeight = (heightM) => {
@@ -314,7 +342,7 @@ export function useCesium(containerId) {
     
     try {
       console.log('[Cesium] 3.2 加载天地图图层...')
-      resources.value.tiandituLayer = addTiandituLayer(viewer.value)
+      resources.value.tiandituLayer = addTiandituLayerOld(viewer.value)
       console.log('[Cesium] 底图图层加载完成')
     } catch (error) {
       console.warn('[Cesium] 底图图层加载失败:', error)
@@ -327,13 +355,28 @@ export function useCesium(containerId) {
    */
   const load3DModel = async () => {
     try {
-      console.log('[Cesium] 4.1 加载白膜模型...')
-      resources.value.modelTileset = await addWhiteModel(viewer.value,{url:regionStore.getModelUrl})
+      const modelUrl = regionStore.getModelUrl
+      const rid = regionStore.regionId
+      if (!modelUrl) {
+        console.warn('[Cesium] 未配置 modelUrl，跳过 3D 模型', { regionId: rid })
+        return
+      }
+      if (viewer.value && resources.value.modelTileset) {
+        removeWhiteModel(viewer.value)
+        resources.value.modelTileset = null
+      }
+      console.log('[Cesium] 4.1 加载白膜模型...', { regionId: rid, modelUrl })
+      resources.value.modelTileset = await addWhiteModel(viewer.value, { url: modelUrl })
+      applyModelVisibility()
       console.log('[Cesium] 白膜模型加载完成')
     } catch (error) {
       console.warn('[Cesium] 白膜模型加载失败:', error)
-      // 说明
     }
+  }
+
+  const applyModelVisibility = () => {
+    const visible = layerSettingsStore.layers.model?.visible !== false
+    setModelVisibility(visible)
   }
 
   /**
@@ -343,35 +386,11 @@ export function useCesium(containerId) {
     try {
       console.log('[Cesium] 5.1 初始化监测点管理器...')
       resources.value.areaManager = AreaManager.getInstance(viewer.value, areaStore)
-      console.log('[Cesium] 5.2 渲染监测点数量:', areaList.value?.length || 0)
-      resources.value.areaManager.render(areaList.value)
+      await ensureLandingPointsRendered()
     } catch (error) {
       console.warn('[Cesium] 监测点管理器初始化失败:', error)
     }
 
-
-    if (MAP_HEATMAP_ENABLED) {
-      try {
-        console.log('[Cesium] 5.4 初始化热力图...')
-        resources.value.heatMapManager = await initHeatVolume(viewer.value)
-        resources.value.heatMapBridge = createReactiveHeatmapBridge({
-          heatmapManager: resources.value.heatMapManager,
-          heatmapStore,
-          layerSettingsStore,
-          areaStore,
-          getCurrentTime: () => {
-            if (!viewer.value?.clock?.currentTime) return new Date()
-            return Cesium.JulianDate.toDate(viewer.value.clock.currentTime)
-          }
-        })
-        heatmapStore.setHeatmapLayer(resources.value.heatMapManager)
-        console.log('[Cesium] 热力图初始化完成')
-      } catch (error) {
-        console.warn('[Cesium] 热力图初始化失败:', error)
-      }
-    } else {
-      console.info('[Cesium] 地图热力已关闭（待气象可视化重构），跳过 heatmap 初始化')
-    }
 
     try {
       console.log('[Cesium] 5.5 初始化航线管理器...')
@@ -464,7 +483,8 @@ export function useCesium(containerId) {
         }
       });
     }
-     console.log('[Cesium] 开始初始化云层...')
+    if (layerSettingsStore.layers.cloud?.visible !== false) {
+      console.log('[Cesium] 开始初始化云层...')
       try {
         resources.value.cloud = new Cloud(viewer.value)
         resources.value.cloud.show()
@@ -472,14 +492,25 @@ export function useCesium(containerId) {
       } catch (cloudError) {
         console.warn('[Cesium] 云层初始化失败:', cloudError)
       }
+    }
 
       
-    try {
-      console.log('[Cesium] 5.3 初始化风场...')
-      resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
-      console.log('[Cesium] 风场初始化完成')
-    } catch (error) {
-      console.warn('[Cesium] 风场初始化失败:', error)
+    if (metVizOnDashboard) {
+      try {
+        console.log('[Cesium] 5.3 初始化风场...')
+        resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
+        syncSceneRenderMode()
+        dashboardEventBus.emit(DASHBOARD_EVENTS.MET_VIZ_CONFIG_CHANGED, {
+          product: metVizStore.product,
+          heightM: metVizStore.heightM,
+          enabled: { ...metVizStore.enabled },
+        })
+        console.log('[Cesium] 风场初始化完成')
+      } catch (error) {
+        console.warn('[Cesium] 风场初始化失败:', error)
+      }
+    } else {
+      console.log('[Cesium] 主大屏已关闭 MetViz，跳过风场初始化')
     }
 
     // 说明：风场数据可能晚于 Viewer 就绪，但高度分层逻辑（风/云/监测点）必须在首帧就注册一次
@@ -504,6 +535,25 @@ export function useCesium(containerId) {
    * 功能说明
    */
   const setupReactiveWatchers = () => {
+    dashboardEventBus.on(DASHBOARD_EVENTS.WIND_VISIBILITY_SYNC, () => {
+      updateWindVisibilityBasedOnConditions()
+    })
+
+    watch(
+      () => metVizStore.enabled.wind,
+      () => {
+        updateWindVisibilityBasedOnConditions()
+        syncSceneRenderMode()
+      }
+    )
+
+    watch(
+      () => windStore.windLayer,
+      () => {
+        if (windStore.windLayer) updateWindVisibilityBasedOnConditions()
+      }
+    )
+
     // 说明
     watch(
       () => areaStore.selectedArea,
@@ -517,38 +567,8 @@ export function useCesium(containerId) {
           flyToRegion(viewer.value, { bbox: newArea.bbox, duration: 1.0 })
         }
 
-        const pointId = newArea.id || newArea.pointId || null
-        if (pointId) {
-          heatmapStore.setCurrentPointId(pointId)
-        }
-
-        if (!resources.value.heatMapManager) {
-          return
-        }
-
-        const currentTime = viewer.value.clock.currentTime
-        const jsDate = currentTime ? Cesium.JulianDate.toDate(currentTime) : new Date()
-
-        // 桥接模式下由 createReactiveHeatmapBridge 统一负责 area/mode 的刷新，
-        // 这里只同步 pointId，避免同一次区域切换触发两次接口调用。
-        if (resources.value.heatMapBridge) return
-
-        await updateHeatmapTime(jsDate)
       },
       { deep: true }
-    )
-
-    // 说明
-    watch(
-      () => heatmapStore.heatmapMode,
-      async (newMode, oldMode) => {
-        // 桥接内部已监听 heatmapMode 并刷新，避免重复请求
-        if (newMode !== oldMode && resources.value.heatMapManager && !resources.value.heatMapBridge) {
-          const currentTime = new Date()
-          console.log('热力图模式切换:', newMode, currentTime)
-          await updateHeatmapTime(currentTime)
-        }
-      }
     )
 
     // 说明
@@ -590,29 +610,84 @@ export function useCesium(containerId) {
     watch(
       () => areaStore.areaList,
       (newAreas) => {
-        if (newAreas && viewer.value && resources.value.areaManager) {
-          resources.value.areaManager.render(newAreas)
-        }
+        if (!viewer.value || !resources.value.areaManager) return
+        resources.value.areaManager.render(newAreas || [], {
+          visible: layerSettingsStore.layers.areaPoints?.visible !== false,
+        })
       },
       { deep: true }
     )
 
-    // Region / mapLift 就绪后自动飞到默认视角（与 switchToOverviewMode 相同逻辑）
+    // 起降点加载后自动飞到能包含全部点的概览视角
     let regionOverviewApplied = false
     watch(
-      () => [regionStore.getMapLift, regionStore.getRegionBounds, viewer.value],
-      ([mapLift, bounds, v]) => {
-        if (regionOverviewApplied || !v) return
-        if (!mapLift && !bounds) return
+      () => [areaStore.areaList, viewer.value],
+      ([points, v]) => {
+        if (regionOverviewApplied || !v || !points?.length) return
         regionOverviewApplied = true
-        console.log('[Dashboard/Camera] 自动应用 Region 视角', {
+        console.log('[Dashboard/Camera] 自动应用起降点概览视角', {
           regionId: regionStore.regionId,
-          hasMapLift: !!mapLift,
-          hasBounds: !!bounds,
+          pointCount: points.length,
         })
-        flyToRegionOverview(v)
+        flyToRegionOverview(v, { points })
       },
       { immediate: true, deep: true }
+    )
+
+    watch(
+      () => [appStore.view, appStore.focus.type, appStore.focus.id, viewer.value, areaStore.areaList],
+      ([view, focusType, focusId, v, points]) => {
+        if (!v || !points?.length) return
+
+        if (view === 'drillLanding' && focusType === 'landingPoint' && focusId) {
+          const point = points.find(
+            (p) => String(p.id || p.landingPointId) === String(focusId)
+          )
+          if (!point) return
+          areaStore.setSelectedLandingPoint(point)
+          const entityId = `area_${point.id || point.landingPointId}`
+          if (resources.value.areaManager?.areaEntities?.has(entityId)) {
+            resources.value.areaManager.setSelected(entityId)
+          } else {
+            switchToFocusMode(v, point)
+          }
+          return
+        }
+
+        if (view === 'home') {
+          areaStore.setSelectedLandingPoint(null)
+          switchToOverviewMode(v, points)
+        }
+      }
+    )
+
+    const reloadRegionMapLayers = async ({ regionId } = {}) => {
+      const rid = regionId || regionStore.regionId
+      if (!rid || !viewer.value) return
+      console.log('[Cesium] REGION_CHANGED 重载地图数据', {
+        regionId: rid,
+        modelUrl: regionStore.getModelUrl,
+      })
+      try {
+        regionOverviewApplied = false
+        await load3DModel()
+        routeManager.clearAllRoutes()
+        routeStore.clearCurrentRoute()
+        areaStore.clearLandingPoints()
+        await areaStore.loadLandingPoints(rid)
+        await ensureLandingPointsRendered()
+        const rz = await getRiskZones(rid)
+        routeManager.setRiskZones(rz?.zones || [])
+        flyToRegionOverview(viewer.value, { points: areaStore.areaList || [] })
+        regionOverviewApplied = true
+      } catch (err) {
+        console.warn('[Cesium] REGION_CHANGED 重载失败', err)
+      }
+    }
+
+    resources.value.regionChangedUnsub = dashboardEventBus.on(
+      DASHBOARD_EVENTS.REGION_CHANGED,
+      reloadRegionMapLayers
     )
 
     // 说明
@@ -684,6 +759,8 @@ export function useCesium(containerId) {
       resources.value.cameraHeightWatcher = null
     }
     resources.value.refreshCameraHeightLayerVisibility = null
+    resources.value.regionChangedUnsub?.()
+    resources.value.regionChangedUnsub = null
 
     if (viewer.value) {
       // 说明
@@ -755,8 +832,16 @@ export function useCesium(containerId) {
    * 功能说明
    */
   const setModelVisibility = (visible) => {
-    if (resources.value.modelTileset) {
-      resources.value.modelTileset.show = visible
+    const models = resources.value.modelTileset
+    if (!models) return
+    if (Array.isArray(models)) {
+      models.forEach((m) => {
+        if (m) m.show = visible
+      })
+      return
+    }
+    if (models.show !== undefined) {
+      models.show = visible
     }
   };
 
@@ -764,13 +849,16 @@ export function useCesium(containerId) {
    * 功能说明
    */
   const setWindVisibility = (visible) => {
-    if (resources.value.windLayer) {
-      // 说明
-      layerSettingsStore.setLayerVisibility('wind', visible);
-
-      // 说明
-      updateWindVisibilityBasedOnConditions();
+    layerSettingsStore.setLayerVisibility('wind', visible);
+    if (metVizOnDashboard) {
+      metVizStore.setLayerEnabled('wind', visible);
+      dashboardEventBus.emit(DASHBOARD_EVENTS.MET_VIZ_CONFIG_CHANGED, {
+        product: metVizStore.product,
+        heightM: metVizStore.heightM,
+        enabled: { ...metVizStore.enabled },
+      });
     }
+    updateWindVisibilityBasedOnConditions();
   };
 
 
@@ -778,27 +866,12 @@ export function useCesium(containerId) {
    * 功能说明
    */
   const updateWindVisibilityBasedOnConditions = () => {
-    if (!resources.value.windLayer) return
+    if (!getWindLayerInstances().length && !windStore.windData) return
     if (resources.value.refreshCameraHeightLayerVisibility) {
       resources.value.refreshCameraHeightLayerVisibility()
       return
     }
-    if (!viewer.value) return
-
-    const cameraPosition = viewer.value.camera.positionCartographic
-    const cameraHeight = cameraPosition.height
-
-    const isWindEnabled = layerSettingsStore.layers.wind.visible
-
-    const shouldBeVisible = isWindEnabled && cameraHeight <= CAMERA_HEIGHT_THRESHOLD
-
-    if (Array.isArray(resources.value.windLayer)) {
-      resources.value.windLayer.forEach((layer) => {
-        if (layer) layer.show = shouldBeVisible
-      })
-    } else {
-      resources.value.windLayer.show = shouldBeVisible
-    }
+    applyWindLayerVisibility()
   }
 
 
@@ -806,6 +879,7 @@ export function useCesium(containerId) {
    * 功能说明
    */
   const setAreasVisibility = (visible) => {
+    layerSettingsStore.setLayerVisibility('areaPoints', visible)
     if (resources.value.areaManager) {
       resources.value.areaManager.setAreasVisibility(visible)
     }
@@ -815,14 +889,14 @@ export function useCesium(containerId) {
    * 功能说明
    */
   const setTemperatureVisibility = (visible) => {
-    console.log('设置温度图层可见性:', visible);
-    if (resources.value.heatMapBridge) {
-      resources.value.heatMapBridge.setVisible(visible)
-      return
-    }
-    if (resources.value.heatMapManager) {
-      resources.value.heatMapManager.setVisible(visible)
-    }
+    layerSettingsStore.setLayerVisibility('temperature', visible);
+    if (!metVizOnDashboard) return;
+    metVizStore.setLayerEnabled('metProduct', visible);
+    dashboardEventBus.emit(DASHBOARD_EVENTS.MET_VIZ_CONFIG_CHANGED, {
+      product: metVizStore.product,
+      heightM: metVizStore.heightM,
+      enabled: { ...metVizStore.enabled },
+    });
   };
 
   /**
@@ -856,38 +930,8 @@ export function useCesium(containerId) {
     resources.value.cloud.setVisible(shouldBeVisible);
   };
 
-  const updateHeatmapTime = async (time) => {
-
-    if (!resources.value.heatMapManager) {
-      console.error('[Heatmap] 热力图管理器尚未初始化')
-      return
-    }
-
-    if (resources.value.heatMapBridge) {
-      try {
-        await resources.value.heatMapBridge.refresh(time)
-      } catch (error) {
-        console.error('[HeatmapBridge] 刷新失败', error)
-      }
-      return
-    }
-
-    try {
-      const mode = heatmapStore.heatmapMode === 'citywide' ? 'citywide' : 'area'
-      const currentArea = areaStore.selectedArea
-      const pointId = heatmapStore.currentPointId || currentArea?.id || currentArea?.pointId
-      const layerType = heatmapStore.mapLayerType === 'risk' ? 'risk' : 'temperature'
-      const heatmapData = await loadMapHeatmapPayload({ mode, layerType, pointId, time })
-      if (pointId) heatmapStore.setCurrentPointId(pointId)
-      heatmapStore.setHeatmapData(heatmapData)
-      const layers = layerSettingsStore.layers || {}
-      const visible = layers.temperature?.visible !== false || layers.riskField?.visible === true
-      resources.value.heatMapManager.setData(heatmapData)
-      resources.value.heatMapManager.setVisible(visible)
-    } catch (error) {
-      console.error('更新热力图失败:', error)
-    }
-  };
+  /** @deprecated 气象填色由 MetVizEngine 经 MET_TIME_CHANGED 刷新 */
+  const updateHeatmapTime = async () => {};
   /**
    * 功能说明
    */
@@ -923,21 +967,14 @@ export function useCesium(containerId) {
     flyToRectangle: (region) => flyToRectangle(viewer.value, region),
     getCurrentCameraParams: () => getCurrentCameraParams(viewer.value),
     // 说明
-    switchToOverviewMode: () => switchToOverviewMode(viewer.value),
+    switchToOverviewMode: () => switchToOverviewMode(viewer.value, areaStore.areaList || []),
     switchToFocusMode: (region) => switchToFocusMode(viewer.value, region),
     // 说明
     setModelVisibility,
     setWindVisibility,
     setAreasVisibility,
     setTemperatureVisibility,
-    setHeatmapLayerType: async (type) => {
-      if (resources.value.heatMapBridge?.setLayerType) {
-        await resources.value.heatMapBridge.setLayerType(type);
-      } else {
-        heatmapStore.setMapLayerType(type);
-        await updateHeatmapTime();
-      }
-    },
+    setHeatmapLayerType: async () => {},
     setCloudVisibility,
     // 说明
     updateHeatmapTime,

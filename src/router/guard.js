@@ -1,6 +1,7 @@
 
 import { ElMessage } from 'element-plus'
 import { canAccessSettingFromStorage } from '@/utils/roleUtils'
+import { getToken } from '@/utils/storageUtils'
 
 const ROUTE_RELOAD_FLAG = '__admin_route_reload__'
 const DYNAMIC_IMPORT_ERROR_PATTERNS = [
@@ -22,8 +23,7 @@ export function setupRouterGuard(router) {
     // 设置页面标题
     document.title = `${to.meta.title || '气象服务系统'} - ${import.meta.env.VITE_APP_TITLE}`
     
-    // 简单的权限控制示例（实际项目可扩展）
-    const isAuthenticated = !!localStorage.getItem('token')
+    const isAuthenticated = Boolean(getToken())
     const canManageSettings = canAccessSettingFromStorage()
     
     if (to.path === '/login' || to.path.startsWith('/demos')) {

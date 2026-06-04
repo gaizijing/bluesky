@@ -5,16 +5,17 @@ import { AreaService } from '@/services/areaService'
 import { InitializationService } from '@/services/initialization'
 import { WallDiffuseMaterialProperty } from '@/cesium/WallDiffuseMaterialProperty'
 
+const DEFAULT_POINT_ICON = '/image/ic_point.png'
+const SELECTED_POINT_ICON = '/image/ic_select_point.png'
+const CLUSTER_POINT_ICON = '/image/ic_cluster.png'
+
 class AreaManager {
   static instance = null
 
   constructor(viewer, areaStore) {
-    if (AreaManager.instance) {
-      return AreaManager.instance
-    }
-
     this.viewer = viewer
     this.areaStore = areaStore
+    this._dataSource = null
     this.areaEntities = new Map()
     this.originalBillboardStyle = new Map()
     this.hoveredEntity = null
@@ -26,12 +27,14 @@ class AreaManager {
     this.areaService = new AreaService()
     this.initializeService = new InitializationService()
     this._bindEvents()
-    AreaManager.instance = this
   }
 
   static getInstance(viewer, areaStore) {
     if (!AreaManager.instance) {
-      new AreaManager(viewer, areaStore)
+      AreaManager.instance = new AreaManager(viewer, areaStore)
+    } else {
+      AreaManager.instance.viewer = viewer
+      AreaManager.instance.areaStore = areaStore
     }
     return AreaManager.instance
   }
@@ -40,32 +43,38 @@ class AreaManager {
    * 渲染重点关注区域
    * @param {Array} areas - 重点关注区域数据数组
    */
-  render(areas) {
-    if (!areas || !this.viewer) return
+  render(areas, { visible = true } = {}) {
+    if (!this.viewer) return
+    const list = Array.isArray(areas) ? areas : []
 
-    // 清除现有实体
     this._clearExistingEntities()
 
-    // 移除旧聚合数据源
     const oldDataSource = this.viewer.dataSources.getByName('areaClustering')[0]
     if (oldDataSource) {
       this.viewer.dataSources.remove(oldDataSource)
     }
 
-    // 创建新的聚合数据源
+    if (!list.length) {
+      this._dataSource = null
+      return
+    }
+
     const dataSource = new Cesium.CustomDataSource('areaClustering')
     this.viewer.dataSources.add(dataSource)
+    this._dataSource = dataSource
 
-    // 配置聚合参数
-    this._configureClustering(dataSource)
+    if (list.length >= 3) {
+      this._configureClustering(dataSource)
+    } else {
+      dataSource.clustering.enabled = false
+    }
 
-    // 创建并添加重点关注区域实体    
-    areas.forEach(area => {
+    list.forEach((area) => {
       const entity = this._createAreaEntity(dataSource, area)
-        dataSource.entities.add(entity)
+      if (entity) dataSource.entities.add(entity)
     })
 
-    this.viewer.zoomTo(dataSource)
+    this.setAreasVisibility(visible)
   }
 
   /**
@@ -117,7 +126,7 @@ class AreaManager {
 
     this.viewer.scene.camera.moveEnd.addEventListener(() => {
       if (this.selectedEntity?.billboard) {
-        this.selectedEntity.billboard.image = '/image/ic_select_point.png'
+        this.selectedEntity.billboard.image = SELECTED_POINT_ICON
         this.selectedEntity.billboard.scale = 1.5
       }
     })
@@ -217,7 +226,7 @@ class AreaManager {
 
           if (entity === this.selectedEntity) {
             if (this.selectedEntity?.billboard) {
-              this.selectedEntity.billboard.image = '/image/ic_select_point.png'
+              this.selectedEntity.billboard.image = SELECTED_POINT_ICON
               this.selectedEntity.billboard.scale = 1.5
             }
           } else if (entity !== this.hoveredEntity) {
@@ -256,19 +265,24 @@ class AreaManager {
   // 私有方法：创建重点关注区域实体
   _createAreaEntity(dataSource, area) {
     const entityId = `area_${area.id}`
-    // 移除旧实体
+    const lng = Number(area.longitude)
+    const lat = Number(area.latitude)
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+      console.warn('[AreaManager] 跳过无效坐标起降点', area?.id, area?.name)
+      return null
+    }
+
     if (this.areaEntities.has(entityId)) {
       const old = this.areaEntities.get(entityId)
       try { dataSource.entities.remove(old) } catch (e) { }
       this.originalBillboardStyle.delete(entityId)
     }
 
-    // 创建新实体，只保留可序列化的area属性
     const serializableArea = {
       id: area.id,
       name: area.name,
-      longitude: area.longitude,
-      latitude: area.latitude,
+      longitude: lng,
+      latitude: lat,
       bbox: area.bbox,
       type: area.type,
       status: area.status,
@@ -277,27 +291,30 @@ class AreaManager {
 
     const entity = new Cesium.Entity({
       id: entityId,
-      position: Cesium.Cartesian3.fromDegrees(area.longitude, area.latitude, 50),
+      show: true,
+      position: Cesium.Cartesian3.fromDegrees(lng, lat, 80),
       billboard: new Cesium.BillboardGraphics({
-        image: '/image/ic_point.png',
-        width: 60,
-        height: 60,
+        image: DEFAULT_POINT_ICON,
+        width: 48,
+        height: 48,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        scaleByDistance: new Cesium.NearFarScalar(500, 1.2, 800000, 0.6),
       }),
       label: new Cesium.LabelGraphics({
         text: area.name,
-        font: '14px sans-serif',
+        font: '14px Microsoft YaHei',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 4,
+        outlineWidth: 3,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        pixelOffset: new Cesium.Cartesian2(0, 0),
+        pixelOffset: new Cesium.Cartesian2(0, -52),
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 500000),
       }),
-
-
       properties: { areaData: serializableArea }
     })
 
@@ -316,10 +333,9 @@ class AreaManager {
       cluster.billboard.show = true
       cluster.billboard.id = cluster.label.id
       cluster.billboard.verticalOrigin = Cesium.VerticalOrigin.BOTTOM
-      const pinBuilder = new Cesium.PinBuilder()
-      cluster.billboard.image = pinBuilder
-        .fromText(`${clusteredEntities.length}`, Cesium.Color.DARKBLUE, 48)
-        .toDataURL()
+      cluster.billboard.image = CLUSTER_POINT_ICON
+      cluster.billboard.width = 48
+      cluster.billboard.height = 48
     })
   }
 
@@ -350,7 +366,7 @@ class AreaManager {
         this._saveOriginalBillboardStyle(entity)
       }
 
-      entity.billboard.image = '/image/ic_select_point.png'
+      entity.billboard.image = SELECTED_POINT_ICON
       entity.billboard.scale = 1.5
       this.viewer.canvas.style.cursor = 'pointer'
 
@@ -360,8 +376,6 @@ class AreaManager {
           : entity.properties?.areaData
         this.areaService.updateSelectedArea(area)
         this.initializeService.initializeAreaWeatherData();
-        this.initializeService.initializeMapWeatherLayer();
-        this.initializeService.initializeModuleData();
       } catch (e) {
         this.areaStore.setSelectedArea(null)
       }
@@ -579,11 +593,13 @@ class AreaManager {
     }
   }
   setAreasVisibility(visible) {
+    const on = Boolean(visible)
+    if (this._dataSource) {
+      this._dataSource.show = on
+    }
     this.areaEntities.forEach((entity) => {
-      if (entity) {
-        entity.show = visible;
-      }
-    });
+      if (entity) entity.show = on
+    })
   }
 }
 

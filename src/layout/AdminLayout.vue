@@ -67,9 +67,13 @@ import {
   DataAnalysis,
   Histogram,
   LocationInformation,
+  Monitor,
   SwitchButton,
+  Upload,
   User,
-  VideoCamera
+  VideoCamera,
+  Warning,
+  MapLocation
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { userLogout } from '@/api/auth'
@@ -82,10 +86,40 @@ const now = ref(new Date())
 
 const menuItems = [
   {
+    path: '/setting/regions',
+    title: '区域管理',
+    description: '区域边界、白膜 modelUrl、mapLift 配置',
+    icon: MapLocation
+  },
+  {
     path: '/setting/flyability-rules',
     title: '适飞规则集',
     description: 'P1 适飞规则 JSON 与发布管理',
     icon: DataAnalysis
+  },
+  {
+    path: '/setting/risk-rules',
+    title: 'R_met 规则集',
+    description: '风险热力图因子权重与阈值',
+    icon: Histogram
+  },
+  {
+    path: '/setting/warning-rules',
+    title: '预警规则集',
+    description: 'L1/L2 预警规则与 LLM 开关',
+    icon: Warning
+  },
+  {
+    path: '/setting/no-fly-zones',
+    title: '禁飞区管理',
+    description: 'GeoJSON 导入与多边形预览',
+    icon: MapLocation
+  },
+  {
+    path: '/setting/route-import',
+    title: '航路导入',
+    description: 'GeoJSON LineString 导入至 Region',
+    icon: Upload
   },
   {
     path: '/setting/scheduler',
@@ -118,24 +152,31 @@ const menuItems = [
     icon: Cpu
   },
   {
+    path: '/setting/device-monitoring',
+    title: '设备监测看板',
+    description: '设备在线率、告警统计与 42h 历史监测图表',
+    icon: Monitor
+  },
+  {
     path: '/setting/camera',
     title: '摄像头管理',
     description: '监控画面、流地址与启用状态统一维护',
     icon: VideoCamera
-  },
-  {
-    path: '/setting/regions',
-    title: '区域管理',
-    description: '区域配置、边界定义与数据同步',
-    icon: LocationInformation
   }
 ]
 
 const routeDescriptions = {
+  '/setting/regions': '维护 Region 边界、白膜 tileset 路径与相机 mapLift；大屏切换区域时读取此处配置。',
+  '/setting/flyability-rules': '管理适飞阈值 JSON，发布后 Dashboard 适飞矩阵引用最新版本。',
+  '/setting/risk-rules': '管理 R_met 因子权重，发布后风险热力图在下一时间桶更新。',
+  '/setting/warning-rules': '配置 L1/L2 预警规则，支持已发布规则集启用 LLM 解读。',
+  '/setting/no-fly-zones': '按 Region 维护禁飞多边形，支持 GeoJSON FeatureCollection 批量导入。',
+  '/setting/route-import': '将 GeoJSON 航路导入指定 Region，供大屏航路总览与钻取使用。',
   '/setting/user': '集中维护用户资料、角色权限和账号状态，保证后台访问边界清晰可控。',
   '/setting/aircraft': '统一整理飞行器型号与性能档案，为业务匹配提供可追踪资产台账。',
   '/setting/landing-points': '编排业务起降点网络，确保站点坐标、类型与运行状态始终可控。',
   '/setting/device': '管理设备台账、在线状态和监测点关联关系，保证感知链路稳定可追踪。',
+  '/setting/device-monitoring': '查看设备运行状态、告警趋势与 42 小时历史监测图表（原大屏设备监控模块）。',
   '/setting/camera': '维护摄像头部署、实时预览和启用状态，确保视频监控链路清晰可控。'
 }
 

@@ -12,14 +12,8 @@ export const getViewerOptions = () => ({
   animation: false,
   timeline: true,
   selectionIndicator: true,
-  // // 渲染精度设置
-  maximumScreenSpaceError: 1, // 较低的值提高精度但可能降低性能，可根据需求调整为2-4
-
-  // // 性能优化关键设置
-  maximumRenderTimeChange: 0.1, // 控制请求渲染模式下的帧率，较小的值提高响应速度
-  scene3DOnly: true, // 如果只需要3D场景，禁用2D和Columbus View可提高性能
-
-  shadows: false, // 禁用阴影计算
+  scene3DOnly: true,
+  shadows: false,
 
   showRenderLoopErrors: false, // 生产环境禁用错误弹窗
   // WebGL上下文配置
@@ -31,7 +25,7 @@ export const getViewerOptions = () => ({
       alpha: false,
       depth: true,
       stencil: false,
-      antialias: true, // 可设置为false进一步提高性能，但会降低画质
+      antialias: false,
       powerPreference: 'high-performance',
       premultipliedAlpha: true,
       preserveDrawingBuffer: false,

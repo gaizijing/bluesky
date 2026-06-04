@@ -1,7 +1,8 @@
 import axios from 'axios'
-import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
+import { ElMessage, ElLoading } from 'element-plus'
 import { getToken, removeToken } from './storageUtils'
 import { clearStore } from '@/store'
+import router from '@/router'
 
 // 创建axios实例
 const service = axios.create({
@@ -12,26 +13,93 @@ const service = axios.create({
   }
 })
 
-// 加载实例
+// 加载实例（引用计数，避免并发请求反复弹出）
 let loadingInstance = null
+let loadingCount = 0
+let authRedirecting = false
+
+function startGlobalLoading() {
+  loadingCount += 1
+  if (loadingCount === 1) {
+    loadingInstance = ElLoading.service({
+      lock: true,
+      text: '加载中...',
+      background: 'rgba(0, 0, 0, 0.3)',
+    })
+  }
+}
+
+function stopGlobalLoading() {
+  loadingCount = Math.max(0, loadingCount - 1)
+  if (loadingCount === 0) {
+    loadingInstance?.close()
+    loadingInstance = null
+  }
+}
+
+function handleUnauthorized(message = '登录已过期，请重新登录') {
+  if (authRedirecting) return
+  authRedirecting = true
+  removeToken()
+  clearStore()
+  const path = router.currentRoute.value?.path || ''
+  if (path !== '/login') {
+    ElMessage.warning(message)
+    router.replace('/login').finally(() => {
+      authRedirecting = false
+    })
+  } else {
+    authRedirecting = false
+  }
+}
+
+const REGION_SCOPED_PREFIXES = [
+  '/landing-points',
+  '/routes',
+  '/no-fly-zones',
+  '/warnings',
+  '/weather/grid-field',
+]
+
+function readRegionIdForRequest() {
+  try {
+    const raw = localStorage.getItem('currentRegionId')
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return typeof parsed === 'string' && parsed.trim() ? parsed.trim() : null
+  } catch {
+    return null
+  }
+}
+
+function needsRegion(url = '') {
+  const path = String(url).split('?')[0]
+  return REGION_SCOPED_PREFIXES.some((prefix) => path.startsWith(prefix))
+}
 
 // 请求拦截器
 service.interceptors.request.use(
   (config) => {
-    // 显示加载
-    loadingInstance = ElLoading.service({
-      lock: true,
-      text: '加载中...',
-      background: 'rgba(0, 0, 0, 0.3)'
-    })
+    const method = (config.method || 'get').toLowerCase()
+    const showLoading = config.showLoading === true
+      || (config.showLoading !== false && !config.skipLoading && method !== 'get')
+
+    if (showLoading) {
+      config.__showLoading = true
+      startGlobalLoading()
+    }
 
     // 添加token
     const token = getToken()
-    console.log('token:', token);
-    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    const regionId = readRegionIdForRequest()
+    if (regionId && needsRegion(config.url) && !config.params?.regionId) {
+      config.params = { ...(config.params || {}), regionId }
+    }
+
     // 如果是本地静态资源请求（/data/ 开头），清空 baseURL
     if (config.url?.startsWith('/cesium/')) {
       config.baseURL = ''; // 确保请求直接指向前端 Vite 服务的静态文件
@@ -39,7 +107,9 @@ service.interceptors.request.use(
     return config
   },
   (error) => {
-    loadingInstance?.close()
+    if (error.config?.__showLoading) {
+      stopGlobalLoading()
+    }
     ElMessage.error('请求错误：' + error.message)
     return Promise.reject(error)
   }
@@ -48,7 +118,9 @@ service.interceptors.request.use(
 // 响应拦截器
 service.interceptors.response.use(
   (response) => {
-    loadingInstance?.close()
+    if (response.config?.__showLoading) {
+      stopGlobalLoading()
+    }
     // 1. 识别本地文件请求：根据URL特征判断
     // --------------------------
     const requestUrl = response.config.url || ''
@@ -75,16 +147,8 @@ service.interceptors.response.use(
       return res
     }
     if (res.code === 401 && !requestUrl.includes('/auth/login')) {
-      ElMessageBox.confirm('登录已过期，请重新登录', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
-        removeToken()
-        clearStore()
-        window.location.reload()
-      })
-      return Promise.reject(new Error(res.message || 'Error'))
+      handleUnauthorized(res.message || '登录已过期，请重新登录')
+      return Promise.reject(new Error(res.message || 'Unauthorized'))
     }
 
     // 其他错误
@@ -92,16 +156,26 @@ service.interceptors.response.use(
     return Promise.reject(new Error(res.message || 'Error'))
   },
   (error) => {
-    loadingInstance?.close()
+    if (error.config?.__showLoading) {
+      stopGlobalLoading()
+    }
 
-    // 网络错误
     if (!error.response) {
       ElMessage.error('网络连接异常，请检查网络')
       return Promise.reject(error)
     }
 
-    // 服务器错误
-    ElMessage.error(`服务器错误：${error.response.status}`)
+    const status = error.response.status
+    const requestUrl = error.config?.url || ''
+    const body = error.response.data
+    const bodyCode = body?.code
+
+    if ((status === 401 || bodyCode === 401) && !requestUrl.includes('/auth/login')) {
+      handleUnauthorized(body?.message || '未登录或 Token 无效')
+      return Promise.reject(error)
+    }
+
+    ElMessage.error(body?.message || `服务器错误：${status}`)
     return Promise.reject(error)
   }
 )

@@ -50,25 +50,18 @@
         <div class="warning-list">
           <div v-for="(warning, idx) in group" :key="idx" class="warning-item"
             :class="`type-${warning.targetType} level-${warning.level}`">
+            <span v-if="isWarningUnread(warning.status)" class="warning-item__unread" aria-label="未读" />
             <!-- 预警类型标签（起降点/航线/空域） -->
             <span class="target-type-tag">{{
               getTargetTypeText(warning.targetType)
             }}</span>
             <!-- 具体预警内容（截图核心展示） -->
             <span class="warning-content">{{ warning.detail }}</span>
-            <button
-              v-if="warning.status === 'NEW' && warning.warningId"
-              class="status-badge unhandled"
-              @click.stop="onAck(warning)"
-            >
-              确认
-            </button>
             <span
-              v-else-if="warning.status"
-              class="status-badge"
-              :class="warning.status === 'CLOSED' ? 'handled' : 'unhandled'"
+              v-if="warning.status === 'HANDLED' || warning.status === 'CLOSED'"
+              class="status-badge handled"
             >
-              {{ warning.status }}
+              {{ getStatusText(warning.status) }}
             </span>
           </div>
         </div>
@@ -85,9 +78,8 @@
 <script setup>
 import { ref, computed, defineAsyncComponent } from "vue";
 import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
-import { ackWarning } from "@/api";
-import { ElMessage } from "element-plus";
 import DialogContainer from '@/components/common/DialogContainer.vue'
+import { warningStatusText, isWarningUnread } from '@/utils/warningStatus';
 
 const dashboardWeatherStore = useDashboardWeatherStore();
 const WeatherWarnings = defineAsyncComponent(() =>
@@ -155,6 +147,8 @@ const selectLevel = (level) => {
   selectedLevel.value = level;
 };
 
+const getStatusText = (status) => warningStatusText(status);
+
 // 历史弹窗控制
 const openHistoryDialog = (e) => {
   e.stopPropagation();
@@ -163,16 +157,6 @@ const openHistoryDialog = (e) => {
 const closeHistoryDialog = () => {
   showHistory.value = false;
 };
-
-async function onAck(warning) {
-  try {
-    await ackWarning(warning.warningId, '大屏确认');
-    ElMessage.success('已确认预警');
-    warning.status = 'ACKNOWLEDGED';
-  } catch (e) {
-    ElMessage.error(e?.message || '确认失败');
-  }
-}
 
 </script>
 
@@ -337,6 +321,7 @@ async function onAck(warning) {
 
 /* 预警项（贴合截图简洁风格） */
 .warning-item {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -345,6 +330,18 @@ async function onAck(warning) {
   border-radius: 4px;
   font-size: 13px;
   line-height: 1.4;
+
+  .warning-item__unread {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.75);
+    pointer-events: none;
+  }
 
   /* 类型标签颜色区分 */
   &.type-takeoff .target-type-tag {

@@ -82,3 +82,30 @@ export async function fetchForecastTrend(landingPointId) {
   }
   return res.data ?? res;
 }
+
+export async function postWeatherByCoordsBatch(body) {
+  return request.post('/weather/by-coords/batch', body);
+}
+
+export async function fetchCurrentPointWeather(pointId) {
+  const data = await request.get('/weather/realtime', { pointId });
+  return toRealtimePanelFields(data);
+}
+
+export async function getWindData(params = {}) {
+  const query = {};
+  if (params.regionId) query.regionId = params.regionId;
+  if (params.time) query.time = params.time;
+  if (params.heightM != null) query.heightM = params.heightM;
+  return request.get('/wind-field', query);
+}
+
+/** GET /weather/vertical-profile */
+export async function fetchVerticalProfile(landingPointId, options = {}) {
+  return request.get('/weather/vertical-profile', {
+    landingPointId,
+    startTime: options.startTime ?? options.time,
+    endTime: options.endTime,
+    heightLevelsM: options.heightLevelsM,
+  });
+}

@@ -8,8 +8,8 @@
       </div>
     </div>
 
-    <!-- Cesium地图容器 -->
-    <div id="cesiumContainer" class="cesium-container" :class="{ 'hidden': loading }"></div>
+    <!-- Cesium地图容器（初始化期间保持可见，避免 canvas 尺寸为 0） -->
+    <div id="cesiumContainer" class="cesium-container"></div>
 
     <!-- 控制面板 -->
     <ControlPanel v-if="layerSettingsStore.isShow" :wind-layer="windStore.windLayer"
@@ -20,15 +20,24 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, watch, ref } from 'vue'
+import { onMounted, onUnmounted, watch, ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
+import * as Cesium from 'cesium'
 import { useCesium } from '@/hooks/useCesium'
 import { useWindStore } from '@/store/modules/wind'
 import { useLayerSettingsStore } from '@/store/modules/layerSettings'
 import { useAreaStore } from '@/store/modules/area'
+import { useAppDashboardStore } from '@/store/modules/appDashboard'
 import ControlPanel from "@/components/map/ControlPanel.vue"
 import { useRouteStore } from '@/store/modules/routeStore'
-import eventManager from '@/cesium/core/eventManager' // 导入独立的事件管理器
+import eventManager from '@/cesium/core/eventManager'
+import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus'
+import { fetchWeatherPoint } from '@/api/v2/weather'
 import { ElMessage } from 'element-plus'
+import { attachMetViz } from '@/composables/useMetVizEngine'
+import { useMetVizStore } from '@/store/modules/metViz'
+import { MET_VIZ_WIND_OPTIONS } from '@/met-viz/constants'
+import { shouldAttachMetViz } from '@/config/metVizRuntime'
 
 // 地图容器ID
 const CESIUM_CONTAINER_ID = 'cesiumContainer'
@@ -36,14 +45,34 @@ const layerSettingsStore = useLayerSettingsStore()
 const windStore = useWindStore()
 const routeStore = useRouteStore()
 const areaStore = useAreaStore()
+const appStore = useAppDashboardStore()
+const metVizStore = useMetVizStore()
+const route = useRoute()
+const metVizActive = computed(() => shouldAttachMetViz(route))
 
 // 模式切换状态
 const currentMode = ref('overview') // 默认概览模式
 
 // Cesium实例和控制方法
 let cesiumHooks = null
+let pickHandler = null
+let metVizHandle = null
 // 加载状态标志
 // const isHookLoaded = ref(false)
+
+function syncMetVizFromLayerSettings() {
+  if (!metVizActive.value) return
+  const windOn = layerSettingsStore.layers.wind?.visible !== false
+  if (windOn) {
+    metVizStore.setLayerEnabled('wind', true)
+    layerSettingsStore.updateWindOptions(MET_VIZ_WIND_OPTIONS)
+  }
+  dashboardEventBus.emit(DASHBOARD_EVENTS.MET_VIZ_CONFIG_CHANGED, {
+    product: metVizStore.product,
+    heightM: metVizStore.heightM,
+    enabled: { ...metVizStore.enabled },
+  })
+}
 
 // 根据图层配置设置图层显示状态
 const applyLayerVisibilitySettings = () => {
@@ -65,6 +94,10 @@ const applyLayerVisibilitySettings = () => {
           break
       }
     }
+    if (metVizActive.value) {
+      syncMetVizFromLayerSettings()
+      metVizHandle?.sync?.().catch((err) => console.warn('[MetViz] layer sync', err))
+    }
   }
 }
 const loading = ref(true)
@@ -72,22 +105,31 @@ const loading = ref(true)
 const initializeMap = async () => {
   try {
     cesiumHooks = useCesium(CESIUM_CONTAINER_ID)
-    // 等待Cesium初始化完成
     await cesiumHooks.initCesium()
 
-
-    // 从本地存储加载设置
     layerSettingsStore.loadSettingsFromLocal()
+    if (!metVizActive.value) {
+      layerSettingsStore.setLayerVisibility('wind', false)
+    }
+    applyLayerVisibilitySettings()
 
-    // 应用图层显示状态设置
-     applyLayerVisibilitySettings()
-   
-    // 使用独立的事件管理器初始化viewer事件
-    eventManager.initializeViewerEvents(cesiumHooks.viewer.value);
-     loading.value = false
-   
+    eventManager.initializeViewerEvents(cesiumHooks.viewer.value)
+    setupPickHandler(cesiumHooks.viewer.value)
+    if (metVizActive.value) {
+      metVizHandle = attachMetViz(cesiumHooks.viewer.value)
+      syncMetVizFromLayerSettings()
+      if (metVizHandle && appStore.regionId) {
+        metVizHandle.sync().catch((err) => console.warn('[MetViz] initial sync', err))
+      }
+    }
+
+    // 容器从隐藏/零尺寸恢复后强制刷新 Cesium 画布
+    cesiumHooks.viewer.value?.resize()
   } catch (error) {
     console.error('地图初始化失败:', error)
+    ElMessage.error('地图初始化失败，请刷新页面重试')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -105,10 +147,6 @@ const handleTimeChange = (time) => {
     cesiumHooks.setCurrentTime(time)
   }
   
-  // 更新热力图数据
-  if (cesiumHooks && cesiumHooks.updateHeatmapTime) {
-    cesiumHooks.updateHeatmapTime(time)
-  }
   
   // 更新航线分析数据（根据时间偏移量）
   if (routeStore.currentRoute) {
@@ -157,16 +195,57 @@ const toggleMode = () => {
   switchMode(newMode)
 }
 
+function setupPickHandler(viewer) {
+  if (!viewer || pickHandler) return
+  pickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas)
+  pickHandler.setInputAction(async (click) => {
+    if (!appStore.pickMode) return
+    const cartesian = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid)
+    if (!cartesian) return
+    const carto = Cesium.Cartographic.fromCartesian(cartesian)
+    const lng = Cesium.Math.toDegrees(carto.longitude)
+    const lat = Cesium.Math.toDegrees(carto.latitude)
+    const heightM = carto.height
+    dashboardEventBus.emit(DASHBOARD_EVENTS.MAP_PICKED, { lng, lat, heightM })
+    try {
+      const weather = await fetchWeatherPoint(lng, lat, {
+        time: appStore.timelineTime,
+        includeRisk: true,
+      })
+      appStore.setPickPopup({ lng, lat, heightM, weather })
+    } catch (err) {
+      appStore.setPickPopup({ lng, lat, heightM, error: err.message || '查询失败' })
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
+}
+
+function destroyPickHandler() {
+  pickHandler?.destroy()
+  pickHandler = null
+}
+
+watch(
+  () => appStore.initialized && appStore.regionId,
+  (ready) => {
+    if (!ready || !metVizHandle) return
+    syncMetVizFromLayerSettings()
+    metVizHandle.sync().catch((err) => console.warn('[MetViz] post-init sync', err))
+  }
+)
+
 // 组件挂载时初始化地图和设置事件监听
 onMounted(() => {
   initializeMap()
-  
+
   // 监听模式切换事件
   eventManager.on('modeChange', (mode) => {
     switchMode(mode)
   })
 })
 onUnmounted(() => {
+  destroyPickHandler()
+  metVizHandle?.destroy()
+  metVizHandle = null
   if (cesiumHooks) {
     cesiumHooks.cleanup()
   }
@@ -229,6 +308,11 @@ onUnmounted(() => {
   100% {
     transform: rotate(360deg);
   }
+}
+
+.cesium-container {
+  width: 100%;
+  height: 100%;
 }
 
 /* 隐藏地图容器的类 */

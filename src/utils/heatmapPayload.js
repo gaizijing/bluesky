@@ -8,12 +8,25 @@ const toNum = (v) => {
 };
 
 export function gridFieldToHeatmapPayload(apiData) {
-  const grid = Array.isArray(apiData?.grid) ? apiData.grid : [];
+  const grid = Array.isArray(apiData?.grid)
+    ? apiData.grid
+    : Array.isArray(apiData?.cells)
+      ? apiData.cells
+      : Array.isArray(apiData?.points)
+        ? apiData.points
+        : [];
+  const product = apiData?.product;
   const points = grid
     .map((c) => {
-      const lng = toNum(c.lng ?? c.longitude);
-      const lat = toNum(c.lat ?? c.latitude);
-      const value = toNum(c.value);
+      let lng = toNum(c.lng ?? c.longitude ?? c.lon ?? c.x);
+      let lat = toNum(c.lat ?? c.latitude ?? c.y);
+      if ((lng == null || lat == null) && Array.isArray(c.lnglat) && c.lnglat.length >= 2) {
+        lng = toNum(c.lnglat[0]);
+        lat = toNum(c.lnglat[1]);
+      }
+      const value = toNum(
+        c.value ?? c[product] ?? c.temperature ?? c.windSpeed ?? c.precipitation ?? c.visibility
+      );
       if (lng == null || lat == null || value == null) return null;
       return { lnglat: [lng, lat], value, reason: c.reason || null };
     })
@@ -35,7 +48,13 @@ export function riskHeatmapToHeatmapPayload(apiData) {
       const lat = toNum(c.lat);
       const value = toNum(c.value);
       if (lng == null || lat == null || value == null) return null;
-      return { lnglat: [lng, lat], value, reason: c.reason || null };
+      return {
+        lnglat: [lng, lat],
+        value,
+        reason: c.reason || null,
+        level: c.level || null,
+        factors: c.factors || null,
+      };
     })
     .filter(Boolean);
   return {

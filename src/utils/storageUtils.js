@@ -118,7 +118,20 @@ export const setToken = (token, type = STORAGE_TYPE.LOCAL) => {
  * @returns {string|null} Token 值（不存在返回 null）
  */
 export const getToken = (type = STORAGE_TYPE.LOCAL) => {
-  return getStorage('token', null, type)
+  try {
+    const storage = window[type]
+    if (!storage) return null
+    const raw = storage.getItem('token')
+    if (raw == null || raw === 'undefined' || raw === 'null') return null
+    // setStorage 写入的是 JSON 字符串；兼容历史明文 token
+    if (raw.startsWith('"') || raw.startsWith('{') || raw.startsWith('[')) {
+      return JSON.parse(raw)
+    }
+    return raw
+  } catch (error) {
+    console.error('获取 Token 失败:', error)
+    return null
+  }
 }
 
 /**

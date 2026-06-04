@@ -56,3 +56,28 @@ export function readStoredRoles() {
 export function canAccessSettingFromStorage() {
   return readStoredRoles().some((role) => SETTING_ADMIN_ROLES.has(role));
 }
+
+export function readStoredRegionIds() {
+  try {
+    const raw = localStorage.getItem('userRegionIds');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+export function isSuperAdminFromStorage() {
+  return readStoredRoles().some((r) => r === 'SUPER_ADMIN' || r === 'admin');
+}
+
+/** REGION_ADMIN 仅可见绑定 Region；SUPER_ADMIN 可见全部 */
+export function filterRegionsForAdmin(regions = []) {
+  if (isSuperAdminFromStorage()) return regions;
+  const allowed = new Set(readStoredRegionIds());
+  if (!allowed.size) return regions;
+  return regions.filter((r) => allowed.has(String(r.regionId || r.id)));
+}

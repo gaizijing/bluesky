@@ -1,11 +1,11 @@
 <template>
   <div class="main-layout">
-    <!-- 头部 -->
-    <div class="layout-top">
+    <!-- 头部（Dashboard 全屏壳层自带 Header） -->
+    <div v-if="!isFullscreenRoute" class="layout-top">
       <Header />
     </div>
     <!-- 主体内容 -->
-    <div class="layout-content">
+    <div class="layout-content" :class="{ 'layout-content--fullscreen': isFullscreenRoute }">
       <!-- 侧边栏 -->
       <!-- <Sidebar /> -->
       <!-- 主内容区 -->
@@ -17,8 +17,13 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import Header from './Header.vue'
 import Sidebar from './Sidebar.vue'
+
+const route = useRoute()
+const isFullscreenRoute = computed(() => Boolean(route.meta.fullscreen))
 </script>
 
 <style scoped lang="scss">
@@ -70,5 +75,9 @@ import Sidebar from './Sidebar.vue'
   padding: 0;
   overflow: hidden;
   box-sizing: border-box;
+}
+
+.layout-content--fullscreen {
+  flex: 1;
 }
 </style>
