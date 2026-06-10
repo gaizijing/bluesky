@@ -1,6 +1,7 @@
 import * as Cesium from 'cesium';
 import { fetchRiskHeatmap } from '@/api/risk';
 import { fetchRegions } from '@/api/v2/region';
+import { fetchGeoJsonEnvelope } from '@/utils/geoJsonEnvelope';
 import { extractIsosurfaceFromGrid, fillChunkGrid } from '../core/marchingCubes.js';
 import { createChunkGrid, getVisibleChunks } from '../core/spatialChunks.js';
 import {
@@ -125,13 +126,8 @@ export class McRiskLayer {
     try {
       const regions = await fetchRegions();
       const region = (regions || []).find((r) => (r.regionId || r.id) === regionId);
-      if (region) {
-        return {
-          west: region.west,
-          south: region.south,
-          east: region.east,
-          north: region.north,
-        };
+      if (region?.boundaryUrl) {
+        return await fetchGeoJsonEnvelope(region.boundaryUrl);
       }
     } catch {
       /* ignore */

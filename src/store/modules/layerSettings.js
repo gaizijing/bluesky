@@ -5,7 +5,7 @@ import { WIND_LAYER_DEFAULTS } from '@/config/windLayerDefaults'
 export const DEFAULT_LAYERS = {
   model: { visible: true, name: '3D模型' },
   wind: { visible: true, name: '风场图层' },
-  cloud: { visible: true, name: '云雾图层' },
+  cloud: { visible: false, name: '云雾图层' },
   areaPoints: { visible: true, name: '重点关注区域' }
 }
 

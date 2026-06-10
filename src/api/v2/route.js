@@ -31,3 +31,8 @@ export const clearRoutes = async (regionId) => {
   await request.delete('/routes', { regionId: rid });
   return true;
 };
+
+export const deleteRoute = async (routeId) => {
+  await request.delete(`/routes/${routeId}`);
+  return true;
+};

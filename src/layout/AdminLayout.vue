@@ -117,8 +117,8 @@ const menuItems = [
   },
   {
     path: '/setting/route-import',
-    title: '航路导入',
-    description: 'GeoJSON LineString 导入至 Region',
+    title: '航路管理',
+    description: 'GeoJSON 导入、列表与删除',
     icon: Upload
   },
   {
@@ -171,7 +171,7 @@ const routeDescriptions = {
   '/setting/risk-rules': '管理 R_met 因子权重，发布后风险热力图在下一时间桶更新。',
   '/setting/warning-rules': '配置 L1/L2 预警规则，支持已发布规则集启用 LLM 解读。',
   '/setting/no-fly-zones': '按 Region 维护禁飞多边形，支持 GeoJSON FeatureCollection 批量导入。',
-  '/setting/route-import': '将 GeoJSON 航路导入指定 Region，供大屏航路总览与钻取使用。',
+  '/setting/route-import': '导入 GeoJSON 航路、查看已导入列表，支持单条或按 Region 批量删除。',
   '/setting/user': '集中维护用户资料、角色权限和账号状态，保证后台访问边界清晰可控。',
   '/setting/aircraft': '统一整理飞行器型号与性能档案，为业务匹配提供可追踪资产台账。',
   '/setting/landing-points': '编排业务起降点网络，确保站点坐标、类型与运行状态始终可控。',

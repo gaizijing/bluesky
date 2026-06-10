@@ -1,16 +1,36 @@
 import * as Cesium from 'cesium'
 import { useWeatherStore } from '@/store/modules/weather'
 import { useRegionStore } from '@/store/modules/region'
+import { fetchGeoJsonEnvelope } from '@/utils/geoJsonEnvelope'
 
-// 获取地区配置
+async function resolveRegionExtent() {
+  const regionStore = useRegionStore()
+  if (regionStore.boundaryEnvelope) {
+    return regionStore.boundaryEnvelope
+  }
+  const url = regionStore.getBoundaryUrl
+  if (url) {
+    try {
+      const envelope = await fetchGeoJsonEnvelope(url)
+      if (envelope) {
+        regionStore.setBoundaryEnvelope(envelope)
+      }
+      return envelope
+    } catch (err) {
+      console.warn('[Cloud] 边界 GeoJSON 包络解析失败', err)
+    }
+  }
+  const center = regionStore.getRegionCenter
+  if (!center) return null
+  const [lng, lat] = center
+  const pad = 0.25
+  return { west: lng - pad, east: lng + pad, south: lat - pad, north: lat + pad }
+}
+
 const getRegionConfig = () => {
   const regionStore = useRegionStore();
   return {
     center: regionStore.getRegionCenter,
-    west: regionStore.getRegionBounds.west,
-    east: regionStore.getRegionBounds.east,
-    south: regionStore.getRegionBounds.south,
-    north: regionStore.getRegionBounds.north,
     name: regionStore.getRegionName
   };
 };
@@ -27,7 +47,7 @@ export default class Cloud {
   /**
    * 初始化并显示云
    */
-  show() {
+  async show() {
     if (!this.viewer || !this.viewer.scene) {
       console.warn('viewer 未初始化完成')
       return
@@ -54,9 +74,13 @@ export default class Cloud {
     this.clouds = new Cesium.CloudCollection();
 
     // 根据天气数据计算云量参数
-    let cloudCover = 0.5; // 默认云量
-    if (weatherStore.currentPointWeather && weatherStore.currentPointWeather.cloud !== undefined) {
-      cloudCover = weatherStore.currentPointWeather.cloud / 100; // 转换为0-1范围
+    let cloudCover = 0.5;
+    const rawCloud = weatherStore.currentPointWeather?.cloud;
+    if (rawCloud != null && rawCloud !== '—') {
+      const parsed = Number(rawCloud);
+      if (Number.isFinite(parsed)) {
+        cloudCover = Math.min(1, Math.max(0, parsed / 100));
+      }
     }
     
     // 确保即使云量为0时也有一些云
@@ -193,7 +217,9 @@ export default class Cloud {
     createBackLayerClouds.bind(this)();
 
     // 根据云量添加不同数量的云
-    const { west, east, south, north } = getRegionConfig();
+    const extent = await resolveRegionExtent()
+    if (!extent) return
+    const { west, east, south, north } = extent
     createRandomClouds.bind(this)(cloudCount, west, east, south, north, 100, 200);
 
     // 添加第二层中等高度的云

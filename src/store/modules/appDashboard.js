@@ -4,6 +4,9 @@ import { bucketFromIso, toShanghaiIso } from '@/utils/timeBucket';
 import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus';
 import { useRegionStore } from '@/store/modules/region';
 import { useRegionLandingStore } from '@/store/modules/regionLanding';
+import { useRegionRoutesStore } from '@/store/modules/regionRoutes';
+import { loadRegionCatalog } from '@/services/regionCatalog';
+import { fetchWarnings } from '@/api/v2/warning';
 
 const REGION_ID_KEY = 'currentRegionId';
 
@@ -25,10 +28,21 @@ export const useAppDashboardStore = defineStore('appDashboard', {
     warningDrawerFocusId: null,
     pickPopup: null,
     initialized: false,
+    /** 未处理预警数 NEW+ACKNOWLEDGED，控制首页预警摘要面板显隐 */
+    activeWarningCount: 0,
+    /** 未读预警数 NEW，控制 Header 铃铛角标 */
+    unreadWarningCount: 0,
+    /** 总览 landing-matrix 缓存，供下钻 1H 适飞与卡片色条对齐 */
+    landingMatrixCache: null,
   }),
 
   getters: {
     currentViewId: (state) => state.view,
+    showHomeWarningSummary: (state) =>
+      state.view === 'home' && state.activeWarningCount > 0,
+    /** 右侧无面板占位时，工具栏贴屏幕右缘 */
+    homeRightPanelCollapsed: (state) =>
+      state.view === 'home' && state.activeWarningCount === 0,
   },
 
   actions: {
@@ -55,20 +69,35 @@ export const useAppDashboardStore = defineStore('appDashboard', {
 
       if (this.regionId) {
         try {
-          const landingStore = useRegionLandingStore();
-          await landingStore.loadLandingPoints(this.regionId);
+          await loadRegionCatalog(this.regionId);
         } catch (err) {
-          console.warn('[appDashboard] load landing points failed', err);
+          console.warn('[appDashboard] load region catalog failed', err);
         }
       }
 
       this.timelineBucket = bucketFromIso(this.timelineTime);
       this.initialized = true;
       if (this.regionId) {
-        dashboardEventBus.emit(DASHBOARD_EVENTS.MET_VIZ_CONFIG_CHANGED, {
+        await this.refreshWarningCounts();
+      }
+    },
+
+    async refreshWarningCounts() {
+      if (!this.regionId) {
+        this.activeWarningCount = 0;
+        this.unreadWarningCount = 0;
+        return;
+      }
+      try {
+        const list = await fetchWarnings({
           regionId: this.regionId,
-          timelineTime: this.timelineTime,
+          statuses: 'NEW,ACKNOWLEDGED',
         });
+        const items = Array.isArray(list) ? list : [];
+        this.activeWarningCount = items.length;
+        this.unreadWarningCount = items.filter((w) => w.status === 'NEW').length;
+      } catch (err) {
+        console.warn('[appDashboard] refreshWarningCounts failed', err);
       }
     },
 
@@ -86,10 +115,14 @@ export const useAppDashboardStore = defineStore('appDashboard', {
       await regionStore.switchRegion(id);
 
       const landingStore = useRegionLandingStore();
+      const routesStore = useRegionRoutesStore();
       landingStore.clearLandingPoints();
-      await landingStore.loadLandingPoints(id);
+      routesStore.clearRoutes();
+      await loadRegionCatalog(id, { force: true });
 
+      this.clearLandingMatrixCache();
       dashboardEventBus.emit(DASHBOARD_EVENTS.REGION_CHANGED, { regionId: id });
+      await this.refreshWarningCounts();
     },
 
     setTimelineTime(time) {
@@ -107,6 +140,9 @@ export const useAppDashboardStore = defineStore('appDashboard', {
     },
 
     setView(view) {
+      if (this.view === 'simFlight' && view !== 'simFlight') {
+        this.cameraMode = 'free';
+      }
       this.view = view;
       if (view === 'home') {
         this.focus = { type: 'none' };
@@ -117,7 +153,18 @@ export const useAppDashboardStore = defineStore('appDashboard', {
       }
     },
 
+    /** 工具栏「首页」：非 home 则切回；已在 home 则重置地图默认视角 */
+    goHome() {
+      if (this.view === 'simFlight') this.cameraMode = 'free';
+      if (this.view === 'home') {
+        dashboardEventBus.emit(DASHBOARD_EVENTS.RESET_HOME_CAMERA);
+        return;
+      }
+      this.setView('home');
+    },
+
     drillLanding(id) {
+      if (this.view === 'simFlight') this.cameraMode = 'free';
       this.view = 'drillLanding';
       this.focus = { type: 'landingPoint', id };
       dashboardEventBus.emit(DASHBOARD_EVENTS.VIEW_CHANGED, {
@@ -127,14 +174,28 @@ export const useAppDashboardStore = defineStore('appDashboard', {
     },
 
     drillRoute(id) {
+      if (this.view === 'simFlight') this.cameraMode = 'free';
       this.view = 'drillRoute';
       this.focus = { type: 'route', id };
       this.routeIdForSim = id;
+      dashboardEventBus.emit(DASHBOARD_EVENTS.VIEW_CHANGED, {
+        view: 'drillRoute',
+        focus: this.focus,
+      });
     },
 
     enterSimFlight(routeId) {
-      if (routeId) this.routeIdForSim = routeId;
+      const resolved =
+        routeId || (this.focus.type === 'route' ? this.focus.id : null) || this.routeIdForSim;
+      if (resolved) this.routeIdForSim = resolved;
       this.view = 'simFlight';
+      this.cameraMode = 'thirdPerson';
+    },
+
+    setCameraMode(mode) {
+      if (['thirdPerson', 'firstPerson', 'free'].includes(mode)) {
+        this.cameraMode = mode;
+      }
     },
 
     togglePanelsHidden() {
@@ -166,6 +227,32 @@ export const useAppDashboardStore = defineStore('appDashboard', {
     closeWarningDrawer() {
       this.warningDrawerOpen = false;
       this.warningDrawerFocusId = null;
+    },
+
+    setLandingMatrixCache(response, hours) {
+      if (!response?.matrix?.length) {
+        this.landingMatrixCache = null;
+        return;
+      }
+      this.landingMatrixCache = {
+        regionId: this.regionId,
+        timelineTime: this.timelineTime,
+        hours,
+        response,
+      };
+    },
+
+    getLandingMatrixCache(hours) {
+      const cache = this.landingMatrixCache;
+      if (!cache?.response?.matrix?.length) return null;
+      if (cache.regionId !== this.regionId) return null;
+      if (cache.timelineTime !== this.timelineTime) return null;
+      if (cache.hours !== hours) return null;
+      return cache.response;
+    },
+
+    clearLandingMatrixCache() {
+      this.landingMatrixCache = null;
     },
   },
 });

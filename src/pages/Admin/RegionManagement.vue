@@ -49,27 +49,27 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="西边界" min-width="100">
+          <el-table-column label="中心点" min-width="160">
             <template #default="{ row }">
-              <div>{{ row.west }}</div>
+              <div>{{ formatCenter(row) }}</div>
             </template>
           </el-table-column>
 
-          <el-table-column label="东边界" min-width="100">
+          <el-table-column label="区划代码" min-width="100">
             <template #default="{ row }">
-              <div>{{ row.east }}</div>
+              <div>{{ row.adcode || '—' }}</div>
             </template>
           </el-table-column>
 
-          <el-table-column label="南边界" min-width="100">
+          <el-table-column label="边界 GeoJSON" min-width="200">
             <template #default="{ row }">
-              <div>{{ row.south }}</div>
+              <div class="admin-boundary-url">{{ row.boundaryUrl || '—' }}</div>
             </template>
           </el-table-column>
 
-          <el-table-column label="北边界" min-width="100">
+          <el-table-column label="建筑白膜" min-width="200">
             <template #default="{ row }">
-              <div>{{ row.north }}</div>
+              <div class="admin-boundary-url">{{ row.modelUrl || '—' }}</div>
             </template>
           </el-table-column>
 
@@ -84,12 +84,6 @@
           <el-table-column label="创建时间" min-width="160">
             <template #default="{ row }">
               <div>{{ formatDate(row.createdAt) }}</div>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="更新时间" min-width="160">
-            <template #default="{ row }">
-              <div>{{ formatDate(row.updatedAt) }}</div>
             </template>
           </el-table-column>
 
@@ -129,7 +123,7 @@
       <div class="admin-drawer__header">
         <p class="admin-page__eyebrow">{{ isEditing ? '编辑区域' : '新增区域' }}</p>
         <h3>{{ isEditing ? '编辑地区配置' : '新增地区配置' }}</h3>
-        <p>维护地区名称和边界坐标，确保系统正常运行。</p>
+        <p>填写地区名称、相机中心点；通过省市区选择自动生成 adcode 并下载边界 GeoJSON。</p>
       </div>
 
       <el-form ref="formRef" :model="formModel" :rules="formRules" label-position="top">
@@ -148,23 +142,63 @@
         </section>
 
         <section class="admin-form-section">
-          <h4 class="admin-section-title">边界坐标</h4>
+          <h4 class="admin-section-title">相机中心点</h4>
           <div class="admin-form-grid">
-            <el-form-item label="西边界" prop="west">
-              <el-input-number v-model="formModel.west" :min="-180" :max="180" :step="0.1" controls-position="right" />
+            <el-form-item label="中心经度" prop="centerLng">
+              <el-input-number v-model="formModel.centerLng" :min="-180" :max="180" :step="0.0001"
+                controls-position="right" />
             </el-form-item>
 
-            <el-form-item label="东边界" prop="east">
-              <el-input-number v-model="formModel.east" :min="-180" :max="180" :step="0.1" controls-position="right" />
+            <el-form-item label="中心纬度" prop="centerLat">
+              <el-input-number v-model="formModel.centerLat" :min="-90" :max="90" :step="0.0001"
+                controls-position="right" />
             </el-form-item>
+          </div>
+          <div class="admin-form-hint">地图默认视角将以该中心点为参考位置。</div>
+        </section>
 
-            <el-form-item label="南边界" prop="south">
-              <el-input-number v-model="formModel.south" :min="-90" :max="90" :step="0.1" controls-position="right" />
-            </el-form-item>
+        <section class="admin-form-section">
+          <h4 class="admin-section-title">行政区划边界</h4>
+          <el-form-item label="省 / 市 / 区" prop="areaCascader">
+            <el-cascader
+              v-model="areaCascader"
+              :props="cascaderProps"
+              clearable
+              placeholder="请选择省、市、区（可停在任意一级）"
+              class="admin-area-cascader"
+              @change="onAreaCascaderChange"
+            />
+          </el-form-item>
+          <div v-if="formModel.adcode" class="admin-form-hint admin-adcode-preview">
+            已生成区划代码：<strong>{{ formModel.adcode }}</strong>
+            <span v-if="selectedAreaLabel">（{{ selectedAreaLabel }}）</span>
+          </div>
 
-            <el-form-item label="北边界" prop="north">
-              <el-input-number v-model="formModel.north" :min="-90" :max="90" :step="0.1" controls-position="right" />
-            </el-form-item>
+          <el-form-item label="GeoJSON 下载地址（可选）" prop="boundarySourceUrl">
+            <el-input v-model="formModel.boundarySourceUrl"
+              placeholder="留空则按上方区划代码从 DataV 自动下载" />
+          </el-form-item>
+
+          <div v-if="isEditing && formModel.boundaryUrl" class="admin-form-hint">
+            当前边界文件：{{ formModel.boundaryUrl }}。重新选择区划或填写新下载地址后保存，将更新边界。
+          </div>
+          <div v-else class="admin-form-hint">
+            新增时请选择区划或填写 GeoJSON 地址；选择后会自动生成 adcode，并尝试填充中心点坐标。
+          </div>
+        </section>
+
+        <section class="admin-form-section">
+          <h4 class="admin-section-title">建筑白膜（3D Tileset）</h4>
+          <el-form-item label="tileset 地址" prop="modelUrl">
+            <el-input
+              v-model="formModel.modelUrl"
+              clearable
+              placeholder="如：/cesium/model/tianjin/tileset.json"
+            />
+          </el-form-item>
+          <div class="admin-form-hint">
+            填写 Cesium 3D Tiles 的 <code>tileset.json</code> 路径（相对站点根或完整 URL）。留空则不加载白膜。
+            历史 <code>modelinfo.json</code> 会在地图端自动替换为 <code>tileset.json</code>。
           </div>
         </section>
       </el-form>
@@ -187,7 +221,8 @@ import {
   Plus,
   Star,
   EditPen,
-  Delete
+  Delete,
+  Search
 } from '@element-plus/icons-vue'
 import {
   getAllRegionConfigs,
@@ -198,9 +233,18 @@ import {
 } from '@/api'
 import { useRegionStore } from '@/store/modules/region';
 import { InitializationService } from '@/services/initialization';
+import {
+  areaCascaderProps,
+  fetchAreaMeta,
+  resolveAreaCascaderPath,
+} from '@/utils/chinaAreaCascader';
 
 const regionStore = useRegionStore();
 const initializationService = new InitializationService();
+
+const cascaderProps = areaCascaderProps
+const areaCascader = ref([])
+const selectedAreaLabel = ref('')
 
 const loading = ref(false)
 const saving = ref(false)
@@ -215,10 +259,12 @@ const createRegionForm = () => ({
   regionId: null,
   id: null,
   name: '',
-  west: 120.0,
-  east: 121.0,
-  south: 36.0,
-  north: 37.0,
+  centerLng: 120.5,
+  centerLat: 36.5,
+  adcode: '',
+  boundarySourceUrl: '',
+  boundaryUrl: '',
+  modelUrl: '',
   isDefault: false
 })
 
@@ -226,10 +272,13 @@ const formModel = reactive(createRegionForm())
 
 const formRules = {
   name: [{ required: true, message: '请输入地区名称', trigger: 'blur' }],
-  west: [{ required: true, message: '请输入西边界', trigger: 'blur' }],
-  east: [{ required: true, message: '请输入东边界', trigger: 'blur' }],
-  south: [{ required: true, message: '请输入南边界', trigger: 'blur' }],
-  north: [{ required: true, message: '请输入北边界', trigger: 'blur' }]
+  centerLng: [{ required: true, message: '请输入中心经度', trigger: 'blur' }],
+  centerLat: [{ required: true, message: '请输入中心纬度', trigger: 'blur' }],
+}
+
+const formatCenter = (row) => {
+  if (row.centerLng == null || row.centerLat == null) return '—'
+  return `${Number(row.centerLng).toFixed(4)}, ${Number(row.centerLat).toFixed(4)}`
 }
 
 const formatDate = (dateString) => {
@@ -255,7 +304,7 @@ const visibleRegionConfigs = computed(() => {
   return regionConfigs.value.filter((item) => {
     const matchesKeyword =
       !keyword ||
-      [item.regionId, item.id, item.name]
+      [item.regionId, item.id, item.name, item.adcode, item.boundaryUrl, item.modelUrl]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(keyword))
 
@@ -274,16 +323,11 @@ const loadRegionConfigs = async () => {
 
   try {
     const response = await getAllRegionConfigs()
-
-    console.log('获取地区配置列表:', response)
-
-
     regionConfigs.value = (Array.isArray(response) ? response : []).map((item) => ({
       ...item,
       id: item.regionId || item.id,
       regionId: item.regionId || item.id,
     }))
-
   } catch (error) {
     console.error('加载地区配置列表失败:', error)
     ElMessage.error('获取地区配置列表失败，请稍后重试')
@@ -292,14 +336,55 @@ const loadRegionConfigs = async () => {
   }
 }
 
-const applyFormModel = (payload) => {
+const applyFormModel = async (payload) => {
   Object.assign(formModel, createRegionForm(), payload)
+  formModel.adcode = payload?.adcode || ''
+  formModel.boundarySourceUrl = ''
+  selectedAreaLabel.value = ''
+  await syncAreaCascaderFromAdcode(formModel.adcode)
+}
+
+const syncAreaCascaderFromAdcode = async (adcode) => {
+  if (!adcode) {
+    areaCascader.value = []
+    return
+  }
+  try {
+    areaCascader.value = await resolveAreaCascaderPath(adcode)
+    const meta = await fetchAreaMeta(adcode)
+    selectedAreaLabel.value = meta?.name || ''
+  } catch (err) {
+    console.warn('[RegionManagement] 区划路径还原失败', err)
+    areaCascader.value = []
+  }
+}
+
+const onAreaCascaderChange = async (values) => {
+  if (!values?.length) {
+    formModel.adcode = ''
+    selectedAreaLabel.value = ''
+    return
+  }
+
+  const adcode = String(values[values.length - 1])
+  formModel.adcode = adcode
+
+  try {
+    const meta = await fetchAreaMeta(adcode)
+    selectedAreaLabel.value = meta?.name || ''
+    if (meta?.center?.length >= 2) {
+      formModel.centerLng = Number(meta.center[0])
+      formModel.centerLat = Number(meta.center[1])
+    }
+  } catch (err) {
+    console.warn('[RegionManagement] 区划中心点获取失败', err)
+  }
 }
 
 const openCreate = async () => {
   isEditing.value = false
   formSnapshot.value = createRegionForm()
-  applyFormModel(formSnapshot.value)
+  await applyFormModel(formSnapshot.value)
   drawerVisible.value = true
   await nextTick()
   formRef.value?.clearValidate()
@@ -307,27 +392,22 @@ const openCreate = async () => {
 
 const openEdit = async (row) => {
   isEditing.value = true
-  formSnapshot.value = { ...row }
-  applyFormModel(row)
+  formSnapshot.value = { ...row, boundarySourceUrl: '' }
+  await applyFormModel(row)
   drawerVisible.value = true
   await nextTick()
   formRef.value?.clearValidate()
 }
 
-const handleReset = () => {
-  applyFormModel(formSnapshot.value || createRegionForm())
+const handleReset = async () => {
+  await applyFormModel(formSnapshot.value || createRegionForm())
 }
 
 const handleSave = async () => {
   await formRef.value?.validate()
 
-  // 验证边界条件
-  if (formModel.west >= formModel.east) {
-    ElMessage.error('西边界必须小于东边界')
-    return
-  }
-  if (formModel.south >= formModel.north) {
-    ElMessage.error('南边界必须小于北边界')
+  if (!isEditing.value && !formModel.adcode?.trim() && !formModel.boundarySourceUrl?.trim()) {
+    ElMessage.error('新增区域请选择省 / 市 / 区，或填写 GeoJSON 下载地址')
     return
   }
 
@@ -336,25 +416,21 @@ const handleSave = async () => {
   try {
     const payload = { ...formModel }
 
-    let response
     if (isEditing.value) {
-      response = await updateRegionConfig(payload)
+      await updateRegionConfig(payload)
     } else {
-      response = await addRegionConfig(payload)
+      await addRegionConfig(payload)
     }
-
 
     ElMessage.success(isEditing.value ? '地区配置已更新' : '地区配置已新增')
     drawerVisible.value = false
     await loadRegionConfigs()
-    // 重新获取地区配置并更新到 store
     await regionStore.fetchRegionConfig();
-    // 重新初始化项目
     await initializationService.initialize();
 
   } catch (error) {
     console.error('保存地区配置失败:', error)
-    ElMessage.error('保存地区配置失败，请稍后重试')
+    ElMessage.error(error?.message || '保存地区配置失败，请稍后重试')
   } finally {
     saving.value = false
   }
@@ -376,11 +452,8 @@ const setAsDefault = async (row) => {
     await setRegionDefault(regionId)
     ElMessage.success('默认地区配置已设置')
     await loadRegionConfigs()
-    // 重新获取地区配置并更新到 store
     await regionStore.fetchRegionConfig();
-    // 重新初始化项目
     await initializationService.initialize();
-  
   } catch (error) {
     console.error('设置默认地区配置失败:', error)
     ElMessage.error('设置默认地区配置失败，请稍后重试')
@@ -399,16 +472,11 @@ const handleDelete = async (row) => {
   }
 
   try {
-    const response = await deleteRegionConfig(row.regionId || row.id)
-
-
+    await deleteRegionConfig(row.regionId || row.id)
     ElMessage.success('地区配置已删除')
     await loadRegionConfigs()
-    // 重新获取地区配置并更新到 store
     await regionStore.fetchRegionConfig();
-    // 重新初始化项目
     await initializationService.initialize();
-
   } catch (error) {
     console.error('删除地区配置失败:', error)
     ElMessage.error('删除地区配置失败，请稍后重试')
@@ -424,18 +492,6 @@ onMounted(async () => {
 .admin-table-row-selected {
   background-color: #ffebe6 !important;
   border-left: 3px solid #1890ff !important;
-}
-
-.admin-button-selected {
-  background-color: #e6f7ff !important;
-  border-color: #1890ff !important;
-  color: #1890ff !important;
-}
-
-.admin-button-selected:hover {
-  background-color: #edeff0 !important;
-  border-color: #40a9ff !important;
-  color: #40a9ff !important;
 }
 
 .admin-pill--neutral {
@@ -457,14 +513,33 @@ onMounted(async () => {
   border: 1px solid #b7eb8f;
 }
 
-.admin-pill--danger {
-  background-color: #fff2f0;
-  color: #ff4d4f;
-  border: 1px solid #ffccc7;
-}
-
 .admin-row-actions {
   display: flex;
   gap: 8px;
+}
+
+.admin-boundary-url {
+  word-break: break-all;
+  font-size: 12px;
+  color: #666;
+}
+
+.admin-form-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #888;
+}
+
+.admin-area-cascader {
+  width: 100%;
+}
+
+.admin-adcode-preview {
+  margin: -4px 0 12px;
+}
+
+.admin-adcode-preview strong {
+  color: #1890ff;
+  font-variant-numeric: tabular-nums;
 }
 </style>

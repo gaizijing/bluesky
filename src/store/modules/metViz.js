@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import dashboardConfig from '@/config/dashboard.config.json';
+import { MET_VIZ_ENABLED } from '@/config/featureFlags';
 import { isMetVizEnabledOnDashboard } from '@/config/metVizRuntime';
 
 const cfg = dashboardConfig.metViz || {};
@@ -7,7 +8,8 @@ const dashboardMetVizOn = isMetVizEnabledOnDashboard();
 
 export const useMetVizStore = defineStore('metViz', {
   state: () => ({
-    toolbarOpen: dashboardMetVizOn,
+    /** 独立气象页默认展开；主大屏 MetViz 开启时同样展开 */
+    toolbarOpen: MET_VIZ_ENABLED || dashboardMetVizOn,
     product: cfg.defaultProduct || 'temperature',
     /** 当前可视化高度（米），风场与气象填色共用 */
     heightM: cfg.heightLevelsM?.[0] ?? 100,

@@ -1,0 +1,47 @@
+
+[
+    {
+        "header": {
+            "parameterCategory": 2,
+            "parameterCategoryName": "Momentum",
+            "parameterNumber": 2,
+            "parameterNumberName": "U-component_of_wind——，正数朝东，负数朝西",
+            "nx": 2, 
+            "ny": 2, 
+            "lo1": 100, 
+            "la1": 20,
+            "lo2": 120, 
+            "la2": 40, 
+            "dx": 10,
+            "dy": 10 
+        },
+        "data": [
+            100,
+            100,
+            0,
+            -100
+        ]
+    },
+    {
+        "header": {
+            "parameterCategory": 2,
+            "parameterCategoryName": "Momentum",
+            "parameterNumber": 3,
+            "parameterNumberName": "V-component_of_wind-正数朝北，负数朝南",
+            "nx": 2,
+            "ny": 2,
+            "lo1": 100,
+            "la1": 20,
+            "lo2": 120,
+            "la2": 40,
+            "dx": 10,
+            "dy": 10
+        },
+        "data": [
+            100,
+            0,
+            0,
+            -100
+        ]
+    }
+]

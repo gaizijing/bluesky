@@ -10,7 +10,7 @@
   },
   "main": {
     "map": {
-      "visible": false
+      "visible": true
     },
     "timeline": {
       "visible": true,
@@ -74,7 +74,7 @@
                 "id": "liveWeather",
                 "title": "实时风象",
                 "visible": true,
-                "height": "32%",
+                "height": "25%",
                 "order": 1,
                 "component": "components/dashboard/panels/drillLanding/LiveWeatherPanel.vue"
               },
@@ -82,7 +82,7 @@
                 "id": "weatherForecast",
                 "title": "3H气象预报",
                 "visible": true,
-                "height": "33%",
+                "height": "40%",
                 "order": 2,
                 "component": "components/dashboard/panels/drillLanding/DrillWeatherForecastPanel.vue"
               },
@@ -90,7 +90,7 @@
                 "id": "flyabilityMatrix",
                 "title": "1H适飞分析",
                 "visible": true,
-                "height": "35%",
+                "height": "25%",
                 "order": 3,
                 "component": "components/dashboard/panels/drillLanding/FlyabilityMatrixPanel.vue"
               }
@@ -106,7 +106,7 @@
                 "id": "windVerticalProfile",
                 "title": "垂直剖面",
                 "visible": true,
-                "height": "50%",
+                "height": "58%",
                 "order": 1,
                 "component": "components/dashboard/panels/drillLanding/WindVerticalProfilePanel.vue"
               },
@@ -114,7 +114,7 @@
                 "id": "surveillanceFootage",
                 "title": "实时监控",
                 "visible": true,
-                "height": "50%",
+                "height": "40%",
                 "order": 2,
                 "component": "components/dashboard/panels/drillLanding/SurveillanceFootagePanel.vue"
               }
@@ -132,7 +132,7 @@
             "panels": [
               {
                 "id": "waypointCards",
-                "title": "航点卡片",
+                "title": "航点实时情况",
                 "visible": true,
                 "height": "100%",
                 "order": 1,
@@ -140,27 +140,23 @@
               }
             ]
           },
+        
           {
-            "id": "drill-route-right",
-            "module": "routeAvoidance",
-            "region": "right",
-            "width": "25%",
+            "id": "drill-route-bottom",
+            "module": "routeProfile",
+            "region": "bottom-full",
+            "height": "240px",
+            "width": "100%",
+            "hideTitleBar": false,
             "panels": [
               {
-                "id": "avoidanceInfo",
-                "title": "规避建议",
+                "id": "routeProfile",
+                "title": "航路剖面",
                 "visible": true,
-                "height": "50%",
+                "height": "100%",
                 "order": 1,
-                "component": "components/dashboard/panels/drillRoute/AvoidanceInfoPanel.vue"
-              },
-              {
-                "id": "routeWarnings",
-                "title": "航路预警",
-                "visible": true,
-                "height": "50%",
-                "order": 2,
-                "component": "components/dashboard/panels/drillRoute/RouteWarningsPanel.vue"
+                "showTitleBar": false,
+                "component": "components/dashboard/panels/drillRoute/RouteProfilePanel.vue"
               }
             ]
           }
@@ -191,7 +187,8 @@
             "id": "sim-dash",
             "module": "simFlightHud",
             "region": "bottom-full",
-            "height": "220px",
+            "width": "920px",
+            "height": "360px",
             "hideTitleBar": true,
             "panels": [
               {
@@ -217,5 +214,12 @@
     "defaultProduct": "temperature",
     "products": ["wind", "temperature", "precipitation", "visibility", "humidity", "cloud", "pressure"],
     "heightLevelsM": [100, 300, 500, 1000, 2000]
+  },
+  "regionMeteo": {
+    "enabled": true,
+    "defaultLayers": {
+      "scalar": false,
+      "wind": false
+    }
   }
 }

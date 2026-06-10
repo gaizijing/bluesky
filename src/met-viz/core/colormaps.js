@@ -24,17 +24,84 @@ export const PRODUCT_COLORMAPS = {
     vmax: 25,
     unit: 'm/s',
     stops: [
+      { stop: 0, color: '#e0f2fe' },
+      { stop: 0.15, color: '#7dd3fc' },
+      { stop: 0.35, color: '#22d3ee' },
+      { stop: 0.55, color: '#facc15' },
+      { stop: 0.75, color: '#f97316' },
+      { stop: 1, color: '#dc2626' },
+    ],
+  },
+  visibility: {
+    vmin: 0,
+    vmax: 20000,
+    unit: 'm',
+    stops: [
+      { stop: 0, color: '#7f1d1d' },
+      { stop: 0.25, color: '#f97316' },
+      { stop: 0.5, color: '#eab308' },
+      { stop: 0.75, color: '#22c55e' },
+      { stop: 1, color: '#dbeafe' },
+    ],
+  },
+  precip: {
+    vmin: 0,
+    vmax: 15,
+    unit: 'mm/h',
+    stops: [
       { stop: 0, color: 'rgba(15, 23, 42, 0)' },
-      { stop: 0.08, color: 'rgba(34, 197, 94, 0.35)' },
-      { stop: 0.35, color: 'rgba(34, 211, 238, 0.55)' },
-      { stop: 0.55, color: 'rgba(250, 204, 21, 0.7)' },
-      { stop: 0.75, color: 'rgba(249, 115, 22, 0.82)' },
-      { stop: 1, color: 'rgba(239, 68, 68, 0.92)' },
+      { stop: 0.1, color: '#bfdbfe' },
+      { stop: 0.35, color: '#3b82f6' },
+      { stop: 0.6, color: '#7c3aed' },
+      { stop: 0.85, color: '#be185d' },
+      { stop: 1, color: '#881337' },
+    ],
+  },
+  humidity: {
+    vmin: 0,
+    vmax: 100,
+    unit: '%',
+    stops: [
+      { stop: 0, color: '#fef3c7' },
+      { stop: 0.35, color: '#86efac' },
+      { stop: 0.65, color: '#22d3ee' },
+      { stop: 1, color: '#1e3a8a' },
+    ],
+  },
+  cloud: {
+    vmin: 0,
+    vmax: 100,
+    unit: '%',
+    stops: [
+      { stop: 0, color: 'rgba(15, 23, 42, 0)' },
+      { stop: 0.2, color: 'rgba(148, 163, 184, 0.35)' },
+      { stop: 0.5, color: 'rgba(100, 116, 139, 0.65)' },
+      { stop: 0.8, color: 'rgba(71, 85, 105, 0.85)' },
+      { stop: 1, color: 'rgba(30, 41, 59, 0.95)' },
+    ],
+  },
+  pressure: {
+    vmin: 980,
+    vmax: 1040,
+    unit: 'hPa',
+    stops: [
+      { stop: 0, color: '#7c3aed' },
+      { stop: 0.35, color: '#3b82f6' },
+      { stop: 0.65, color: '#22c55e' },
+      { stop: 1, color: '#f97316' },
     ],
   },
 };
 
-export const IMAGERY_PRODUCTS = ['temperature', 'wind'];
+export const IMAGERY_PRODUCTS = [
+  'temperature',
+  'wind',
+  'visibility',
+  'precipitation',
+  'humidity',
+  'cloud',
+  'pressure',
+];
 
 export function getColormap(product) {
   const key = product === 'precipitation' ? 'precip' : product;
@@ -42,7 +109,8 @@ export function getColormap(product) {
 }
 
 export function isImageryProduct(product) {
-  return IMAGERY_PRODUCTS.includes(product);
+  const key = product === 'precip' ? 'precipitation' : product;
+  return IMAGERY_PRODUCTS.includes(key);
 }
 
 /**

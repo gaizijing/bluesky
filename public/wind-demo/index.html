@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>风场 Demo · Cesium Wind</title>
+  <link rel="stylesheet" href="https://unpkg.com/cesium@1.98.0/Build/Cesium/Widgets/widgets.css" />
+  <script src="https://unpkg.com/cesium@1.98.0/Build/Cesium/Cesium.js"></script>
+  <script src="./cesium-wind.js"></script>
+  <script src="./china-boundary-mask.js"></script>
+  <style>
+    html, body, #map {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0b1a2a;
+    }
+    .hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 10;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: rgba(8, 20, 36, 0.82);
+      color: #d7ecff;
+      font: 13px/1.5 "Segoe UI", sans-serif;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+    .hud a {
+      color: #7ec8ff;
+      text-decoration: none;
+    }
+    .hud a:hover {
+      text-decoration: underline;
+    }
+    .hud__debug {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #9ec7e8;
+    }
+    .height-control {
+      position: absolute;
+      right: 18px;
+      top: 50%;
+      z-index: 10;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 12px;
+      border-radius: 10px;
+      background: rgba(8, 20, 36, 0.82);
+      color: #d7ecff;
+      font: 12px/1.4 "Segoe UI", sans-serif;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      user-select: none;
+    }
+    .height-control__label {
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .height-control__value {
+      min-width: 4.5em;
+      text-align: center;
+      color: #9ec7e8;
+      font-variant-numeric: tabular-nums;
+    }
+    .height-control__slider {
+      writing-mode: vertical-lr;
+      direction: rtl;
+      width: 28px;
+      height: 220px;
+      margin: 0;
+      accent-color: #4db3ff;
+      cursor: pointer;
+    }
+    .height-control__hint {
+      font-size: 11px;
+      color: #7a9bb8;
+      text-align: center;
+    }
+    .cesium-viewer-bottom {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="hud">
+    <strong>风场粒子 Demo</strong><br />
+    数据：GFS 0.25° · 裁剪至中国边界 · 2026-06-09 00Z<br />
+    <a href="/">← 返回主系统</a>
+    <div class="hud__debug" id="windDebug">paths: — · 相机高度: —</div>
+  </div>
+
+  <aside class="height-control">
+    <span class="height-control__label">风场高度</span>
+    <span class="height-control__value" id="windHeightValue">10 m</span>
+    <input
+      id="windHeightSlider"
+      class="height-control__slider"
+      type="range"
+      min="0"
+      max="10000"
+      step="100"
+      value="10"
+      aria-label="风场渲染高度"
+    />
+    <span class="height-control__hint">0 m<br />↑<br />10 km</span>
+  </aside>
+
+  <script>
+    if (!Cesium.SceneTransforms.wgs84ToWindowCoordinates) {
+      Cesium.SceneTransforms.wgs84ToWindowCoordinates =
+        Cesium.SceneTransforms.worldToWindowCoordinates;
+    }
+
+    function projectToWindowCoordinates(scene, position) {
+      return Cesium.SceneTransforms.wgs84ToWindowCoordinates(scene, position)
+        || Cesium.SceneTransforms.worldToWindowCoordinates(scene, position);
+    }
+
+    const windDisplay = { renderHeightM: 10 };
+    /** @type {ReturnType<typeof createChinaBoundaryMask> | null} */
+    let chinaMask = null;
+
+    function isInsideWindArea(field, lng, lat) {
+      if (!field.contains(lng, lat)) return false;
+      if (chinaMask && !chinaMask.contains(lng, lat)) return false;
+      return true;
+    }
+
+    function patchFieldChinaClip(field) {
+      if (!field || !chinaMask) return;
+      const nativeContains = field.contains.bind(field);
+      field.contains = function (lon, lat) {
+        return nativeContains(lon, lat) && chinaMask.contains(lon, lat);
+      };
+    }
+
+    function formatWindHeight(m) {
+      return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
+    }
+
+    function getCameraObliqueFactor(viewer) {
+      const tilt = viewer.camera.pitch + Math.PI / 2;
+      return Cesium.Math.clamp(tilt / (Math.PI / 3), 0, 1);
+    }
+
+    function windParamsForCameraHeight(heightM, obliqueFactor = 0) {
+      let params;
+      if (heightM > 2_000_000) params = { paths: 4000, velocityScale: 1 / 45, maxAge: 60 };
+      else if (heightM > 800_000) params = { paths: 2500, velocityScale: 1 / 60, maxAge: 60 };
+      else if (heightM > 200_000) params = { paths: 1500, velocityScale: 1 / 80, maxAge: 70 };
+      else if (heightM > 60_000) params = { paths: 1200, velocityScale: 1 / 105, maxAge: 130 };
+      else if (heightM > 10_000) params = { paths: 650, velocityScale: 1 / 220, maxAge: 120 };
+      else if (heightM > 3_000) params = { paths: 450, velocityScale: 1 / 380, maxAge: 140 };
+      else params = { paths: 400, velocityScale: 1 / 600, maxAge: 160 };
+
+      if (obliqueFactor <= 0.12) return params;
+      return {
+        paths: Math.round(params.paths * (1 + obliqueFactor * 0.6)),
+        velocityScale: params.velocityScale * (1 - obliqueFactor * 0.3),
+        maxAge: Math.round(params.maxAge + obliqueFactor * 50),
+      };
+    }
+
+    function windParamsForCamera(viewer) {
+      return windParamsForCameraHeight(
+        viewer.camera.positionCartographic.height,
+        getCameraObliqueFactor(viewer),
+      );
+    }
+
+    function sampleLngLatInWindArea(viewer, field) {
+      const w = viewer.canvas.clientWidth;
+      const h = viewer.canvas.clientHeight;
+      const oblique = getCameraObliqueFactor(viewer);
+      const attempts = oblique > 0.12 ? 16 : 8;
+
+      for (let i = 0; i < attempts; i++) {
+        const x = w * (0.08 + Math.random() * 0.84);
+        const y = oblique > 0.12 ? h * (0.32 + Math.random() * 0.66) : h * Math.random();
+        const cartesian = viewer.camera.pickEllipsoid(new Cesium.Cartesian2(x, y));
+        if (!cartesian) continue;
+        const carto = Cesium.Cartographic.fromCartesian(cartesian);
+        const lng = Cesium.Math.toDegrees(carto.longitude);
+        const lat = Cesium.Math.toDegrees(carto.latitude);
+        if (isInsideWindArea(field, lng, lat)) return { lng, lat };
+      }
+
+      if (chinaMask) {
+        const [fWest, fSouth, fEast, fNorth] = field.extent();
+        const west = Math.max(fWest, chinaMask.bbox.west);
+        const south = Math.max(fSouth, chinaMask.bbox.south);
+        const east = Math.min(fEast, chinaMask.bbox.east);
+        const north = Math.min(fNorth, chinaMask.bbox.north);
+        if (west < east && south < north) {
+          return chinaMask.sampleInBBox(west, south, east, north, 32);
+        }
+      }
+      return null;
+    }
+
+    function patchViewportParticleSpawn(viewer, windLayer) {
+      const field = windLayer.getData();
+      if (!field || !field.randomize) return;
+
+      const nativeRandomize = field.randomize.bind(field);
+      const VIEWPORT_SPAWN_MAX_HEIGHT = 200_000;
+
+      field.randomize = function (o, width, height, unproject) {
+        const heightM = viewer.camera.positionCartographic.height;
+        const oblique = getCameraObliqueFactor(viewer);
+
+        if (heightM <= VIEWPORT_SPAWN_MAX_HEIGHT || oblique > 0.12) {
+          const ground = sampleLngLatInWindArea(viewer, field);
+          if (ground) {
+            o.x = ground.lng;
+            o.y = ground.lat;
+            return o;
+          }
+        }
+
+        if (heightM > VIEWPORT_SPAWN_MAX_HEIGHT && oblique <= 0.12) {
+          return nativeRandomize(o, width, height, unproject);
+        }
+
+        const rect = viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid);
+        if (!rect) return nativeRandomize(o, width, height, unproject);
+
+        const [fWest, fSouth, fEast, fNorth] = field.extent();
+        const west = Math.max(Cesium.Math.toDegrees(rect.west), fWest);
+        const south = Math.max(Cesium.Math.toDegrees(rect.south), fSouth);
+        const east = Math.min(Cesium.Math.toDegrees(rect.east), fEast);
+        const north = Math.min(Cesium.Math.toDegrees(rect.north), fNorth);
+
+        if (west >= east || south >= north) {
+          return nativeRandomize(o, width, height, unproject);
+        }
+
+        o.x = west + Math.random() * (east - west);
+        o.y = south + Math.random() * (north - south);
+        if (isInsideWindArea(field, o.x, o.y)) return o;
+
+        if (chinaMask) {
+          const sampled = chinaMask.sampleInBBox(
+            Math.max(west, chinaMask.bbox.west),
+            Math.max(south, chinaMask.bbox.south),
+            Math.min(east, chinaMask.bbox.east),
+            Math.min(north, chinaMask.bbox.north),
+            24,
+          );
+          if (sampled) {
+            o.x = sampled.lng;
+            o.y = sampled.lat;
+            return o;
+          }
+        }
+
+        return nativeRandomize(o, width, height, unproject);
+      };
+    }
+
+    function patchObliqueWindBehavior(viewer, windLayer) {
+      const field = windLayer.getData();
+      const base = windLayer.wind;
+      if (!base || !field) return;
+
+      windLayer.project = function (coordinate) {
+        const position = Cesium.Cartesian3.fromDegrees(
+          coordinate[0],
+          coordinate[1],
+          windDisplay.renderHeightM,
+        );
+        const sceneCoor = projectToWindowCoordinates(viewer.scene, position);
+        if (!sceneCoor || !Number.isFinite(sceneCoor.x) || !Number.isFinite(sceneCoor.y)) {
+          return null;
+        }
+        return [sceneCoor.x, sceneCoor.y];
+      };
+      base.project = windLayer.project.bind(windLayer);
+
+      base.intersectsCoordinate = function (coordinate) {
+        if (!isInsideWindArea(field, coordinate[0], coordinate[1])) return false;
+        const projected = this.project(coordinate);
+        if (!projected) return false;
+        const cw = this.ctx.canvas.width;
+        const ch = this.ctx.canvas.height;
+        return projected[0] >= -cw * 0.25 && projected[0] <= cw * 1.25
+          && projected[1] >= -ch * 0.25 && projected[1] <= ch * 1.25;
+      };
+    }
+
+    function bindWindCameraControls(viewer, windLayer) {
+      const debugEl = document.getElementById('windDebug');
+      let currentParams = windParamsForCamera(viewer);
+      let cameraMoving = false;
+      let obliqueSyncTimer = null;
+
+      const updateDebug = () => {
+        if (!debugEl) return;
+        const heightM = viewer.camera.positionCartographic.height;
+        const oblique = getCameraObliqueFactor(viewer);
+        const status = cameraMoving ? ' · 相机移动中（风场已清空）' : '';
+        debugEl.textContent = [
+          `paths: ${currentParams.paths}`,
+          `maxAge: ${currentParams.maxAge}`,
+          `风场高度: ${formatWindHeight(windDisplay.renderHeightM)}`,
+          `相机: ${(heightM / 1000).toFixed(1)} km`,
+          `倾角: ${(oblique * 60).toFixed(0)}°`,
+          status,
+        ].join(' · ');
+      };
+
+      const rebuildParticles = () => {
+        const base = windLayer.wind;
+        if (!base) return;
+        base.prerender();
+        base.start();
+      };
+
+      const applyWindParams = (next, { rebuild = false } = {}) => {
+        const base = windLayer.wind;
+        if (!base) return;
+        const pathsChanged = next.paths !== currentParams.paths;
+        currentParams = { ...next };
+        if (pathsChanged) base.setOptions(next);
+        else {
+          Object.assign(base.options, next);
+          if (rebuild) rebuildParticles();
+        }
+      };
+
+      viewer.camera.moveStart.addEventListener(() => {
+        cameraMoving = true;
+        updateDebug();
+        windLayer.wind?.clearCanvas();
+      });
+
+      viewer.camera.moveEnd.addEventListener(() => {
+        applyWindParams(windParamsForCamera(viewer), { rebuild: true });
+        cameraMoving = false;
+        updateDebug();
+      });
+
+      viewer.camera.changed.addEventListener(() => {
+        if (cameraMoving) return;
+        if (obliqueSyncTimer) return;
+        obliqueSyncTimer = window.setTimeout(() => {
+          obliqueSyncTimer = null;
+          const next = windParamsForCamera(viewer);
+          if (next.paths !== currentParams.paths) applyWindParams(next);
+          else if (
+            next.maxAge !== currentParams.maxAge
+            || next.velocityScale !== currentParams.velocityScale
+          ) applyWindParams(next);
+          updateDebug();
+        }, 250);
+      });
+
+      applyWindParams(currentParams);
+      updateDebug();
+    }
+
+    function bindWindHeightControl(viewer, windLayer) {
+      const slider = document.getElementById('windHeightSlider');
+      const valueEl = document.getElementById('windHeightValue');
+      if (!slider) return;
+
+      const applyHeight = (heightM) => {
+        windDisplay.renderHeightM = heightM;
+        if (valueEl) valueEl.textContent = formatWindHeight(heightM);
+        const base = windLayer.wind;
+        if (base) {
+          base.clearCanvas();
+          base.prerender();
+          base.start();
+        }
+      };
+
+      slider.addEventListener('input', () => applyHeight(Number(slider.value)));
+      applyHeight(Number(slider.value));
+    }
+
+    const viewer = new Cesium.Viewer('map', {
+      animation: false,
+      timeline: false,
+      baseLayerPicker: false,
+      geocoder: false,
+      homeButton: false,
+      sceneModePicker: false,
+      navigationHelpButton: false,
+      infoBox: false,
+      selectionIndicator: false,
+      fullscreenButton: false,
+      terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+    });
+
+    viewer.imageryLayers.removeAll();
+    viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+      credit: 'Mars3D',
+      url: 'https://data.mars3d.cn/tile/img/{z}/{x}/{y}.jpg',
+    }));
+
+    viewer.cesiumWidget.creditContainer.style.display = 'none';
+    viewer.scene.globe.depthTestAgainstTerrain = false;
+    viewer.scene.fog.enabled = false;
+    viewer.scene.debugShowFramesPerSecond = true;
+
+    viewer.camera.setView({
+      destination: Cesium.Rectangle.fromDegrees(73, 18, 135, 54),
+    });
+
+    const windOptions = {
+      colorScale: [
+        'rgb(36,104, 180)', 'rgb(60,157, 194)', 'rgb(128,205,193 )', 'rgb(151,218,168 )',
+        'rgb(198,231,181)', 'rgb(238,247,217)', 'rgb(255,238,159)', 'rgb(252,217,125)',
+        'rgb(255,182,100)', 'rgb(252,150,75)', 'rgb(250,112,52)', 'rgb(245,64,32)',
+        'rgb(237,45,28)', 'rgb(220,24,32)', 'rgb(180,0,35)',
+      ],
+      frameRate: 16,
+      maxAge: 60,
+      globalAlpha: 0.8,
+      velocityScale: 1 / 80,
+      paths: 4000,
+    };
+
+    Promise.all([
+      fetch('./gfs_china_2026060900.json').then((res) => {
+        if (!res.ok) throw new Error('无法加载风场 JSON: ' + res.status);
+        return res.json();
+      }),
+      fetch('/data/china-boundary.geojson').then((res) => {
+        if (!res.ok) throw new Error('无法加载中国边界: ' + res.status);
+        return res.json();
+      }),
+    ])
+      .then(([data, boundaryGeo]) => {
+        chinaMask = createChinaBoundaryMask(boundaryGeo);
+        const windLayer = new CesiumWind.WindLayer(data, { windOptions });
+        patchFieldChinaClip(windLayer.getData());
+        windLayer.addTo(viewer);
+        patchViewportParticleSpawn(viewer, windLayer);
+        patchObliqueWindBehavior(viewer, windLayer);
+        bindWindCameraControls(viewer, windLayer);
+        bindWindHeightControl(viewer, windLayer);
+      })
+      .catch((err) => {
+        console.error(err);
+        alert('风场或边界数据加载失败，请确认 gfs_china_2026060900.json 与 /data/china-boundary.geojson 可访问。');
+      });
+  </script>
+</body>
+</html>

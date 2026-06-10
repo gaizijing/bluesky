@@ -22,12 +22,10 @@ export const getRegionConfig = async () => {
     name: region.name,
     modelUrl: region.modelUrl,
     mapLift: region.mapLift,
-    bounds: {
-      west: region.west,
-      east: region.east,
-      south: region.south,
-      north: region.north,
-    },
+    boundaryUrl: region.boundaryUrl,
+    adcode: region.adcode,
+    centerLng: region.centerLng,
+    centerLat: region.centerLat,
   };
 };
 
@@ -43,13 +41,11 @@ export const getRegionConfigById = async (id) => {
 export const addRegionConfig = async (data) => {
   const payload = {
     name: data.name,
-    west: data.west,
-    east: data.east,
-    south: data.south,
-    north: data.north,
-    centerLng: data.centerLng ?? (data.west + data.east) / 2,
-    centerLat: data.centerLat ?? (data.south + data.north) / 2,
-    modelUrl: data.modelUrl,
+    centerLng: Number(data.centerLng),
+    centerLat: Number(data.centerLat),
+    adcode: data.adcode?.trim() || undefined,
+    boundarySourceUrl: data.boundarySourceUrl?.trim() || undefined,
+    modelUrl: data.modelUrl?.trim() || undefined,
     enabled: data.enabled !== false,
     isDefault: Boolean(data.isDefault),
   };
@@ -64,22 +60,20 @@ export const setRegionDefault = async (regionId) => {
 
 export const updateRegionConfig = async (data) => {
   const regionId = data.regionId || data.id;
-  const west = Number(data.west);
-  const east = Number(data.east);
-  const south = Number(data.south);
-  const north = Number(data.north);
   const payload = {
     name: data.name,
-    west,
-    east,
-    south,
-    north,
-    centerLng: data.centerLng ?? (west + east) / 2,
-    centerLat: data.centerLat ?? (south + north) / 2,
-    modelUrl: data.modelUrl,
+    centerLng: data.centerLng != null ? Number(data.centerLng) : undefined,
+    centerLat: data.centerLat != null ? Number(data.centerLat) : undefined,
+    modelUrl: data.modelUrl?.trim() || undefined,
     enabled: data.enabled !== false,
     isDefault: Boolean(data.isDefault),
   };
+  if (data.adcode?.trim()) {
+    payload.adcode = data.adcode.trim();
+  }
+  if (data.boundarySourceUrl?.trim()) {
+    payload.boundarySourceUrl = data.boundarySourceUrl.trim();
+  }
   const response = await request.put(`/regions/${regionId}`, payload);
   return mapRegionToLegacyConfig(response);
 };

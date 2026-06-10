@@ -18,79 +18,52 @@ import AsyncState from '@/components/common/AsyncState.vue';
 import { fetchVerticalProfile } from '@/api/weather';
 import { useDrillFocus } from '@/composables/useDrillFocus';
 import { usePanelRefresh } from '@/composables/usePanelRefresh';
+import {
+  adaptVerticalProfileResponse,
+  buildMockWindProfileGrid,
+  buildWindProfileChartOption,
+} from '@/utils/windVerticalProfileChart';
+
+const USE_MOCK_DATA = import.meta.env.VITE_WIND_PROFILE_MOCK !== 'false';
 
 const { landingPointId, timelineTime } = useDrillFocus();
 const chartRef = ref(null);
+const chartGrid = ref(null);
 const isStale = ref(false);
 let chartInstance = null;
 
-function renderChart(layers) {
-  if (!chartRef.value) return;
-  if (chartInstance) chartInstance.dispose();
-  chartInstance = echarts.init(chartRef.value);
+function renderChart(grid) {
+  if (!chartRef.value || !grid) return;
 
-  const sorted = [...layers].sort((a, b) => Number(a.height) - Number(b.height));
-  const heights = sorted.map((l) => `${l.height}m`);
-  const wind = sorted.map((l) => Number(l.windSpeed) || 0);
-  const temp = sorted.map((l) => Number(l.temperature) || 0);
-
-  chartInstance.setOption({
-    animation: false,
-    tooltip: { trigger: 'axis' },
-    legend: {
-      data: ['风速 m/s', '气温 °C'],
-      textStyle: { color: '#cbd5e1', fontSize: 11 },
-      top: 0,
-    },
-    grid: { left: 48, right: 16, top: 32, bottom: 24 },
-    xAxis: {
-      type: 'category',
-      data: heights,
-      axisLabel: { color: '#94a3b8', fontSize: 10, interval: 0, rotate: 30 },
-      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.15)' } },
-    },
-    yAxis: [
-      {
-        type: 'value',
-        name: '风速',
-        axisLabel: { color: '#94a3b8', fontSize: 10 },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } },
-      },
-      {
-        type: 'value',
-        name: '气温',
-        axisLabel: { color: '#94a3b8', fontSize: 10 },
-        splitLine: { show: false },
-      },
-    ],
-    series: [
-      {
-        name: '风速 m/s',
-        type: 'bar',
-        data: wind,
-        itemStyle: { color: '#3b82f6' },
-      },
-      {
-        name: '气温 °C',
-        type: 'line',
-        yAxisIndex: 1,
-        data: temp,
-        smooth: true,
-        itemStyle: { color: '#f97316' },
-      },
-    ],
-  });
+  try {
+    if (!chartInstance) {
+      chartInstance = echarts.init(chartRef.value);
+    }
+    chartInstance.setOption(buildWindProfileChartOption(grid), true);
+    chartInstance.resize();
+  } catch (err) {
+    console.error('[WindVerticalProfilePanel] render failed:', err);
+  }
 }
 
 async function load() {
-  if (!landingPointId.value) return;
-  const res = await fetchVerticalProfile(landingPointId.value, {
-    startTime: timelineTime.value,
-  });
-  isStale.value = Boolean(res?.isStale);
-  const layers = res?.heightLayers || [];
-  await nextTick();
-  renderChart(layers);
+  if (!landingPointId.value) {
+    chartGrid.value = null;
+    return;
+  }
+
+  if (USE_MOCK_DATA) {
+    chartGrid.value = buildMockWindProfileGrid({
+      startTime: timelineTime.value ? new Date(timelineTime.value) : new Date(),
+    });
+    isStale.value = false;
+  } else {
+    const res = await fetchVerticalProfile(landingPointId.value, {
+      startTime: timelineTime.value,
+    });
+    isStale.value = Boolean(res?.isStale);
+    chartGrid.value = adaptVerticalProfileResponse(res, timelineTime.value);
+  }
 }
 
 function handleResize() {
@@ -101,9 +74,20 @@ watch(landingPointId, () => reload());
 
 const { loading, error, reload } = usePanelRefresh(load);
 
+watch(
+  [loading, chartRef, chartGrid],
+  async ([isLoading]) => {
+    if (isLoading || !chartRef.value || !chartGrid.value) return;
+    await nextTick();
+    renderChart(chartGrid.value);
+  },
+  { flush: 'post' },
+);
+
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
   chartInstance?.dispose();
+  chartInstance = null;
 });
 
 window.addEventListener('resize', handleResize);

@@ -73,9 +73,10 @@
 <script setup>
 import { computed, ref } from 'vue';
 import AsyncState from '@/components/common/AsyncState.vue';
-import { fetchLandingPoints } from '@/api/v2/landing';
-import { fetchLandingMatrix } from '@/api/flyability';
+import { resolveLandingMatrixResponse } from '@/api/flyability';
+import { FLYABILITY_OVERVIEW_HOURS, FLYABILITY_MATRIX_SLOT_LIMIT } from '@/utils/flyabilityChart';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
+import { useRegionLandingStore } from '@/store/modules/regionLanding';
 import { usePanelRefresh } from '@/composables/usePanelRefresh';
 import {
   flyabilityColor,
@@ -86,10 +87,11 @@ import {
   parseLandingMatrixOverview,
 } from '@/utils/flyabilityMatrix';
 
-const MATRIX_HOURS = 2;
-const MATRIX_SLOT_LIMIT = 6;
+const MATRIX_HOURS = FLYABILITY_OVERVIEW_HOURS;
+const MATRIX_SLOT_LIMIT = FLYABILITY_MATRIX_SLOT_LIMIT;
 
 const appStore = useAppDashboardStore();
+const landingStore = useRegionLandingStore();
 const cards = ref([]);
 const typeFilter = ref('all');
 
@@ -141,11 +143,12 @@ async function load() {
     return;
   }
   const [points, matrixRes] = await Promise.all([
-    fetchLandingPoints(appStore.regionId),
-    fetchLandingMatrix({
+    landingStore.ensureLandingPoints(appStore.regionId),
+    resolveLandingMatrixResponse({
       regionId: appStore.regionId,
       time: appStore.timelineTime,
       hours: MATRIX_HOURS,
+      appStore,
     }),
   ]);
   cards.value = parseLandingMatrixOverview(matrixRes, points);

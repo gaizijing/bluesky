@@ -1,0 +1,80 @@
+/**
+ * 起降点 / 点选气象锚点弹窗（挂到 document.body，需全局样式）
+ */
+.landing-overlay-root {
+  position: fixed;
+  z-index: 9000;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 28px));
+}
+
+.landing-overlay-root.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.landing-popup {
+  pointer-events: auto;
+  position: relative;
+  width: 220px;
+  max-width: min(220px, 78vw);
+  padding: 0;
+  background: transparent;
+  color: #e8f4ff;
+  font-family: "Outfit", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.landing-popup__inner {
+  position: relative;
+  z-index: 1;
+  min-height: 168px;
+  padding: 16px 34px 36px;
+  background: url('/region-meteo-demo/landing-popup-bg.png') center / 100% 100% no-repeat;
+  box-sizing: border-box;
+}
+
+.landing-popup__title {
+  margin: 0 0 8px;
+  padding-right: 18px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8f8ff;
+}
+
+.landing-popup__close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(8, 20, 36, 0.55);
+  color: #b8e4ff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.landing-popup__row {
+  margin: 0 0 5px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #e2f0ff;
+  word-break: break-all;
+}
+
+.landing-popup__badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 13px;
+  background: rgba(80, 200, 120, 0.18);
+  color: #a8e6c0;
+}
+
+.landing-popup__badge.is-off {
+  background: rgba(255, 120, 120, 0.16);
+  color: #ffb4b4;
+}

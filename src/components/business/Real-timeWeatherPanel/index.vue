@@ -11,11 +11,17 @@
         <div class="panel-label">
           <span>实时风速</span>
         </div>
-        <div class="panel-value">
-          <span class="value">{{ dashboardWeatherStore.realTimeWeatherPanelData.windSpeed }}</span>
-          <span class="unit">
-            m/s
-          </span>
+        <div class="panel-value wind-speed-value">
+          <div class="wind-speed-primary">
+            <span class="value">{{ dashboardWeatherStore.realTimeWeatherPanelData.windSpeed }}</span>
+            <span class="unit">m/s</span>
+          </div>
+          <div
+            v-if="dashboardWeatherStore.realTimeWeatherPanelData.windSpeedKmh"
+            class="wind-speed-converted"
+          >
+            ({{ dashboardWeatherStore.realTimeWeatherPanelData.windSpeedKmh }} km/h)
+          </div>
         </div>
         <div class="panel-desc">
           {{ WIND_SPEED_DESC[getWindSpeedLevel(dashboardWeatherStore.realTimeWeatherPanelData.windSpeed)] }}
@@ -98,7 +104,8 @@ const getWindSpeedLevel = (windSpeed) => {
 <style scoped lang="scss">
 .landing-point-card {
   position: relative;
-  min-height: 200px;
+  height: 100%;
+  min-height: 0;
 }
 
 .loading-overlay {
@@ -147,6 +154,9 @@ const getWindSpeedLevel = (windSpeed) => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 15px;
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
 }
 
 // 数据面板通用样式
@@ -237,6 +247,26 @@ const getWindSpeedLevel = (windSpeed) => {
     .panel-desc.desc-high {
       color: #f87171;
     }
+  }
+}
+
+// 风速面板：主数值与 km/h 换算分行展示，避免窄面板内换行错乱
+.wind-speed-panel .panel-value.wind-speed-value {
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+
+  .wind-speed-primary {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .wind-speed-converted {
+    font-size: 11px;
+    color: #94a3b8;
+    white-space: nowrap;
   }
 }
 

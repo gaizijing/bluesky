@@ -49,20 +49,22 @@
 <script setup>
 import { ref } from 'vue';
 import AsyncState from '@/components/common/AsyncState.vue';
-import { fetchRoutes } from '@/api/v2/route';
 import { fetchRouteMatrix } from '@/api/flyability';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
+import { useRegionRoutesStore } from '@/store/modules/regionRoutes';
 import { usePanelRefresh } from '@/composables/usePanelRefresh';
 import {
   flyabilityColor,
   routeOverviewLabel,
 } from '@/utils/flyabilityLevel';
+import { FLYABILITY_MATRIX_SLOT_LIMIT } from '@/utils/flyabilityChart';
 import { parseRouteMatrixOverview } from '@/utils/flyabilityMatrix';
 
 const MATRIX_HOURS = 2;
-const MATRIX_SLOT_LIMIT = 6;
+const MATRIX_SLOT_LIMIT = FLYABILITY_MATRIX_SLOT_LIMIT;
 
 const appStore = useAppDashboardStore();
+const routesStore = useRegionRoutesStore();
 const overview = ref({ routes: [], routeRows: [], timeRows: [], grid: [], bucketTime: null });
 
 function colorOf(level) {
@@ -78,7 +80,7 @@ async function load() {
     overview.value = { routes: [], routeRows: [], timeRows: [], grid: [], bucketTime: null };
     return;
   }
-  const page = await fetchRoutes(appStore.regionId, 1, 50);
+  const page = await routesStore.ensureRouteList(appStore.regionId, { page: 1, size: 50 });
   const records = page?.records || [];
   if (!records.length) {
     overview.value = { routes: [], routeRows: [], timeRows: [], grid: [], bucketTime: null };

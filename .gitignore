@@ -13,6 +13,11 @@ dist-ssr
 *.local
 public/cesium/model
 
+# 离线 Cesium 地形 / 影像
+../source/Terrain/
+../source/Tiles/
+../source/CT/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

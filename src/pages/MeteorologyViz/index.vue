@@ -2,25 +2,29 @@
   <div class="met-viz-page">
     <DashboardHeader v-if="config.header.visible" />
     <div class="met-viz-page__map">
-      <MapContainer />
+      <RegionMeteoMap />
     </div>
-    <MetVizToolbar />
+    <RegionMeteoControls />
     <TimelineBar v-if="config.main.timeline.visible" />
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, provide } from 'vue';
 import dashboardConfig from '@/config/dashboard.config.json';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
 import { useTimelineAutoNow } from '@/composables/useTimelineAutoNow';
+import { useRegionMeteoEngine } from '@/composables/useRegionMeteoEngine';
 import DashboardHeader from '@/components/dashboard/header/Header.vue';
-import MetVizToolbar from '@/components/dashboard/metviz/MetVizToolbar.vue';
 import TimelineBar from '@/components/dashboard/timeline/TimelineBar.vue';
-import MapContainer from '@/components/map/MapContainer.vue';
+import RegionMeteoMap from '@/components/regionMeteo/RegionMeteoMap.vue';
+import RegionMeteoControls from '@/components/regionMeteo/RegionMeteoControls.vue';
 
 const config = dashboardConfig;
 const appStore = useAppDashboardStore();
+const regionMeteo = useRegionMeteoEngine();
+
+provide('regionMeteo', regionMeteo);
 
 useTimelineAutoNow();
 

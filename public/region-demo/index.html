@@ -1,0 +1,291 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Region 地图 Demo · 区域边界</title>
+  <link rel="stylesheet" href="https://unpkg.com/cesium@1.122.0/Build/Cesium/Widgets/widgets.css" />
+  <script src="https://unpkg.com/cesium@1.122.0/Build/Cesium/Cesium.js"></script>
+  <style>
+    html, body, #map {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0b1a2a;
+    }
+    .hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 10;
+      width: min(360px, calc(100vw - 24px));
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: rgba(8, 20, 36, 0.88);
+      color: #d7ecff;
+      font: 13px/1.55 "Segoe UI", "PingFang SC", sans-serif;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+    }
+    .hud h1 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .hud__subtitle {
+      margin: 0 0 12px;
+      color: #8fb8d8;
+      font-size: 12px;
+    }
+    .hud label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: #9ec7e8;
+    }
+    .hud select {
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 7px 10px;
+      border: 1px solid rgba(126, 200, 255, 0.25);
+      border-radius: 6px;
+      background: rgba(12, 32, 56, 0.9);
+      color: #e8f4ff;
+      font: inherit;
+      cursor: pointer;
+    }
+    .hud__metrics {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 10px;
+      margin: 0 0 12px;
+      font-size: 12px;
+    }
+    .hud__metrics dt {
+      color: #7a9bb8;
+    }
+    .hud__metrics dd {
+      margin: 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .hud__legend {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .legend-swatch {
+      width: 18px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .legend-swatch--geo {
+      background: rgba(0, 210, 255, 0.12);
+      border: 2px solid #00d2ff;
+    }
+    .legend-swatch--landing {
+      background: radial-gradient(circle at 50% 35%, #ffe566, #f59e0b);
+      border: 2px solid #fff;
+      border-radius: 50%;
+      width: 12px;
+      height: 12px;
+    }
+    .legend-swatch--nofly {
+      background: rgba(239, 68, 68, 0.35);
+      border: 2px solid #ef4444;
+    }
+    .landing-overlay-root {
+      position: fixed;
+      z-index: 1000;
+      pointer-events: none;
+      transform: translate(-50%, calc(-100% - 28px));
+      transform-style: preserve-3d;
+      perspective: 900px;
+      transition: opacity 0.18s ease;
+    }
+    .landing-overlay-root.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+    .landing-popup {
+      pointer-events: auto;
+      position: relative;
+      width: 220px;
+      max-width: min(220px, 78vw);
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      color: #e8f4ff;
+      transform: rotateX(8deg);
+      transform-origin: center bottom;
+      overflow: visible;
+    }
+    .landing-popup__inner {
+      position: relative;
+      z-index: 1;
+      min-height: 168px;
+      padding: 16px 34px 36px;
+      background: url('/region-demo/landing-popup-bg.png') center / 100% 100% no-repeat;
+      box-sizing: border-box;
+    }
+    .landing-popup__title {
+      margin: 0 0 8px;
+      padding-right: 18px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: #e8f8ff;
+      text-shadow: 0 0 10px rgba(0, 210, 255, 0.35), 0 1px 2px rgba(0, 0, 0, 0.65);
+    }
+    .landing-popup__close {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      z-index: 2;
+      width: 20px;
+      height: 20px;
+      border: none;
+      border-radius: 4px;
+      background: rgba(8, 20, 36, 0.55);
+      color: #b8e4ff;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .landing-popup__close:hover {
+      background: rgba(255, 255, 255, 0.16);
+      color: #fff;
+    }
+    .landing-popup__row {
+      margin: 0 0 5px;
+      font-size: 14px;
+      line-height: 1.45;
+      color: #e2f0ff;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+      word-break: break-all;
+    }
+    .landing-popup__row:last-child {
+      margin-bottom: 0;
+    }
+    .landing-popup__badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 13px;
+      background: rgba(80, 200, 120, 0.18);
+      color: #a8e6c0;
+    }
+    .landing-popup__badge.is-off {
+      background: rgba(255, 120, 120, 0.16);
+      color: #ffb4b4;
+    }
+    .hud__status {
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .hud__status.loading {
+      background: rgba(77, 179, 255, 0.12);
+      color: #9ec7e8;
+    }
+    .hud__status.error {
+      background: rgba(255, 90, 90, 0.14);
+      color: #ffb4b4;
+    }
+    .hud__status.ok {
+      background: rgba(80, 200, 120, 0.12);
+      color: #a8e6c0;
+    }
+    .hud__actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .hud__actions button {
+      padding: 6px 12px;
+      border: 1px solid rgba(126, 200, 255, 0.35);
+      border-radius: 6px;
+      background: rgba(30, 80, 130, 0.5);
+      color: #d7ecff;
+      font: inherit;
+      cursor: pointer;
+    }
+    .hud__actions button:hover {
+      background: rgba(50, 110, 170, 0.65);
+    }
+    .hud a {
+      display: inline-block;
+      margin-top: 10px;
+      color: #7ec8ff;
+      text-decoration: none;
+      font-size: 12px;
+    }
+    .hud a:hover {
+      text-decoration: underline;
+    }
+    .cesium-viewer-bottom {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <aside class="hud">
+    <h1>Region 区域地图 Demo</h1>
+    <p class="hud__subtitle">数据来自 <code>/api/regions</code>、<code>/api/no-fly-zones</code> 与起降点等接口</p>
+
+    <div id="statusBox" class="hud__status loading">正在加载 Region 列表…</div>
+
+    <label for="regionSelect">选择 Region</label>
+    <select id="regionSelect" disabled>
+      <option value="">— 加载中 —</option>
+    </select>
+
+    <dl class="hud__metrics" id="metrics">
+      <dt>名称</dt><dd id="mName">—</dd>
+      <dt>Region ID</dt><dd id="mId">—</dd>
+      <dt>中心</dt><dd id="mCenter">—</dd>
+      <dt>地形</dt><dd id="mTerrain">加载中…</dd>
+      <dt>边界 GeoJSON</dt><dd id="mGeoUrl">—</dd>
+      <dt>起降点</dt><dd id="mLandingCount">—</dd>
+      <dt>建筑白膜</dt><dd id="mWhiteModel">—</dd>
+      <dt>禁飞区</dt><dd id="mNoFlyCount">—</dd>
+    </dl>
+
+    <div class="hud__legend">
+      <div class="legend-item">
+        <span class="legend-swatch legend-swatch--geo"></span>
+        <span>行政区划边界（GeoJSON 面）</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch legend-swatch--landing"></span>
+        <span>起降点：单击弹窗 · 双击跳转 · 拉远聚合</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch legend-swatch--nofly"></span>
+        <span>禁飞区（/api/no-fly-zones 多边形，高度 400m）</span>
+      </div>
+    </div>
+
+    <div class="hud__actions">
+      <button type="button" id="btnFlyTo">飞到区域</button>
+      <button type="button" id="btnReload">重新加载</button>
+    </div>
+
+    <a href="/">← 返回主系统</a>
+  </aside>
+
+  <script src="/region-demo/env.js"></script>
+  <script src="/region-demo/app.js"></script>
+</body>
+</html>

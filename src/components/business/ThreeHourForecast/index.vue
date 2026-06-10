@@ -55,23 +55,17 @@ const getWeatherIcon = (desc) => {
 </script>
 
 <style scoped>
-.forecast-container{
-  width: 98%;
-}
-
-.forecast-header {
-  margin-bottom: 12px;
-}
-
-.forecast-header h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: #e2e8f0;
-  text-align: center;
+.three-hour-forecast {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .forecast-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 98%;
   display: flex;
   justify-content: space-between;
   overflow-x: auto;

@@ -33,7 +33,7 @@ export function toRealtimePanelFields(payload) {
     throw new Error(payload?.message || '获取实时天气失败');
   }
   const windMs = Number(payload.windSpeed);
-  const windKmh = Number.isFinite(windMs) ? (windMs * 3.6).toFixed(1) : '0';
+  const hasWindMs = Number.isFinite(windMs);
   return {
     temp: String(payload.temperature ?? '—'),
     feelsLike: String(payload.temperature ?? '—'),
@@ -42,7 +42,8 @@ export function toRealtimePanelFields(payload) {
     wind360: '0',
     windDir: payload.windDirection != null ? String(payload.windDirection) : '—',
     windScale: '—',
-    windSpeed: Number.isFinite(windMs) ? `${windMs.toFixed(1)} m/s（${windKmh} km/h）` : '—',
+    windSpeed: hasWindMs ? windMs.toFixed(1) : '—',
+    windSpeedKmh: hasWindMs ? (windMs * 3.6).toFixed(1) : null,
     humidity: String(payload.humidity ?? '—'),
     precip: String(payload.precipitation ?? '0'),
     pressure: '—',
@@ -77,10 +78,11 @@ export async function fetchWeatherGridField({
 /** GET /weather/forecast-trend → 图表用 minutely 结构 */
 export async function fetchForecastTrend(landingPointId) {
   const res = await request.get('/weather/forecast-trend', { pointId: landingPointId });
-  if (!res?.data && !res?.time) {
+  const payload = res?.time ? res : res?.data;
+  if (!payload?.time?.length) {
     throw new Error('预报数据格式错误');
   }
-  return res.data ?? res;
+  return payload;
 }
 
 export async function postWeatherByCoordsBatch(body) {

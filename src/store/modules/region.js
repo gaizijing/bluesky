@@ -15,39 +15,46 @@ export const useRegionStore = defineStore('region', {
     regionId: stored,
     regions: [],
     regionConfig: null,
+    /** 由 boundary GeoJSON 解析的包络，仅地图内部使用 */
+    boundaryEnvelope: null,
     isLoading: false,
     error: null,
   };
   },
 
   getters: {
-    /** V1 白膜：仅 3D Tileset（tileset.json）；优先 DB/API 的 modelUrl，否则按 regionId 映射静态资源 */
     getModelUrl: (state) => {
       const fromApi = state.regionConfig?.modelUrl;
       if (typeof fromApi === 'string' && fromApi.trim()) {
         return fromApi.trim();
       }
-      const rid = state.regionId || state.regionConfig?.regionId;
-      if (rid === 'R1') return '/cesium/model/tianjin/tileset.json';
-      if (rid === 'R2') return '/cesium/model/qingdaoshi/tileset.json';
       return null;
     },
     getRegionName: (state) => state.regionConfig?.defaultName || state.regionConfig?.name || '',
-    getRegionBounds: (state) => state.regionConfig?.bounds,
     getMapLift: (state) => state.regionConfig?.mapLift,
     getRegionCenter: (state) => {
-      if (!state.regionConfig?.bounds) {
-        return null;
+      const cfg = state.regionConfig;
+      if (!cfg) return null;
+      if (cfg.centerLng != null && cfg.centerLat != null) {
+        return [cfg.centerLng, cfg.centerLat];
       }
-      const bounds = state.regionConfig.bounds;
-      return [(bounds.west + bounds.east) / 2, (bounds.south + bounds.north) / 2];
+      const lift = cfg.mapLift;
+      if (lift?.longitude != null && lift?.latitude != null) {
+        return [Number(lift.longitude), Number(lift.latitude)];
+      }
+      return null;
     },
+    getBoundaryUrl: (state) => state.regionConfig?.boundaryUrl || null,
   },
 
   actions: {
     setRegionId(regionId) {
       this.regionId = regionId;
       setStorage(REGION_ID_KEY, regionId);
+    },
+
+    setBoundaryEnvelope(envelope) {
+      this.boundaryEnvelope = envelope;
     },
 
     applyRegionVo(region) {
@@ -58,23 +65,16 @@ export const useRegionStore = defineStore('region', {
         name: region.name,
         modelUrl: region.modelUrl,
         mapLift: region.mapLift,
-        bounds: {
-          west: region.west,
-          east: region.east,
-          south: region.south,
-          north: region.north,
-        },
+        boundaryUrl: region.boundaryUrl,
+        adcode: region.adcode,
+        centerLng: region.centerLng,
+        centerLat: region.centerLat,
       };
       this.regionConfig = config;
+      this.boundaryEnvelope = null;
       if (config.regionId) {
         this.setRegionId(config.regionId);
       }
-      console.log('[Dashboard/Camera] regionStore.applyRegionVo', {
-        regionId: config.regionId,
-        name: config.name,
-        mapLift: config.mapLift,
-        bounds: config.bounds,
-      });
       return config;
     },
 

@@ -22,8 +22,8 @@ export function buildVolumeFromRegion(bounds, cells = [], heightRange = DEFAULT_
     north,
     minHeight: heightRange.minHeight,
     maxHeight: heightRange.maxHeight,
-    nx: 64,
-    ny: 64,
+    nx: heightRange.nx ?? 64,
+    ny: heightRange.ny ?? 64,
     nz: heightRange.nz,
     cells: Array.isArray(cells) ? cells : [],
   };

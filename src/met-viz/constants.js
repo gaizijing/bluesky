@@ -37,7 +37,7 @@ export { IMAGERY_PRODUCTS, PRODUCT_COLORMAPS, getColormap } from './core/colorma
 
 /** Ventusky 风格：白色半透明流线、慢速飘动；domain 由 wind.js 按实况覆盖 */
 export const MET_VIZ_WIND_OPTIONS = {
-  particlesTextureSize: 160,
+  particlesTextureSize: 96,
   lineWidth: { min: 0.2, max: 0.65 },
   lineLength: { min: 16, max: 28 },
   speedFactor: 0.22,

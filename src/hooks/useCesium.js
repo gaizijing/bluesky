@@ -6,9 +6,11 @@ import { useAreaStore } from '@/store/modules/area'
 import { useRegionStore } from '@/store/modules/region'
 import { createViewer, destroyViewer } from '@/cesium/core/viewer'
 import { handleCameraMove, getCurrentCameraParams, flyToRegion, flyToRectangle, limitCameraRange, switchToOverviewMode, switchToFocusMode, flyToRegionOverview, setupCameraPrintKeydown, watchCameraHeight } from '@/cesium/core/camera'
-import { addTiandituLayerOld, addTiandituWithGaodeOverlay } from '@/cesium/layers/tianditu'
+import { switchBaseLayer } from '@/cesium/layers/basemap'
 import { loadTerrain } from '@/cesium/layers/terrain'
+import { getMapTilesConfig } from '@/config/mapTiles'
 import { addWhiteModel, removeWhiteModel } from '@/cesium/layers/model3d'
+import { loadRegionBoundary, clearRegionBoundary } from '@/cesium/layers/regionBoundary'
 import { AreaManager } from '@/cesium/entities/area.js'
 import { initWind } from '@/cesium/visualization/wind'
 //3d
@@ -18,14 +20,17 @@ import { useRouteStore } from '@/store/modules/routeStore'
 import eventManager from '@/cesium/core/eventManager' 
 import { SkyBoxManager } from '@/cesium/volumeCloud/SkyBoxManager' 
 import { CAMERA_HEIGHT_THRESHOLD, CAMERA_HEIGHT_WIND_OFF_HYSTERESIS_M } from '../config/windLayerDefaults'
-import Cloud from '@/cesium/visualization/cloud'
-import { getRiskZones } from '@/api/v2/risk'
+import { fetchNoFlyZones } from '@/api/v2/noFlyZone'
 import { useAppDashboardStore } from '@/store/modules/appDashboard'
 import { useMetVizStore } from '@/store/modules/metViz'
 import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus'
 import { isMetVizEnabledOnDashboard } from '@/config/metVizRuntime'
 
-export function useCesium(containerId) {
+function logPerf(tag, label, startMs) {
+  console.log(`[${tag}][Perf] ${label} — ${(performance.now() - startMs).toFixed(1)}ms`)
+}
+
+export function useCesium(containerId, options = {}) {
   // 说明
   const windStore = useWindStore()
   const metVizStore = useMetVizStore()
@@ -35,6 +40,9 @@ export function useCesium(containerId) {
   const regionStore = useRegionStore()
   const appStore = useAppDashboardStore()
   const metVizOnDashboard = isMetVizEnabledOnDashboard()
+  const enableMetVizWind = Boolean(options.enableMetVizWind)
+  const metVizWindActive = metVizOnDashboard || enableMetVizWind
+  const deferRegionLayersToMeteo = Boolean(options.deferRegionLayersToMeteo)
 
   // 说明
   const viewer = ref(null)
@@ -54,12 +62,14 @@ export function useCesium(containerId) {
     cameraHeightWatcher: null,
     skyBoxManager: null,
     cameraPrintKeydownHandler: null,
-    cloud: null,
     /** 根据当前相机高度与会话航线状态刷新风场/云层等 */
     refreshCameraHeightLayerVisibility: null,
     /** @type {(() => void) | null} */
     regionChangedUnsub: null,
+    cameraWindPauseCleanup: null,
   })
+
+  let windPausedForCamera = false
 
   // 说明
   const { areaList } = toRefs(areaStore)
@@ -82,19 +92,31 @@ export function useCesium(containerId) {
       window.viewer = viewer.value
 
       const scene = viewer.value.scene
-      scene.globe.depthTestAgainstTerrain = true
-      scene.fog.enabled = true
       scene.requestRenderMode = true
-      scene.maximumRenderTimeChange = 0.5
       scene.fxaa = false
+
+      if (deferRegionLayersToMeteo) {
+        // 与 region-meteo-demo 一致，减轻 Dashboard 首屏渲染压力
+        scene.globe.depthTestAgainstTerrain = false
+        scene.fog.enabled = false
+        scene.maximumRenderTimeChange = Infinity
+      } else {
+        scene.globe.depthTestAgainstTerrain = true
+        scene.fog.enabled = true
+        scene.maximumRenderTimeChange = 0.5
+      }
 
       viewer.value.shadows = false
       viewer.value.terrainShadows = Cesium.ShadowMode.DISABLED
       viewer.value.resolutionScale = Math.min(window.devicePixelRatio || 1, 1.25)
 
-      resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
-        cameraHeightThreshold: 240000,
-      })
+      if (!deferRegionLayersToMeteo) {
+        resources.value.skyBoxManager = new SkyBoxManager(viewer.value, {
+          cameraHeightThreshold: 240000,
+        })
+      } else {
+        console.log('[Cesium] SkyBoxManager 跳过（RegionMeteo Dashboard 模式）')
+      }
       console.log('[Cesium] Viewer 基础配置完成')
     } catch (error) {
       console.error('[Cesium] 初始化 Viewer 失败:', error)
@@ -223,7 +245,7 @@ export function useCesium(containerId) {
   /** MetViz 开启风场时不受 10km 相机高度限制（区域概览 ~120km 也能看） */
   const shouldShowWindLayers = () => {
     if (layerSettingsStore.layers.wind?.visible === false) return false
-    if (metVizOnDashboard && metVizStore.enabled?.wind) return true
+    if (metVizWindActive && metVizStore.enabled?.wind) return true
     if (!viewer.value) return false
     const c = viewer.value.camera.positionCartographic
     if (!Cesium.defined(c)) return false
@@ -238,20 +260,73 @@ export function useCesium(containerId) {
 
   const syncSceneRenderMode = () => {
     if (!viewer.value?.scene) return
-    const windAnimating =
-      metVizOnDashboard &&
+    const windRunning =
+      metVizWindActive &&
       metVizStore.enabled?.wind &&
       layerSettingsStore.layers.wind?.visible !== false &&
-      getWindLayerInstances().length > 0
-    viewer.value.scene.requestRenderMode = !windAnimating
-    viewer.value.scene.maximumRenderTimeChange = windAnimating ? 0 : 0.5
-    if (!windAnimating) {
+      getWindLayerInstances().length > 0 &&
+      !windPausedForCamera
+    viewer.value.scene.requestRenderMode = !windRunning
+    viewer.value.scene.maximumRenderTimeChange = windRunning ? 0 : Infinity
+    if (!windRunning) {
       viewer.value.scene.requestRender()
     }
   }
 
+  const pauseWindForCameraInteraction = () => {
+    if (!metVizWindActive || windPausedForCamera) return
+    if (!metVizStore.enabled?.wind) return
+    windPausedForCamera = true
+    getWindLayerInstances().forEach((layer) => {
+      if (layer) layer.show = false
+    })
+    syncSceneRenderMode()
+  }
+
+  const resumeWindAfterCameraInteraction = () => {
+    if (!windPausedForCamera) return
+    windPausedForCamera = false
+    applyWindLayerVisibility()
+  }
+
+  const setupCameraInteractionWindPause = () => {
+    if (!viewer.value || !metVizWindActive) return
+
+    resources.value.cameraWindPauseCleanup?.()
+    let interactTimer = null
+
+    const onMoveStart = () => {
+      if (interactTimer) {
+        clearTimeout(interactTimer)
+        interactTimer = null
+      }
+      pauseWindForCameraInteraction()
+    }
+
+    const onMoveEnd = () => {
+      if (interactTimer) clearTimeout(interactTimer)
+      interactTimer = setTimeout(() => {
+        interactTimer = null
+        resumeWindAfterCameraInteraction()
+      }, 250)
+    }
+
+    const moveStartRemover = viewer.value.camera.moveStart.addEventListener(onMoveStart)
+    const moveEndRemover = viewer.value.camera.moveEnd.addEventListener(onMoveEnd)
+
+    resources.value.cameraWindPauseCleanup = () => {
+      if (interactTimer) {
+        clearTimeout(interactTimer)
+        interactTimer = null
+      }
+      moveStartRemover?.()
+      moveEndRemover?.()
+      windPausedForCamera = false
+    }
+  }
+
   const applyWindLayerVisibility = () => {
-    const showWind = shouldShowWindLayers()
+    const showWind = shouldShowWindLayers() && !windPausedForCamera
     const layers = getWindLayerInstances()
     layers.forEach((layer) => {
       if (layer?.show !== undefined) layer.show = showWind
@@ -278,23 +353,6 @@ export function useCesium(containerId) {
 
     const applyLowAltitudeLayers = (isBelowThreshold) => {
       applyWindLayerVisibility()
-
-      if (isBelowThreshold) {
-        const suppressCloudForSession =
-          routeStore.sessionPathOnMap && routeStore.currentRoute?.mode === 'session';
-
-        if (resources.value.cloud) {
-          const isCloudEnabled = layerSettingsStore.layers.cloud.visible;
-          if (isCloudEnabled && !suppressCloudForSession) {
-            resources.value.cloud.show();
-            resources.value.cloud.setVisible(true);
-          }
-        }
-      } else {
-        if (resources.value.cloud) {
-          resources.value.cloud.destroy();
-        }
-      }
       applyAreaPointsVisibility()
     }
 
@@ -331,23 +389,26 @@ export function useCesium(containerId) {
   /**
    * 功能说明
    */
-  const loadBaseLayers = () => {
+  const loadBaseLayers = async () => {
+    const mapCfg = getMapTilesConfig()
     try {
+      let stepStart = performance.now()
       console.log('[Cesium] 3.1 加载地形...')
-      loadTerrain(viewer.value)
-      console.log('[Cesium] 地形加载完成')
+      await loadTerrain(viewer.value, mapCfg)
+      logPerf('Cesium', '3.1 loadTerrain', stepStart)
     } catch (error) {
       console.warn('[Cesium] 地形加载失败:', error)
     }
-    
+
     try {
-      console.log('[Cesium] 3.2 加载天地图图层...')
-      resources.value.tiandituLayer = addTiandituLayerOld(viewer.value)
-      console.log('[Cesium] 底图图层加载完成')
+      let stepStart = performance.now()
+      console.log('[Cesium] 3.2 加载底图图层...', mapCfg.cesium?.base_layer)
+      viewer.value.imageryLayers.removeAll(true)
+      switchBaseLayer(viewer.value, mapCfg)
+      logPerf('Cesium', '3.2 switchBaseLayer', stepStart)
     } catch (error) {
       console.warn('[Cesium] 底图图层加载失败:', error)
     }
-
   }
 
   /**
@@ -382,28 +443,61 @@ export function useCesium(containerId) {
   /**
    * 功能说明
    */
-  const initEntitiesAndVisualizations = async () => {
+  const loadRegionBoundaryLayer = async () => {
+    const v = viewer.value
+    if (!v) return
+    const boundaryUrl = regionStore.getBoundaryUrl
+    clearRegionBoundary(v)
+    if (!boundaryUrl) return
     try {
-      console.log('[Cesium] 5.1 初始化监测点管理器...')
-      resources.value.areaManager = AreaManager.getInstance(viewer.value, areaStore)
-      await ensureLandingPointsRendered()
-    } catch (error) {
-      console.warn('[Cesium] 监测点管理器初始化失败:', error)
+      await loadRegionBoundary(v, boundaryUrl)
+    } catch (err) {
+      console.warn('[Cesium] 区域边界 GeoJSON 加载失败', boundaryUrl, err)
+    }
+  }
+
+  const initEntitiesAndVisualizations = async () => {
+    if (!deferRegionLayersToMeteo) {
+      try {
+        let stepStart = performance.now()
+        console.log('[Cesium] 5.0 加载区域边界 GeoJSON...')
+        await loadRegionBoundaryLayer()
+        logPerf('Cesium', '5.0 regionBoundary', stepStart)
+      } catch (error) {
+        console.warn('[Cesium] 区域边界加载失败:', error)
+      }
+
+      try {
+        let stepStart = performance.now()
+        console.log('[Cesium] 5.1 初始化监测点管理器...')
+        resources.value.areaManager = AreaManager.getInstance(viewer.value, areaStore)
+        await ensureLandingPointsRendered()
+        logPerf('Cesium', '5.1 areaManager + landingPoints', stepStart)
+      } catch (error) {
+        console.warn('[Cesium] 监测点管理器初始化失败:', error)
+      }
+    } else {
+      console.log('[Cesium] 5.0~5.1 跳过边界/起降点（由 RegionMeteo 负责）')
     }
 
-
-    try {
-      console.log('[Cesium] 5.5 初始化航线管理器...')
-      routeManager.init(viewer.value)
-      console.log('[Cesium] 航线管理器初始化完成')
+    if (!deferRegionLayersToMeteo) {
       try {
-        const rz = await getRiskZones()
-        routeManager.setRiskZones(rz?.zones || [])
-      } catch (rzErr) {
-        console.warn('[Cesium] 风险区加载失败', rzErr)
+        let stepStart = performance.now()
+        console.log('[Cesium] 5.5 初始化航线管理器...')
+        routeManager.init(viewer.value)
+        console.log('[Cesium] 航线管理器初始化完成')
+        try {
+          const rawZones = await fetchNoFlyZones()
+          routeManager.setRiskZones(rawZones)
+        } catch (rzErr) {
+          console.warn('[Cesium] 风险区加载失败', rzErr)
+        }
+        logPerf('Cesium', '5.5 routeManager + riskZones', stepStart)
+      } catch (error) {
+        console.warn('[Cesium] 航线管理器初始化失败:', error)
       }
-    } catch (error) {
-      console.warn('[Cesium] 航线管理器初始化失败:', error)
+    } else {
+      console.log('[Cesium] 5.5 航线管理器延后（进入 drill/simFlight 时再 init）')
     }
 
     if (!window.__routeVerticalFlytoBound) {
@@ -483,19 +577,8 @@ export function useCesium(containerId) {
         }
       });
     }
-    if (layerSettingsStore.layers.cloud?.visible !== false) {
-      console.log('[Cesium] 开始初始化云层...')
-      try {
-        resources.value.cloud = new Cloud(viewer.value)
-        resources.value.cloud.show()
-        console.log('[Cesium] 云层初始化完成')
-      } catch (cloudError) {
-        console.warn('[Cesium] 云层初始化失败:', cloudError)
-      }
-    }
-
-      
     if (metVizOnDashboard) {
+      const windStart = performance.now()
       try {
         console.log('[Cesium] 5.3 初始化风场...')
         resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
@@ -505,31 +588,63 @@ export function useCesium(containerId) {
           heightM: metVizStore.heightM,
           enabled: { ...metVizStore.enabled },
         })
-        console.log('[Cesium] 风场初始化完成')
+        logPerf('Cesium', '5.3 initWind', windStart)
+        setupCameraInteractionWindPause()
       } catch (error) {
         console.warn('[Cesium] 风场初始化失败:', error)
       }
+    } else if (enableMetVizWind) {
+      console.log('[Cesium] 气象页风场默认关闭，开启后懒加载 initWind')
     } else {
-      console.log('[Cesium] 主大屏已关闭 MetViz，跳过风场初始化')
+      console.log('[Cesium] MetViz 风场未启用，跳过 initWind')
     }
 
-    // 说明：风场数据可能晚于 Viewer 就绪，但高度分层逻辑（风/云/监测点）必须在首帧就注册一次
-    if (!windStore.windData) {
-      const unwatch = watch(
-        () => windStore.windData,
-        (newData) => {
-          if (newData) {
-            unwatch();
-            setupCameraHeightWatcher()
+    if (!deferRegionLayersToMeteo) {
+      // 说明：风场数据可能晚于 Viewer 就绪，但高度分层逻辑（风/云/监测点）必须在首帧就注册一次
+      const cameraWatcherStart = performance.now()
+      if (!windStore.windData) {
+        const unwatch = watch(
+          () => windStore.windData,
+          (newData) => {
+            if (newData) {
+              unwatch();
+              setupCameraHeightWatcher()
+            }
           }
-        }
-      )
-    }
-    setupCameraHeightWatcher()
+        )
+      }
+      setupCameraHeightWatcher()
 
-    console.log('[Cesium] 相机高度监听设置完成')
+      logPerf('Cesium', '5.7 setupCameraHeightWatcher', cameraWatcherStart)
+      console.log('[Cesium] 相机高度监听设置完成')
+    } else {
+      console.log('[Cesium] 5.7 跳过相机高度监听（RegionMeteo Dashboard 模式）')
+    }
   }
 
+
+  let windInitPromise = null
+
+  const ensureWindLayer = async () => {
+    if (!viewer.value || !metVizWindActive) return null
+    if (resources.value.windLayer) return resources.value.windLayer
+    if (!windInitPromise) {
+      windInitPromise = (async () => {
+        try {
+          console.log('[Cesium] 懒加载风场 initWind...')
+          resources.value.windLayer = await initWind(viewer.value, layerSettingsStore)
+          syncSceneRenderMode()
+          setupCameraInteractionWindPause()
+          return resources.value.windLayer
+        } catch (error) {
+          windInitPromise = null
+          console.warn('[Cesium] 风场懒加载失败:', error)
+          throw error
+        }
+      })()
+    }
+    return windInitPromise
+  }
 
   /**
    * 功能说明
@@ -576,6 +691,7 @@ export function useCesium(containerId) {
       () => routeStore.currentRoute,
       (newRoute) => {
         if (newRoute && viewer.value) {
+          if (deferRegionLayersToMeteo) routeManager.init(viewer.value)
           // 说明
           if (newRoute.startTime && newRoute.endTime) {
             // 说明
@@ -606,60 +722,78 @@ export function useCesium(containerId) {
       }
     )
 
-    // 说明
-    watch(
-      () => areaStore.areaList,
-      (newAreas) => {
-        if (!viewer.value || !resources.value.areaManager) return
-        resources.value.areaManager.render(newAreas || [], {
-          visible: layerSettingsStore.layers.areaPoints?.visible !== false,
-        })
-      },
-      { deep: true }
-    )
-
-    // 起降点加载后自动飞到能包含全部点的概览视角
     let regionOverviewApplied = false
-    watch(
-      () => [areaStore.areaList, viewer.value],
-      ([points, v]) => {
-        if (regionOverviewApplied || !v || !points?.length) return
-        regionOverviewApplied = true
-        console.log('[Dashboard/Camera] 自动应用起降点概览视角', {
-          regionId: regionStore.regionId,
-          pointCount: points.length,
-        })
-        flyToRegionOverview(v, { points })
-      },
-      { immediate: true, deep: true }
-    )
 
-    watch(
-      () => [appStore.view, appStore.focus.type, appStore.focus.id, viewer.value, areaStore.areaList],
-      ([view, focusType, focusId, v, points]) => {
-        if (!v || !points?.length) return
+    if (!deferRegionLayersToMeteo) {
+      // 说明
+      watch(
+        () => areaStore.areaList,
+        (newAreas) => {
+          if (!viewer.value || !resources.value.areaManager) return
+          resources.value.areaManager.render(newAreas || [], {
+            visible: layerSettingsStore.layers.areaPoints?.visible !== false,
+          })
+        },
+        { deep: true }
+      )
 
-        if (view === 'drillLanding' && focusType === 'landingPoint' && focusId) {
-          const point = points.find(
-            (p) => String(p.id || p.landingPointId) === String(focusId)
-          )
-          if (!point) return
-          areaStore.setSelectedLandingPoint(point)
-          const entityId = `area_${point.id || point.landingPointId}`
-          if (resources.value.areaManager?.areaEntities?.has(entityId)) {
-            resources.value.areaManager.setSelected(entityId)
-          } else {
-            switchToFocusMode(v, point)
+      // 起降点加载后自动飞到能包含全部点的概览视角
+      watch(
+        () => [areaStore.areaList, viewer.value],
+        ([points, v]) => {
+          if (regionOverviewApplied || !v || !points?.length) return
+          regionOverviewApplied = true
+          console.log('[Dashboard/Camera] 自动应用起降点概览视角', {
+            regionId: regionStore.regionId,
+            pointCount: points.length,
+          })
+          flyToRegionOverview(v, { points })
+        },
+        { immediate: true, deep: true }
+      )
+
+      watch(
+        () => [appStore.view, appStore.focus.type, appStore.focus.id, viewer.value, areaStore.areaList],
+        ([view, focusType, focusId, v, points], oldValues) => {
+          if (!v || !points?.length) return
+          const prevView = oldValues?.[0]
+
+          if (view === 'drillLanding' && focusType === 'landingPoint' && focusId) {
+            const point = points.find(
+              (p) => String(p.id || p.landingPointId) === String(focusId)
+            )
+            if (!point) return
+            areaStore.setSelectedLandingPoint(point)
+            const entityId = `area_${point.id || point.landingPointId}`
+            if (resources.value.areaManager?.areaEntities?.has(entityId)) {
+              resources.value.areaManager.setSelected(entityId)
+            } else {
+              switchToFocusMode(v, point)
+            }
+            return
           }
-          return
-        }
 
-        if (view === 'home') {
-          areaStore.setSelectedLandingPoint(null)
-          switchToOverviewMode(v, points)
+          // 仅从其他视图切回 home 时再飞概览，避免与首次自动概览重复
+          if (view === 'home' && prevView && prevView !== 'home') {
+            areaStore.setSelectedLandingPoint(null)
+            switchToOverviewMode(v, points)
+          }
         }
-      }
-    )
+      )
+    } else {
+      // RegionMeteo：首屏/切 Region 在 reloadRegion 全部加载完再 flyToRegion；此处只处理回到 home
+      watch(
+        () => [appStore.view, viewer.value, areaStore.areaList, regionStore.boundaryEnvelope],
+        ([view, v, points], oldValues) => {
+          if (!v || view !== 'home') return
+          const prevView = oldValues?.[0]
+          if (prevView && prevView !== 'home') {
+            areaStore.setSelectedLandingPoint(null)
+            flyToRegionOverview(v, { points: points || [] })
+          }
+        },
+      )
+    }
 
     const reloadRegionMapLayers = async ({ regionId } = {}) => {
       const rid = regionId || regionStore.regionId
@@ -670,14 +804,15 @@ export function useCesium(containerId) {
       })
       try {
         regionOverviewApplied = false
+        await loadRegionBoundaryLayer()
         await load3DModel()
         routeManager.clearAllRoutes()
         routeStore.clearCurrentRoute()
         areaStore.clearLandingPoints()
         await areaStore.loadLandingPoints(rid)
         await ensureLandingPointsRendered()
-        const rz = await getRiskZones(rid)
-        routeManager.setRiskZones(rz?.zones || [])
+        const rawZones = await fetchNoFlyZones(rid)
+        routeManager.setRiskZones(rawZones)
         flyToRegionOverview(viewer.value, { points: areaStore.areaList || [] })
         regionOverviewApplied = true
       } catch (err) {
@@ -685,10 +820,12 @@ export function useCesium(containerId) {
       }
     }
 
-    resources.value.regionChangedUnsub = dashboardEventBus.on(
-      DASHBOARD_EVENTS.REGION_CHANGED,
-      reloadRegionMapLayers
-    )
+    resources.value.regionChangedUnsub = deferRegionLayersToMeteo
+      ? null
+      : dashboardEventBus.on(
+        DASHBOARD_EVENTS.REGION_CHANGED,
+        reloadRegionMapLayers
+      )
 
     // 说明
     resources.value.cameraPrintKeydownHandler = setupCameraPrintKeydown(viewer.value)
@@ -698,32 +835,49 @@ export function useCesium(containerId) {
    * 功能说明
    */
   const initCesium = async () => {
+    const totalStart = performance.now()
     try {
       isLoading.value = true
       console.log('[Cesium] 开始初始化 Cesium...')
 
-      // 说明
+      let stepStart = performance.now()
       console.log('[Cesium] 1. 初始化 Viewer...')
       initViewer()
-      
+      logPerf('Cesium', '1. initViewer', stepStart)
+
+      stepStart = performance.now()
       console.log('[Cesium] 2. 配置相机...')
       configCamera()
-      
+      logPerf('Cesium', '2. configCamera', stepStart)
+
+      stepStart = performance.now()
       console.log('[Cesium] 3. 加载基础图层...')
-      loadBaseLayers()
-      
+      await loadBaseLayers()
+      logPerf('Cesium', '3. loadBaseLayers', stepStart)
+
+      stepStart = performance.now()
       console.log('[Cesium] 4. 加载 3D 模型...')
-      await load3DModel()
-      
+      if (!deferRegionLayersToMeteo) {
+        await load3DModel()
+      } else {
+        console.log('[Cesium] 4. 跳过白膜（由 RegionMeteo 负责）')
+      }
+      logPerf('Cesium', '4. load3DModel', stepStart)
+
+      stepStart = performance.now()
       console.log('[Cesium] 5. 初始化实体与可视化...')
       await initEntitiesAndVisualizations()
-      
+      logPerf('Cesium', '5. initEntitiesAndVisualizations', stepStart)
+
+      stepStart = performance.now()
       console.log('[Cesium] 6. 设置响应式监听...')
       setupReactiveWatchers()
-      
+      logPerf('Cesium', '6. setupReactiveWatchers', stepStart)
+
       // 说明
       setTimelineVisible(false)
-      
+
+      logPerf('Cesium', 'initCesium 总计', totalStart)
       console.log('[Cesium] 初始化完成')
 
     } catch (error) {
@@ -759,20 +913,18 @@ export function useCesium(containerId) {
       resources.value.cameraHeightWatcher = null
     }
     resources.value.refreshCameraHeightLayerVisibility = null
+    resources.value.cameraWindPauseCleanup?.()
+    resources.value.cameraWindPauseCleanup = null
     resources.value.regionChangedUnsub?.()
     resources.value.regionChangedUnsub = null
 
     if (viewer.value) {
+      clearRegionBoundary(viewer.value)
+
       // 说明
       if (resources.value.skyBoxManager) {
         resources.value.skyBoxManager.destroy()
         resources.value.skyBoxManager = null
-      }
-
-      // 说明
-      if (resources.value.cloud) {
-        resources.value.cloud.destroy()
-        resources.value.cloud = null
       }
 
       // 说明
@@ -850,7 +1002,10 @@ export function useCesium(containerId) {
    */
   const setWindVisibility = (visible) => {
     layerSettingsStore.setLayerVisibility('wind', visible);
-    if (metVizOnDashboard) {
+    if (visible) {
+      windPausedForCamera = false
+    }
+    if (metVizWindActive) {
       metVizStore.setLayerEnabled('wind', visible);
       dashboardEventBus.emit(DASHBOARD_EVENTS.MET_VIZ_CONFIG_CHANGED, {
         product: metVizStore.product,
@@ -903,32 +1058,10 @@ export function useCesium(containerId) {
    * 功能说明
    */
   const setCloudVisibility = (visible) => {
-    if (resources.value.cloud) {
-      layerSettingsStore.setLayerVisibility('cloud', visible);
-      console.log('设置云层可见性:', visible);
-      resources.value.cloud.setVisible(visible);
-    }
+    layerSettingsStore.setLayerVisibility('cloud', visible);
   };
 
-  /**
-   * 功能说明
-   */
-  const updateCloudVisibilityBasedOnConditions = () => {
-    if (!resources.value.cloud) return;
-
-    // 说明
-    const cameraPosition = viewer.value.camera.positionCartographic;
-    const cameraHeight = cameraPosition.height;
-
-    // 说明
-    const isCloudEnabled = layerSettingsStore.layers.cloud.visible;
-
-    // 说明
-    const shouldBeVisible = isCloudEnabled && cameraHeight <= CAMERA_HEIGHT_THRESHOLD;
-
-    // 说明
-    resources.value.cloud.setVisible(shouldBeVisible);
-  };
+  const updateCloudVisibilityBasedOnConditions = () => {};
 
   /** @deprecated 气象填色由 MetVizEngine 经 MET_TIME_CHANGED 刷新 */
   const updateHeatmapTime = async () => {};
@@ -962,6 +1095,7 @@ export function useCesium(containerId) {
     errorMsg,
     initCesium,
     cleanup,
+    ensureWindLayer,
     // 说明
     flyToRegion: (region) => flyToRegion(viewer.value, region),
     flyToRectangle: (region) => flyToRectangle(viewer.value, region),

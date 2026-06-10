@@ -18,7 +18,7 @@
         <p>{{ emptyText || '暂无数据' }}</p>
       </slot>
     </div>
-    <div v-else class="async-state__content">
+    <div v-else class="async-state__content async-state__content--fill">
       <el-alert
         v-if="stale"
         class="async-state__stale"
@@ -75,6 +75,13 @@ defineProps({
   height: 100%;
   color: rgba(255, 255, 255, 0.75);
   font-size: 14px;
+}
+
+.async-state__content--fill {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 .async-state__stale {

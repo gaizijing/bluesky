@@ -34,6 +34,53 @@ import ThreeHourForecast from "@/components/business/ThreeHourForecast/index.vue
 const moduleStore = useModuleStore();
 const dashboardWeatherStore = useDashboardWeatherStore();
 
+function formatTimeHm(date) {
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+function parseTimeLabel(hm, referenceTime = new Date()) {
+  const [h, m] = hm.split(':').map(Number);
+  const d = new Date(referenceTime);
+  d.setSeconds(0, 0);
+  d.setMilliseconds(0);
+  d.setHours(h, m, 0, 0);
+  // 跨午夜时，将偏早的刻度归到次日
+  if (d.getTime() < referenceTime.getTime() - 12 * 60 * 60 * 1000) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d.getTime();
+}
+
+function parsePointTime(data, index, referenceTime) {
+  const iso = data.time_iso?.[index];
+  if (iso) {
+    const ts = new Date(iso).getTime();
+    if (!Number.isNaN(ts)) return ts;
+  }
+  return parseTimeLabel(data.time[index], referenceTime);
+}
+
+function pairSeriesData(data, values, referenceTime) {
+  return data.time.map((_, index) => [
+    parsePointTime(data, index, referenceTime),
+    values?.[index] ?? null,
+  ]);
+}
+
+function buildXAxisRange(data, referenceTime = new Date()) {
+  const stamps = data.time.map((_, index) => parsePointTime(data, index, referenceTime));
+  if (!stamps.length) {
+    return {};
+  }
+  const pad = 10 * 60 * 1000;
+  return {
+    min: Math.min(...stamps) - pad,
+    max: Math.max(...stamps) + pad,
+  };
+}
+
 
 // 图表实例
 let trendChartInstance = null;
@@ -75,19 +122,29 @@ const updateTrendChart = (data) => {
 
   // 提取时间标签
   const timeLabels = data.time;
+  if (!Array.isArray(timeLabels) || timeLabels.length === 0) {
+    return;
+  }
+  const referenceTime = new Date();
+  const xRange = buildXAxisRange(data, referenceTime);
+  const elementColors = weatherElements.value.map((el) => el.color);
 
   // 自定义tooltip格式化器
   const tooltipFormatter = (params) => {
-    let result = `<div style="margin-bottom: 6px"><strong style="color: #3b82f6">${timeLabels[params[0].dataIndex]}</strong></div>`;
+    const first = params[0];
+    const ts = Array.isArray(first.value) ? first.value[0] : first.axisValue;
+    const timeStr = formatTimeHm(new Date(ts));
+    let result = `<div style="margin-bottom: 6px"><strong style="color: #3b82f6">${timeStr}</strong></div>`;
 
     params.forEach(param => {
       const element = weatherElements.value.find(el => el.name === param.seriesName);
       if (element) {
+        const rawValue = Array.isArray(param.value) ? param.value[1] : param.value;
         result += `
           <div style="margin: 4px 0; line-height: 1.4">
             <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${element.color}; margin-right: 6px;"></span>
             <span style="color: #94a3b8; display: inline-block; width: 60px">${element.name}：</span>
-            <span style="color: ${element.color}">${param.value} ${element.unit}</span>
+            <span style="color: ${element.color}">${rawValue} ${element.unit}</span>
           </div>
         `;
       }
@@ -98,6 +155,7 @@ const updateTrendChart = (data) => {
 
   // 配置图表
   const option = {
+    color: elementColors,
     tooltip: {
       appendToBody: true,
       trigger: 'axis',
@@ -113,16 +171,19 @@ const updateTrendChart = (data) => {
       extraCssText: 'z-index: 9999 !important; max-width: 280px;'
     },
     legend: {
-      data: ['风速', '能见度', '降水量'],
+      data: weatherElements.value.map((el) => ({
+        name: el.name,
+        icon: 'rect',
+        itemStyle: { color: el.color },
+      })),
       top: '5%',
       left: '10%',
       itemWidth: 10,
       itemHeight: 10,
       itemGap: 20,
-      icon: 'rect',
       textStyle: {
-        color: '#ffffff'
-      }
+        color: '#ffffff',
+      },
     },
     grid: {
       left: '3%',
@@ -132,8 +193,10 @@ const updateTrendChart = (data) => {
       containLabel: true
     },
     xAxis: {
-      type: 'category',
-      data: timeLabels,
+      type: 'time',
+      boundaryGap: false,
+      min: xRange.min,
+      max: xRange.max,
       axisLine: {
         lineStyle: {
           color: 'rgba(255, 255, 255, 0.3)'
@@ -142,20 +205,10 @@ const updateTrendChart = (data) => {
       axisLabel: {
         color: 'rgba(255, 255, 255, 0.7)',
         rotate: 0,
-        fontSize: 10
+        fontSize: 10,
+        formatter: (value) => formatTimeHm(new Date(value)),
       },
       splitLine: { show: false },
-      axisPointer: {
-        type: 'line',
-        lineStyle: {
-          color: '#7581BD',
-          width: 1
-        },
-        handle: {
-          show: true,
-          color: '#7581BD'
-        }
-      },
     },
     // 双Y轴配置
     yAxis: [
@@ -231,12 +284,16 @@ const updateTrendChart = (data) => {
       {
         name: '风速',
         type: 'line',
+        color: '#f97316',
         yAxisIndex: 0,
-        data: data.wind_speed_10m,
+        data: pairSeriesData(data, data.wind_speed_10m, referenceTime),
         smooth: true,
         lineStyle: {
           color: '#f97316',
-          width: 1
+          width: 1,
+        },
+        itemStyle: {
+          color: '#f97316',
         },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(
@@ -256,12 +313,16 @@ const updateTrendChart = (data) => {
       {
         name: '能见度',
         type: 'line',
+        color: '#22c55e',
         yAxisIndex: 1,
-        data: data.visibility,
+        data: pairSeriesData(data, data.visibility, referenceTime),
         smooth: true,
         lineStyle: {
           color: '#22c55e',
-          width: 1
+          width: 1,
+        },
+        itemStyle: {
+          color: '#22c55e',
         },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(
@@ -281,12 +342,13 @@ const updateTrendChart = (data) => {
       {
         name: '降水量',
         type: 'bar',
+        color: '#3b82f6',
         yAxisIndex: 2,
-        data: data.precipitation,
+        data: pairSeriesData(data, data.precipitation, referenceTime),
         barWidth: '40%',
         itemStyle: {
           color: '#3b82f6',
-          opacity: 1
+          opacity: 1,
         },
         emphasis: {
           itemStyle: {
@@ -313,24 +375,23 @@ const handleResize = () => {
   }
 };
 
-// 初始化图表
+// 初始化图表并在有数据时立即渲染
 const initCharts = () => {
-  // 确保容器存在
   if (!trendChartRef.value) {
     console.error('图表容器不存在，无法初始化图表');
     return;
   }
 
-  // 销毁现有图表实例
   if (trendChartInstance) {
     trendChartInstance.dispose();
     trendChartInstance = null;
   }
 
   try {
-    // 创建新的图表实例
     trendChartInstance = echarts.init(trendChartRef.value);
-   
+    if (weatherForecastPanelData.value) {
+      updateTrendChart(weatherForecastPanelData.value);
+    }
   } catch (error) {
     console.error('创建图表实例失败:', error);
   }
@@ -338,10 +399,13 @@ const initCharts = () => {
 
 // 监听模块数据变化
 watch(weatherForecastPanelData, (newData) => {
-  if (newData) {
-    updateTrendChart(newData);
+  if (!newData) return;
+  if (!trendChartInstance && trendChartRef.value) {
+    initCharts();
+    return;
   }
-}, { deep: true });
+  updateTrendChart(newData);
+}, { deep: true, immediate: true });
 
 
 // 组件挂载
@@ -378,10 +442,11 @@ watch(
 .weather-analysis-panel {
   width: 100%;
   height: 100%;
-  min-height: 260px;
-  display: block;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   position: relative;
-  overflow: visible;
+  overflow: hidden;
 }
 
 /* 面板标题样式 */
@@ -485,24 +550,26 @@ watch(
 
 /* 优化图表容器样式 */
 .charts-container {
-  height: auto;
-  min-height: 260px;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
   margin: 0;
   padding: 0;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .chart-section {
-  height: 140px;
+  flex: 1 1 0;
+  min-height: 0;
   width: 100%;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   position: relative;
-}
 
-/* 为热力图部分增加额外的高度 */
-.chart-section:last-child {
-  height: 150px;
+  &:last-child {
+    margin-bottom: 0;
+  }
 }
 
 .chart-wrapper {

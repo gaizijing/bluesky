@@ -9,6 +9,26 @@ export const routes = [
     }
   },
   {
+    path: '/demos/cesium-kriging-demo',
+    name: 'KrigingDemo',
+    component: () => import('@demos/cesium-kriging-demo/KrigingDemoPage.vue'),
+    meta: {
+      title: 'Kriging 温度插值',
+      hidden: true,
+      fullscreen: true
+    }
+  },
+  {
+    path: '/demos/cesium-wind-field-demo',
+    name: 'WindFieldDemo',
+    component: () => import('@demos/cesium-wind-field-demo/WindFieldDemoPage.vue'),
+    meta: {
+      title: '风场粒子 Demo（生产链路）',
+      hidden: true,
+      fullscreen: true,
+    },
+  },
+  {
     path: '/',
     name: 'Layout',
     component: () => import('@/layout/MainLayout.vue'),
@@ -26,7 +46,7 @@ export const routes = [
         }
       },
       {
-        path: '/meteorology-viz',
+        path: '/map',
         name: 'MeteorologyViz',
         component: () => import('@/pages/MeteorologyViz/index.vue'),
         meta: {
@@ -96,7 +116,7 @@ export const routes = [
         name: 'RouteImport',
         component: () => import('@/pages/Admin/RouteImport.vue'),
         meta: {
-          title: '航路导入'
+          title: '航路管理'
         }
       },
       {

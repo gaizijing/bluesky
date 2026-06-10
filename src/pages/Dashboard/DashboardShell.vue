@@ -14,10 +14,12 @@
     </div>
     <DashboardLayout v-if="!appStore.panelsHidden" />
     <MapToolbar v-if="config.toolbar.visible" />
+    <SimFlightMapBridge v-if="appStore.view === 'simFlight' && mapVisible" />
     <LegendPanel v-if="appStore.legendOpen" />
-    <PickPopup v-if="appStore.pickPopup" />
+    <PickPopup v-if="appStore.pickPopup && !regionMeteoOnDashboard" />
     <TimelineBar v-if="config.main.timeline.visible" />
     <MetVizToolbar v-if="metVizOnDashboard" />
+    <RegionMeteoControls v-if="regionMeteoOnDashboard" />
     <WarningDrawer />
 
     <div v-if="devViewSwitcher" class="dashboard-shell__dev-views">
@@ -35,10 +37,11 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, computed } from 'vue';
+import { onMounted, onUnmounted, computed, provide } from 'vue';
 import dashboardConfig from '@/config/dashboard.config.json';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
 import { useTimelineAutoNow } from '@/composables/useTimelineAutoNow';
+import { useRegionMeteoEngine } from '@/composables/useRegionMeteoEngine';
 import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus';
 import DashboardHeader from '@/components/dashboard/header/Header.vue';
 import DashboardLayout from '@/components/dashboard/DashboardLayout.vue';
@@ -47,16 +50,22 @@ import LegendPanel from '@/components/dashboard/toolbar/LegendPanel.vue';
 import PickPopup from '@/components/dashboard/toolbar/PickPopup.vue';
 import TimelineBar from '@/components/dashboard/timeline/TimelineBar.vue';
 import MetVizToolbar from '@/components/dashboard/metviz/MetVizToolbar.vue';
-import { isMetVizEnabledOnDashboard } from '@/config/metVizRuntime';
+import RegionMeteoControls from '@/components/regionMeteo/RegionMeteoControls.vue';
+import { isMetVizEnabledOnDashboard, isRegionMeteoEnabledOnDashboard } from '@/config/metVizRuntime';
 import WarningDrawer from '@/components/dashboard/warning/WarningDrawer.vue';
 import MapContainer from '@/components/map/MapContainer.vue';
+import SimFlightMapBridge from '@/components/dashboard/panels/simFlight/SimFlightMapBridge.vue';
 
 const config = dashboardConfig;
 const appStore = useAppDashboardStore();
+const regionMeteo = useRegionMeteoEngine();
+provide('regionMeteo', regionMeteo);
 const metVizOnDashboard = isMetVizEnabledOnDashboard();
-const mapVisible = config.main?.map?.visible !== false;
+const regionMeteoOnDashboard = isRegionMeteoEnabledOnDashboard();
+const mapVisible = computed(() => config.main?.map?.visible !== false);
 const views = Object.keys(config.main.views);
 const devViewSwitcher = import.meta.env.DEV;
+
 
 useTimelineAutoNow();
 
@@ -70,8 +79,8 @@ let offRegion = null;
 
 function switchDevView(view) {
   if (view === 'drillLanding') appStore.drillLanding('LP001');
-  else if (view === 'drillRoute') appStore.drillRoute('demo-route');
-  else if (view === 'simFlight') appStore.enterSimFlight('demo-route');
+  else if (view === 'drillRoute') appStore.drillRoute('route-sf-huangdao');
+  else if (view === 'simFlight') appStore.enterSimFlight('route-sf-huangdao');
   else appStore.setView(view);
 }
 

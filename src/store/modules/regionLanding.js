@@ -2,6 +2,9 @@ import { defineStore } from 'pinia';
 import { fetchLandingPoints } from '@/api';
 import { useRegionStore } from '@/store/modules/region';
 
+let landingLoadPromise = null;
+let landingLoadRegionId = null;
+
 const convertStatusToChinese = (status) => {
   const map = {
     available: '正常',
@@ -15,6 +18,7 @@ export const useRegionLandingStore = defineStore('regionLanding', {
   state: () => ({
     selectedLandingPoint: null,
     landingPoints: [],
+    loadedRegionId: null,
   }),
 
   getters: {
@@ -47,7 +51,7 @@ export const useRegionLandingStore = defineStore('regionLanding', {
       }
     },
 
-    async loadLandingPoints(regionId) {
+    async ensureLandingPoints(regionId, { force = false } = {}) {
       const regionStore = useRegionStore();
       let rid = typeof regionId === 'string' ? regionId.trim() : regionId;
       if (!rid) {
@@ -60,9 +64,32 @@ export const useRegionLandingStore = defineStore('regionLanding', {
       if (!rid) {
         throw new Error('尚未选择区域，无法加载起降点');
       }
-      const points = await fetchLandingPoints(rid);
-      this.setLandingPoints(points);
-      return points;
+
+      if (!force && this.loadedRegionId === rid && this.landingPoints.length) {
+        return this.landingPoints;
+      }
+
+      if (!force && landingLoadPromise && landingLoadRegionId === rid) {
+        return landingLoadPromise;
+      }
+
+      landingLoadRegionId = rid;
+      landingLoadPromise = (async () => {
+        const points = await fetchLandingPoints(rid);
+        this.setLandingPoints(points);
+        this.loadedRegionId = rid;
+        return points;
+      })();
+
+      try {
+        return await landingLoadPromise;
+      } finally {
+        landingLoadPromise = null;
+      }
+    },
+
+    async loadLandingPoints(regionId) {
+      return this.ensureLandingPoints(regionId, { force: false });
     },
 
     selectLandingPoint(point) {
@@ -72,6 +99,9 @@ export const useRegionLandingStore = defineStore('regionLanding', {
     clearLandingPoints() {
       this.landingPoints = [];
       this.selectedLandingPoint = null;
+      this.loadedRegionId = null;
+      landingLoadPromise = null;
+      landingLoadRegionId = null;
     },
 
     // 兼容旧 area store API

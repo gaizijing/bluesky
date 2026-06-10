@@ -6,27 +6,22 @@ const LOG_PREFIX = '[Dashboard/Camera]';
 // 获取地区配置（边界与中心，默认视角由起降点范围决定）
 export const getRegionConfig = () => {
   const regionStore = useRegionStore();
-  const bounds = regionStore.getRegionBounds;
   const center = regionStore.getRegionCenter;
-  console.log(LOG_PREFIX, 'getRegionConfig', {
-    regionId: regionStore.regionId,
-    regionName: regionStore.getRegionName,
-    bounds,
-    center,
-  });
+  const envelope = regionStore.boundaryEnvelope;
+  const mapLift = regionStore.getMapLift;
   return {
     name: regionStore.getRegionName,
     center,
-    rectangle: bounds ? Cesium.Rectangle.fromDegrees(
-      bounds.west,
-      bounds.south,
-      bounds.east,
-      bounds.north
+    rectangle: envelope ? Cesium.Rectangle.fromDegrees(
+      envelope.west,
+      envelope.south,
+      envelope.east,
+      envelope.north
     ) : null,
-    defaultHeight: 18000,
-    heading: 0,
-    pitch: -45,
-    terrainExaggeration: 1,
+    defaultHeight: mapLift?.height ?? 18000,
+    heading: mapLift?.heading ?? 0,
+    pitch: mapLift?.pitch ?? -45,
+    terrainExaggeration: mapLift?.terrainExaggeration ?? 1,
   };
 };
 
@@ -76,6 +71,22 @@ export const flyToLandingPointsOverview = (viewer, points = [], options = {}) =>
     easingFunction: options.easingFunction || Cesium.EasingFunction.CUBIC_IN_OUT,
   });
   return true;
+};
+
+/** 点击地图聚焦到指定经纬度 */
+export const flyToMapPoint = (viewer, lng, lat, options = {}) => {
+  if (!viewer || !Number.isFinite(lng) || !Number.isFinite(lat)) return;
+  const height = Math.max(Number(options.height) || 8000, 500);
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(lng, lat, height),
+    orientation: {
+      heading: Cesium.Math.toRadians(options.heading ?? 0),
+      pitch: Cesium.Math.toRadians(options.pitch ?? -45),
+      roll: 0,
+    },
+    duration: options.duration ?? 1.2,
+    easingFunction: options.easingFunction || Cesium.EasingFunction.CUBIC_IN_OUT,
+  });
 };
 
 
@@ -160,35 +171,58 @@ export const getFlyToOptions = (options) => ({
 export const flyToRegionOverview = (viewer, options = {}) => {
   if (!viewer) {
     console.warn(LOG_PREFIX, 'flyToRegionOverview 跳过: viewer 未初始化');
-    return;
+    return false;
   }
 
   const points = options.points;
   if (Array.isArray(points) && points.length) {
     if (flyToLandingPointsOverview(viewer, points, options)) {
-      return;
+      return true;
     }
   }
 
   const regionConfig = getRegionConfig();
-  if (!regionConfig.rectangle) {
-    console.warn(LOG_PREFIX, 'flyToRegionOverview 跳过: 无起降点且无 bounds.rectangle');
-    return;
+  if (regionConfig.center) {
+    console.log(LOG_PREFIX, 'flyToRegionOverview 回退到中心点', {
+      regionName: regionConfig.name,
+      center: regionConfig.center,
+    });
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(
+        regionConfig.center[0],
+        regionConfig.center[1],
+        regionConfig.defaultHeight ?? 18000,
+      ),
+      orientation: {
+        heading: Cesium.Math.toRadians(regionConfig.heading ?? 0),
+        pitch: Cesium.Math.toRadians(regionConfig.pitch ?? -45),
+        roll: 0,
+      },
+      duration: options.duration ?? 2,
+      easingFunction: options.easingFunction || Cesium.EasingFunction.CUBIC_IN_OUT,
+    });
+    return true;
   }
 
-  console.log(LOG_PREFIX, 'flyToRegionOverview 回退到 rectangle 范围', {
+  if (!regionConfig.rectangle) {
+    console.warn(LOG_PREFIX, 'flyToRegionOverview 跳过: 无起降点且无中心点/边界');
+    return false;
+  }
+
+  console.log(LOG_PREFIX, 'flyToRegionOverview 回退到 GeoJSON 包络', {
     regionName: regionConfig.name,
   });
   viewer.camera.flyTo({
     destination: regionConfig.rectangle,
     orientation: {
-      heading: 0,
+      heading: Cesium.Math.toRadians(regionConfig.heading ?? 0),
       pitch: Cesium.Math.toRadians(regionConfig.pitch ?? -45),
       roll: 0,
     },
     duration: options.duration ?? 2,
     easingFunction: options.easingFunction || Cesium.EasingFunction.CUBIC_IN_OUT,
   });
+  return true;
 };
 
 /**

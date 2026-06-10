@@ -1,13 +1,5 @@
 <template>
   <div class="suitability-chart-container">
-    <el-alert
-      v-if="showStaleHint"
-      class="stale-hint"
-      type="warning"
-      :closable="false"
-      show-icon
-      title="部分时段数据尚未由调度缓存生成，展示为实时估算值"
-    />
     <div ref="chartRef" class="chart-wrapper"></div>
   </div>
 </template>
@@ -17,6 +9,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import * as echarts from 'echarts';
 import { useModuleStore } from "@/store/modules/module";
 import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
+import { FLYABILITY_BUCKET_MINUTES, chartStatusColor, chartStatusLabel } from "@/utils/flyabilityChart";
 
 const moduleStore = useModuleStore();
 const dashboardWeatherStore = useDashboardWeatherStore();
@@ -28,13 +21,13 @@ const flightSuitableAnalysisPanelData = computed(() => {
   return dashboardWeatherStore.getFlightSuitableAnalysisPanelData();
 });
 
-const showStaleHint = computed(() => Boolean(flightSuitableAnalysisPanelData.value?.isStale));
-
 const FACTOR_ORDER = ["综合", "风", "风切变", "颠簸指数", "湍流", "降水", "能见度"];
 
-const alignToHalfHour = (date) => {
+const alignToBucket = (date) => {
   const d = new Date(date);
-  d.setMinutes(d.getMinutes() < 30 ? 0 : 30, 0, 0);
+  const step = FLYABILITY_BUCKET_MINUTES;
+  d.setMinutes(d.getMinutes() - (d.getMinutes() % step), 0, 0);
+  d.setSeconds(0, 0);
   return d;
 };
 
@@ -44,18 +37,20 @@ const formatTime = (date) => {
   return `${h}:${m}`;
 };
 
-const buildFallbackTimeLabels = (slotCount) => {
+const buildFallbackTimeLabels = (slotCount, startTime) => {
   const labels = [];
-  const start = alignToHalfHour(new Date());
-  for (let i = 0; i <= slotCount; i++) {
-    labels.push(formatTime(new Date(start.getTime() + i * 30 * 60 * 1000)));
+  const parsed = startTime ? new Date(startTime) : null;
+  const start = parsed && !Number.isNaN(parsed.getTime())
+    ? alignToBucket(parsed)
+    : alignToBucket(new Date());
+  const stepMs = FLYABILITY_BUCKET_MINUTES * 60 * 1000;
+  for (let i = 0; i <= slotCount; i += 1) {
+    labels.push(formatTime(new Date(start.getTime() + i * stepMs)));
   }
   return labels;
 };
 
-const toStatus = (raw) => {
-  return raw === 1 || raw === true || raw === "1" || raw === "true" ? 1 : 0;
-};
+const toStatus = (raw) => Number(raw);
 
 const normalizeChartData = (rawData) => {
   if (!rawData || !Array.isArray(rawData.factors) || rawData.factors.length === 0) {
@@ -80,7 +75,7 @@ const normalizeChartData = (rawData) => {
   const backendTimeLabels = Array.isArray(rawData.timeLabels) ? rawData.timeLabels : [];
   const timeLabels = backendTimeLabels.length === slotCount + 1
     ? backendTimeLabels
-    : buildFallbackTimeLabels(slotCount);
+    : buildFallbackTimeLabels(slotCount, rawData.bucketStartTime || rawData.metadata?.bucketTime);
 
   return {
     factors: rawFactors,
@@ -134,7 +129,7 @@ const initChart = () => {
       formatter: (params) => {
         const slotIdx = Number(params.data[0]);
         const factorIdx = Number(params.data[1]);
-        const status = Number(params.data[2]) === 1;
+        const status = toStatus(params.data[2]);
         const value = params.data[3];
         const unit = params.data[4] || '';
         const rangeLabel = `${timeLabels[slotIdx]} - ${timeLabels[slotIdx + 1]}`;
@@ -142,8 +137,8 @@ const initChart = () => {
         return [
           `<div>${factors[factorIdx]}</div>`,
           `<div>时间：${rangeLabel}</div>`,
-          `<div>状态：${status ? '适飞' : '不适飞'}</div>`,
-          status ? '' : `<div>数值：${formatValue(value)}${unit}</div>`
+          `<div>状态：${chartStatusLabel(status)}</div>`,
+          status === 2 ? '' : `<div>数值：${formatValue(value)}${unit}</div>`
         ].join('');
       }
     },
@@ -152,8 +147,10 @@ const initChart = () => {
       type: 'piecewise',
       dimension: 2,
       pieces: [
-        { value: 1, color: '#31d158' },
-        { value: 0, color: '#e25151' }
+        { value: 2, color: chartStatusColor(2) },
+        { value: 1, color: chartStatusColor(1) },
+        { value: 0, color: chartStatusColor(0) },
+        { value: -1, color: chartStatusColor(-1) },
       ]
     },
     grid: {
@@ -212,17 +209,17 @@ const initChart = () => {
       itemStyle: {
         borderWidth: 2,
         borderColor: '#0f2433',
-        color: (params) => Number(params.data[2]) === 1 ? '#31d158' : '#e25151'
+        color: (params) => chartStatusColor(toStatus(params.data[2])),
       },
       label: {
         show: true,
         color: '#ffffff',
         fontSize: 10,
         formatter: (params) => {
-          const status = Number(params.data[2]) === 1;
+          const status = toStatus(params.data[2]);
           const value = params.data[3];
           const unit = params.data[4] || '';
-          return status ? '' : `${formatValue(value)}`;
+          return status === 2 ? '' : `${formatValue(value)}${unit ? unit : ''}`;
         }
       }
     }]
@@ -239,6 +236,7 @@ watch(
   flightSuitableAnalysisPanelData,
   async () => {
     await nextTick();
+    if (!chartRef.value) return;
     initChart();
   },
   { deep: true, immediate: true }
@@ -270,14 +268,13 @@ onUnmounted(() => {
 <style scoped>
 .suitability-chart-container {
   position: relative;
-}
-
-.stale-hint {
-  margin-bottom: 8px;
+  height: 100%;
+  min-height: 0;
 }
 
 .chart-wrapper {
   width: 100%;
-  height: 220px;
+  height: 100%;
+  min-height: 160px;
 }
 </style>

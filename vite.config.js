@@ -6,10 +6,17 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import postcssPxToViewport from 'postcss-px-to-viewport'
+import { offlineMapServerPlugin } from './vite/plugins/offlineMapServer.js'
+import { staticDemoPagesPlugin } from './vite/plugins/staticDemoPages.js'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd())
+  const defaultMapRoot = resolve(__dirname, '../source')
+  const offlineMapRoot = env.VITE_OFFLINE_MAP_SERVE_DIR
+    ? resolve(__dirname, env.VITE_OFFLINE_MAP_SERVE_DIR)
+    : defaultMapRoot
+  const tileServerPort = Number(env.VITE_MAP_TILE_SERVER_PORT) || 8765
 
   return {
     base: './',
@@ -17,8 +24,13 @@ export default defineConfig(({ mode }) => {
       global: 'window'
     },
     plugins: [
+      staticDemoPagesPlugin({ tiandituToken: env.VITE_TIANDITU_TOKEN }),
       vue(),
       cesium(),
+      offlineMapServerPlugin(offlineMapRoot, {
+        host: env.VITE_MAP_TILE_SERVER_HOST || '127.0.0.1',
+        port: tileServerPort,
+      }),
       // 自动导入 Element Plus 工具类（如 ElMessage、ElMessageBox 等）
       AutoImport({
         resolvers: [
@@ -56,6 +68,13 @@ export default defineConfig(({ mode }) => {
       port: 8081,
       open: true,
       proxy: {
+        // 天地图 WMTS（开发环境避免 CORS / 直连 502）
+        '/tianditu-proxy': {
+          target: 'https://t0.tianditu.gov.cn',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/tianditu-proxy/, ''),
+          secure: true,
+        },
         // 和风天气API代理（只代理特定的天气API请求）
         '/api/weather/now': {
           target: 'https://devapi.qweather.com/v7',

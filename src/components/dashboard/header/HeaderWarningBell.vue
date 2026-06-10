@@ -1,5 +1,10 @@
 <template>
-  <el-badge :value="count" :hidden="count === 0" :max="99" class="warning-bell">
+  <el-badge
+    :value="appStore.unreadWarningCount"
+    :hidden="appStore.unreadWarningCount === 0"
+    :max="99"
+    class="warning-bell"
+  >
     <el-button circle class="warning-bell__btn" @click="openDrawer">
       <el-icon class="warning-bell__icon"><Bell /></el-icon>
     </el-button>
@@ -7,29 +12,18 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
 import { Bell } from '@element-plus/icons-vue';
-import { fetchWarnings } from '@/api/v2/warning';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
 import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus';
 
 const appStore = useAppDashboardStore();
-const count = ref(0);
 let timer = null;
 let offRegion = null;
 let offWarning = null;
 
-async function refreshCount() {
-  if (!appStore.regionId) {
-    count.value = 0;
-    return;
-  }
-  try {
-    const list = await fetchWarnings({ statuses: 'NEW' });
-    count.value = Array.isArray(list) ? list.length : 0;
-  } catch {
-    count.value = 0;
-  }
+function refreshCounts() {
+  appStore.refreshWarningCounts();
 }
 
 function openDrawer() {
@@ -37,10 +31,10 @@ function openDrawer() {
 }
 
 onMounted(() => {
-  refreshCount();
-  timer = setInterval(refreshCount, 30000);
-  offRegion = dashboardEventBus.on(DASHBOARD_EVENTS.REGION_CHANGED, refreshCount);
-  offWarning = dashboardEventBus.on(DASHBOARD_EVENTS.WARNING_CHANGED, refreshCount);
+  refreshCounts();
+  timer = setInterval(refreshCounts, 30000);
+  offRegion = dashboardEventBus.on(DASHBOARD_EVENTS.REGION_CHANGED, refreshCounts);
+  offWarning = dashboardEventBus.on(DASHBOARD_EVENTS.WARNING_CHANGED, refreshCounts);
 });
 
 onUnmounted(() => {
@@ -48,8 +42,6 @@ onUnmounted(() => {
   offRegion?.();
   offWarning?.();
 });
-
-watch(() => appStore.regionId, refreshCount);
 </script>
 
 <style scoped lang="scss">
@@ -63,8 +55,8 @@ watch(() => appStore.regionId, refreshCount);
 }
 
 .warning-bell__btn {
-  width: 36px;
-  height: 36px;
+  width: 35px;
+  height: 35px;
   padding: 0;
   background: rgba(59, 130, 246, 0.25);
   border: 1px solid rgba(96, 165, 250, 0.35);

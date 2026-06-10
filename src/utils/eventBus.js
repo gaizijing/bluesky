@@ -13,6 +13,10 @@ export const DASHBOARD_EVENTS = {
   /** 预警已读 / 处理 / 关闭后刷新外部面板 */
   WARNING_CHANGED: 'WARNING_CHANGED',
   FLIGHT_POSITION_UPDATED: 'FLIGHT_POSITION_UPDATED',
+  /** 主地图聚焦 ISIM 飞机 */
+  FOCUS_ISIM_AIRCRAFT: 'FOCUS_ISIM_AIRCRAFT',
+  /** 总览模式下重置相机到 Region 默认视角 */
+  RESET_HOME_CAMERA: 'RESET_HOME_CAMERA',
 };
 
 export const dashboardEventBus = {

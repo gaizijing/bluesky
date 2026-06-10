@@ -25,7 +25,7 @@
   font-style: normal;
 }
 
-// 添加全局公共样式（如重置样式、body 样式等）
+html,
 body {
   margin: 0 !important;
   padding: 0;
@@ -78,7 +78,7 @@ body {
   background-image: url(/src/assets/images/bg_panel_title.png);
   background-size: cover;
   background-repeat: no-repeat;
-  background-position: inherit ！important;
+  background-position: inherit !important;
   height: 40px;
   position: absolute;
   top: -30px;

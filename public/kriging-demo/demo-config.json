@@ -1,0 +1,18 @@
+{
+  "heightLevelsM": [100, 300, 500, 1000, 2000],
+  "gridProducts": [
+    "temperature",
+    "wind",
+    "visibility",
+    "precip",
+    "humidity",
+    "cloud",
+    "pressure"
+  ],
+  "defaultProduct": "temperature",
+  "maxKrigingSamples": 96,
+  "isoBandCount": 8,
+  "canvasWidth": 2048,
+  "apiTimeoutMs": 15000,
+  "reloadDebounceMs": 280
+}

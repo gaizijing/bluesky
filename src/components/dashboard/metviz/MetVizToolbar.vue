@@ -88,19 +88,13 @@ function onWindToggle() {
     layerSettings.updateWindOptions(MET_VIZ_WIND_OPTIONS);
   }
   emitRefresh();
-  queueMicrotask(() => {
-    dashboardEventBus.emit(DASHBOARD_EVENTS.WIND_VISIBILITY_SYNC);
-  });
 }
 
 onMounted(() => {
   if (!IMAGERY_PRODUCTS.includes(metStore.product)) {
     metStore.setProduct('temperature');
   }
-  if (layerSettings.layers.wind?.visible !== false) {
-    metStore.setLayerEnabled('wind', true);
-    layerSettings.updateWindOptions(MET_VIZ_WIND_OPTIONS);
-  }
+  layerSettings.setLayerVisibility('wind', metStore.enabled.wind);
   emitRefresh();
 });
 </script>
