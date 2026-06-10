@@ -90,9 +90,9 @@ import { useRoute } from 'vue-router'
 import * as Cesium from 'cesium'
 import { createDemoViewer } from '@demos/shared/demoViewer.js'
 import { fetchDefaultRegion } from '@/api/v2/region'
-import { HEIGHT_LEVELS_M, MET_PRODUCTS } from '@/met-viz/constants'
-import { getColormap } from '@/met-viz/core/colormaps'
-import { KrigingGridLayer } from '@/met-viz/layers/KrigingGridLayer'
+import { HEIGHT_LEVELS_M, MET_PRODUCTS } from '@demos/shared/met-viz/constants'
+import { getColormap } from '@demos/shared/met-viz/core/colormaps'
+import { KrigingGridLayer } from '@demos/shared/met-viz/layers/KrigingGridLayer'
 
 const IMAGERY_IDS = ['temperature', 'wind', 'visibility', 'precipitation', 'humidity', 'cloud', 'pressure']
 

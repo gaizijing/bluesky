@@ -1,7 +1,5 @@
 import './landing-popup.css';
 
-const POPUP_BG = '/region-meteo-demo/landing-popup-bg.png';
-
 /**
  * 地图锚点弹窗（起降点 / 点选气象共用样式）
  */
@@ -26,8 +24,6 @@ export class AnchorPopup {
       + '</div></div>';
     document.body.appendChild(root);
     root.querySelector('.landing-popup__close').addEventListener('click', () => this.hide());
-    const inner = root.querySelector('.landing-popup__inner');
-    if (inner) inner.style.backgroundImage = 'url(' + POPUP_BG + ')';
     this.root = root;
   }
 

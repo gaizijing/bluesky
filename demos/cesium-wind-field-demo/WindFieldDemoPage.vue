@@ -78,7 +78,7 @@ import {
 } from '@demos/cesium-wind-field-demo/core/windFieldLayer.js';
 import { getWindData } from '@/api/weather';
 import { fetchDefaultRegion } from '@/api/v2/region';
-import { HEIGHT_LEVELS_M, MET_VIZ_WIND_OPTIONS } from '@/met-viz/constants';
+import { HEIGHT_LEVELS_M, MET_VIZ_WIND_OPTIONS } from '@demos/shared/met-viz/constants';
 
 const cesiumRef = ref(null);
 const viewerRef = shallowRef(null);

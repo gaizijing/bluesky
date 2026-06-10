@@ -1,4 +1,4 @@
-/** MetViz 产品列表（与 dashboard.config.json metViz.products 对齐） */
+/** MetViz Demo 产品列表 */
 export const MET_PRODUCTS = [
   { id: 'temperature', label: '温度' },
   { id: 'wind', label: '风速' },

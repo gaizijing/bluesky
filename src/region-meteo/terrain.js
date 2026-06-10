@@ -15,6 +15,15 @@ export function applyTerrainSceneSettings(viewerInstance, exaggeration) {
   }
 }
 
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} 超时（${ms}ms）`)), ms);
+    }),
+  ]);
+}
+
 export async function loadTerrain(viewerInstance) {
   const mapCfg = getMapTilesConfig();
   const terrainUrl = String(mapCfg.cesium?.terrain_url || DEFAULT_ONLINE_TERRAIN).trim();
@@ -22,11 +31,15 @@ export async function loadTerrain(viewerInstance) {
 
   try {
     console.log('[region-meteo] 加载在线地形:', terrainUrl);
-    const provider = await Cesium.CesiumTerrainProvider.fromUrl(terrainUrl, {
-      requestWaterMask: true,
-      requestVertexNormals: true,
-    });
-    await provider.readyPromise;
+    const provider = await withTimeout(
+      Cesium.CesiumTerrainProvider.fromUrl(terrainUrl, {
+        requestWaterMask: true,
+        requestVertexNormals: true,
+      }),
+      12000,
+      '地形服务',
+    );
+    await withTimeout(provider.readyPromise, 12000, '地形就绪');
     viewerInstance.terrainProvider = provider;
     applyTerrainSceneSettings(viewerInstance, exaggeration);
     return { ok: true, label: '在线地形（×' + exaggeration + '）' };

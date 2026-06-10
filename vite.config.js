@@ -105,7 +105,13 @@ export default defineConfig(({ mode }) => {
         output: {
           chunkFileNames: 'js/[name]-[hash].js',
           entryFileNames: 'js/[name]-[hash].js',
-          assetFileNames: '[ext]/[name]-[hash].[ext]'
+          assetFileNames: '[ext]/[name]-[hash].[ext]',
+          manualChunks(id) {
+            if (id.includes('node_modules/cesium')) return 'cesium';
+            if (id.includes('node_modules/echarts')) return 'echarts';
+            if (id.includes('node_modules/element-plus')) return 'element-plus';
+            if (id.includes('node_modules/@element-plus/icons-vue')) return 'element-plus-icons';
+          },
         }
       }
     },

@@ -117,7 +117,7 @@
       </aside>
     </div>
 
-    <aside v-if="state?.legend" class="legend" aria-label="色标图例">
+    <aside v-if="showLegend" class="legend" aria-label="色标图例">
       <div>
         <div class="legend__title">{{ state.legend.title }}</div>
         <div class="legend__unit">{{ state.legend.unit }}</div>
@@ -135,11 +135,20 @@
 
 <script setup>
 import { computed, inject, ref } from 'vue';
+import { useAppDashboardStore } from '@/store/modules/appDashboard';
 import './region-meteo-controls.css';
 
+const appStore = useAppDashboardStore();
 const regionMeteo = inject('regionMeteo');
 const status = computed(() => regionMeteo?.status?.value ?? { text: '', type: 'ok' });
 const state = computed(() => regionMeteo?.engineState?.value);
+
+/** /map 独立页常显；Dashboard 仍由工具栏 legend 开关控制 */
+const showLegend = computed(() => {
+  if (!state.value?.legend) return false;
+  if (state.value.attachMode === 'standalone') return true;
+  return appStore.legendOpen;
+});
 
 const layersOpen = ref(true);
 const meteoOpen = ref(true);

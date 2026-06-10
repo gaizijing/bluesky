@@ -7,6 +7,7 @@ import { PlaneModel } from '@/cesium/entities/routes/PlaneModel';
 import { FollowCameraController } from '@/cesium/core/followCamera';
 import { AircraftTrailController } from '@/cesium/visualization/aircraftTrail';
 import { AircraftHeadingLineController } from '@/cesium/visualization/aircraftHeadingLine';
+import { createCancellableRafScheduler } from '@/utils/rafSchedule';
 
 const ISIM_PLANE_ID = 'isim_live_aircraft';
 
@@ -32,6 +33,7 @@ export function useIsimCesiumSync() {
   const trailController = ref(null);
   const headingLineController = ref(null);
   let viewerWaitTimer = null;
+  let scheduleAircraftUpdate = null;
 
   function getViewer() {
     return window.viewer || null;
@@ -204,13 +206,13 @@ export function useIsimCesiumSync() {
     if (data) updateCesiumAircraft(data);
   }
 
-  watch(
-    simData,
-    (data) => {
-      if (isConnected.value && data) updateCesiumAircraft(data);
-    },
-    { deep: true },
-  );
+  scheduleAircraftUpdate = createCancellableRafScheduler((data) => {
+    if (isConnected.value && data) updateCesiumAircraft(data);
+  });
+
+  watch(simData, (data) => {
+    if (isConnected.value && data) scheduleAircraftUpdate(data);
+  });
 
   watch(isConnected, (connected) => {
     if (!connected) {
@@ -240,6 +242,8 @@ export function useIsimCesiumSync() {
 
   onUnmounted(() => {
     if (viewerWaitTimer) clearInterval(viewerWaitTimer);
+    scheduleAircraftUpdate?.cancel();
+    scheduleAircraftUpdate = null;
     followCamera.value?.destroy();
     followCamera.value = null;
     trailController.value?.destroy();

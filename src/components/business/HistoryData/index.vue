@@ -41,7 +41,7 @@
 
 <script setup>
 import { ref, onMounted, watch, nextTick, onUnmounted, computed } from "vue";
-import * as echarts from "echarts";
+import echarts from '@/utils/echarts';
 import { useModuleStore } from "@/store/modules/module";
 import { useDeviceStore } from "@/store/modules/device";
 

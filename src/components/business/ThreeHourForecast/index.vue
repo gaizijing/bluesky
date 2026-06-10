@@ -71,6 +71,7 @@ const getWeatherIcon = (desc) => {
   overflow-x: auto;
   gap: 5px;
   padding-bottom: 8px;
+  overflow:hidden
 }
 
 .forecast-item {

@@ -1,6 +1,44 @@
 <template>
   <div class="dashboard-layout" :style="layoutStyle">
-    <template v-for="mod in visibleModules" :key="mod.id">
+    <!-- 首页左右侧：常驻 DOM + KeepAlive，切视图不卸载 -->
+    <template v-for="mod in persistentHomeModules" :key="`persist-${mod.id}`">
+      <div
+        v-show="appStore.view === 'home' && hasVisiblePanels(mod)"
+        class="dashboard-module"
+        :class="regionClass(mod)"
+        :style="moduleStyle(mod)"
+      >
+        <div
+          v-for="panel in sortedPanels(mod.panels)"
+          :key="panel.id"
+          class="main-panel"
+          :class="[
+            bgClass(mod.region),
+            { 'main-panel--chromeless': !showPanelTitle(panel, mod) },
+          ]"
+          :style="panelStyle(panel, mod)"
+        >
+          <div v-if="showPanelTitle(panel, mod)" class="panel-header">
+            <span class="panel-title">{{ panel.title }}</span>
+          </div>
+          <div
+            class="panel-content"
+            :class="{ 'panel-content--chromeless': !showPanelTitle(panel, mod) }"
+          >
+            <KeepAlive>
+              <component
+                :is="getPanel(panel.component)"
+                :key="panel.id"
+                :panel-id="panel.id"
+                :title="panel.title"
+              />
+            </KeepAlive>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template v-for="mod in transientModules" :key="mod.id">
       <div
         v-if="hasVisiblePanels(mod)"
         class="dashboard-module"
@@ -25,7 +63,7 @@
             :class="{ 'panel-content--chromeless': !showPanelTitle(panel, mod) }"
           >
             <component
-              :is="resolvePanel(panel.component)"
+              :is="getPanel(panel.component)"
               :panel-id="panel.id"
               :title="panel.title"
             />
@@ -46,25 +84,43 @@ const panelModules = import.meta.glob('@/components/dashboard/panels/**/*.vue');
 const headerHeight = dashboardConfig.header?.height ?? 88;
 const timelineHeight = dashboardConfig.main?.timeline?.height ?? 48;
 
+const HOME_PERSISTENT_IDS = new Set(['home-left', 'home-right']);
+
+/** 模块级缓存，避免每次渲染新建 defineAsyncComponent */
+const panelComponentCache = new Map();
+const PLACEHOLDER = defineAsyncComponent(
+  () => import('./panels/_placeholders/PlaceholderPanel.vue'),
+);
+
 const appStore = useAppDashboardStore();
 const { hasLiveFlight } = useSimLiveGate();
 
-const visibleModules = computed(() => {
-  const view = dashboardConfig.main.views[appStore.view];
-  const modules = view?.modules ?? [];
-  if (appStore.view === 'simFlight') {
+function filterHomeModule(mod) {
+  if (mod.id === 'home-right' || mod.module === 'warningSummary') {
+    return appStore.showHomeWarningSummary;
+  }
+  return true;
+}
+
+const persistentHomeModules = computed(() => {
+  const modules = dashboardConfig.main.views.home?.modules ?? [];
+  return modules.filter(
+    (mod) => HOME_PERSISTENT_IDS.has(mod.id) && filterHomeModule(mod),
+  );
+});
+
+const transientModules = computed(() => {
+  const view = appStore.view;
+  if (view === 'home') return [];
+
+  const modules = dashboardConfig.main.views[view]?.modules ?? [];
+  if (view === 'simFlight') {
     return modules.filter((mod) => {
       if (mod.id === 'sim-mini') return hasLiveFlight.value;
       return true;
     });
   }
-  if (appStore.view !== 'home') return modules;
-  return modules.filter((mod) => {
-    if (mod.id === 'home-right' || mod.module === 'warningSummary') {
-      return appStore.showHomeWarningSummary;
-    }
-    return true;
-  });
+  return modules;
 });
 
 const bottomPanelHeight = computed(() => {
@@ -97,14 +153,20 @@ function showPanelTitle(panel, mod) {
   return Boolean(panel.title);
 }
 
-function resolvePanel(componentPath) {
+function getPanel(componentPath) {
+  if (panelComponentCache.has(componentPath)) {
+    return panelComponentCache.get(componentPath);
+  }
   const fileName = componentPath.split('/').pop();
   const key = Object.keys(panelModules).find((k) => k.endsWith(`/${fileName}`));
   if (!key) {
     console.warn('[DashboardLayout] panel not found:', componentPath);
-    return defineAsyncComponent(() => import('./panels/_placeholders/PlaceholderPanel.vue'));
+    panelComponentCache.set(componentPath, PLACEHOLDER);
+    return PLACEHOLDER;
   }
-  return defineAsyncComponent(panelModules[key]);
+  const asyncPanel = defineAsyncComponent(panelModules[key]);
+  panelComponentCache.set(componentPath, asyncPanel);
+  return asyncPanel;
 }
 
 function regionClass(mod) {

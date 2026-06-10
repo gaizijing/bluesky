@@ -7,11 +7,12 @@ import { useAppDashboardStore } from '@/store/modules/appDashboard';
  * - 首次无数据：loading=true，展示 skeleton
  * - 后续刷新：保留当前内容，接口返回后由 loadFn 直接替换，不闪空
  */
-export function usePanelRefresh(loadFn, { immediate = true, refreshOnWarning = false } = {}) {
+export function usePanelRefresh(loadFn, { immediate = true, refreshOnWarning = false, debounceMs = 200 } = {}) {
   const appStore = useAppDashboardStore();
   const loading = ref(false);
   const error = ref(null);
   let hasLoadedOnce = false;
+  let reloadDebounceTimer = null;
 
   async function reload(options = {}) {
     const force = options === true || options?.force === true;
@@ -40,13 +41,21 @@ export function usePanelRefresh(loadFn, { immediate = true, refreshOnWarning = f
     reload();
   }
 
+  function scheduleReload(options = {}) {
+    if (reloadDebounceTimer) clearTimeout(reloadDebounceTimer);
+    reloadDebounceTimer = setTimeout(() => {
+      reloadDebounceTimer = null;
+      reload(options);
+    }, debounceMs);
+  }
+
   let offTime = null;
   let offRegion = null;
   let offWarning = null;
 
   onMounted(() => {
     if (immediate) reload();
-    offTime = dashboardEventBus.on(DASHBOARD_EVENTS.MET_TIME_CHANGED, reload);
+    offTime = dashboardEventBus.on(DASHBOARD_EVENTS.MET_TIME_CHANGED, () => scheduleReload());
     offRegion = dashboardEventBus.on(DASHBOARD_EVENTS.REGION_CHANGED, onRegionChanged);
     if (refreshOnWarning) {
       offWarning = dashboardEventBus.on(DASHBOARD_EVENTS.WARNING_CHANGED, () => reload({ force: true }));
@@ -57,6 +66,7 @@ export function usePanelRefresh(loadFn, { immediate = true, refreshOnWarning = f
     offTime?.();
     offRegion?.();
     offWarning?.();
+    if (reloadDebounceTimer) clearTimeout(reloadDebounceTimer);
   });
 
   return { loading, error, reload };

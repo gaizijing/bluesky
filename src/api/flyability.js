@@ -2,6 +2,13 @@ import request from '@/utils/request';
 import { resolveRegionId } from './regionContext';
 import { matrixToChartData, FLYABILITY_BUCKET_MINUTES } from '@/utils/flyabilityChart';
 
+/** 并发请求去重：同一 region/time/hours 只发一次 landing-matrix */
+const landingMatrixInflight = new Map();
+
+function landingMatrixKey(rid, time, hours) {
+  return `${rid}|${time}|${hours}`;
+}
+
 /** P1：起降点适飞矩阵（原始响应） */
 export async function fetchLandingMatrix({ regionId, landingPointId, time, hours = 1 } = {}) {
   const rid = await resolveRegionId(regionId);
@@ -18,9 +25,36 @@ export async function resolveLandingMatrixResponse({ regionId, time, hours = 1, 
   const cached = appStore?.getLandingMatrixCache?.(hours);
   if (cached) return cached;
 
-  const raw = await fetchLandingMatrix({ regionId, time, hours });
-  appStore?.setLandingMatrixCache?.(raw, hours);
-  return raw;
+  const rid = await resolveRegionId(regionId);
+  const key = landingMatrixKey(rid, time, hours);
+  if (landingMatrixInflight.has(key)) {
+    return landingMatrixInflight.get(key);
+  }
+
+  const promise = fetchLandingMatrix({ regionId: rid, time, hours })
+    .then((raw) => {
+      landingMatrixInflight.delete(key);
+      appStore?.setLandingMatrixCache?.(raw, hours);
+      return raw;
+    })
+    .catch((err) => {
+      landingMatrixInflight.delete(key);
+      throw err;
+    });
+
+  landingMatrixInflight.set(key, promise);
+  return promise;
+}
+
+/** 时间轴/区域变更时预取，面板 reload 时可直接命中 store 缓存 */
+export function prefetchLandingMatrix({ regionId, time, hours = 1, appStore } = {}) {
+  if (!regionId && !appStore?.regionId) return Promise.resolve(null);
+  return resolveLandingMatrixResponse({
+    regionId: regionId || appStore?.regionId,
+    time,
+    hours,
+    appStore,
+  }).catch(() => null);
 }
 
 /** P1：航路适飞矩阵 */

@@ -164,7 +164,7 @@ export const getFlyToOptions = (options) => ({
 })
 
 /**
- * 地区概览飞行：优先框选全部起降点，否则回退到 Region 边界
+ * 地区概览飞行：优先中心点，其次起降点，最后回退到 Region 边界
  * @param {Cesium.Viewer} viewer
  * @param {{ points?: Array, duration?: number }} [options]
  */
@@ -174,16 +174,9 @@ export const flyToRegionOverview = (viewer, options = {}) => {
     return false;
   }
 
-  const points = options.points;
-  if (Array.isArray(points) && points.length) {
-    if (flyToLandingPointsOverview(viewer, points, options)) {
-      return true;
-    }
-  }
-
   const regionConfig = getRegionConfig();
   if (regionConfig.center) {
-    console.log(LOG_PREFIX, 'flyToRegionOverview 回退到中心点', {
+    console.log(LOG_PREFIX, 'flyToRegionOverview 使用中心点（忽略边界）', {
       regionName: regionConfig.name,
       center: regionConfig.center,
     });
@@ -204,8 +197,15 @@ export const flyToRegionOverview = (viewer, options = {}) => {
     return true;
   }
 
+  const points = options.points;
+  if (Array.isArray(points) && points.length) {
+    if (flyToLandingPointsOverview(viewer, points, options)) {
+      return true;
+    }
+  }
+
   if (!regionConfig.rectangle) {
-    console.warn(LOG_PREFIX, 'flyToRegionOverview 跳过: 无起降点且无中心点/边界');
+    console.warn(LOG_PREFIX, 'flyToRegionOverview 跳过: 无中心点/起降点/边界');
     return false;
   }
 

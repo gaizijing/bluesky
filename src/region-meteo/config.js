@@ -31,7 +31,7 @@ export function toApiProduct(productId) {
 export async function loadDemoConfig(inject = {}) {
   let remote = {};
   try {
-    const res = await fetch('/region-meteo-demo/demo-config.json', { cache: 'no-cache' });
+    const res = await fetch('/region-meteo/demo-config.json', { cache: 'no-cache' });
     if (res.ok) remote = await res.json();
   } catch { /* 使用 FALLBACK */ }
 

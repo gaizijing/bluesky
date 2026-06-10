@@ -12,8 +12,8 @@
 </template>
 
 <script setup>
-import { ref, watch, onUnmounted, nextTick } from 'vue';
-import * as echarts from 'echarts';
+import { ref, watch, onUnmounted, onActivated, nextTick } from 'vue';
+import echarts from '@/utils/echarts';
 import AsyncState from '@/components/common/AsyncState.vue';
 import { fetchVerticalProfile } from '@/api/weather';
 import { useDrillFocus } from '@/composables/useDrillFocus';
@@ -83,6 +83,11 @@ watch(
   },
   { flush: 'post' },
 );
+
+onActivated(async () => {
+  await nextTick();
+  if (chartGrid.value) renderChart(chartGrid.value);
+});
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);

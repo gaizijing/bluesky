@@ -1,3 +1,5 @@
+import * as Cesium from 'cesium';
+
 function resolveTiandituToken(configToken) {
   const params = new URLSearchParams(location.search);
   const fromUrl = params.get('tiandituToken') || params.get('tk');
@@ -101,5 +103,7 @@ export function createMapViewer(container, config = {}) {
   viewer.cesiumWidget.creditContainer.style.display = 'none';
   viewer.scene.globe.depthTestAgainstTerrain = false;
   viewer.scene.fog.enabled = false;
+  // requestRenderMode 下需主动触发首帧，否则底图在引擎挂载完成前一直空白
+  viewer.scene.requestRender();
   return viewer;
 }

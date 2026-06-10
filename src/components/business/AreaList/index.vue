@@ -213,7 +213,7 @@ const setFilter = (status) => {
     .stat-item {
       min-width: 110px;
       text-align: center;
-      background: url("@/assets/images/bg_mp_type.png");
+      background: url("@/assets/images/area-type-badge-bg.png");
       background-size: cover;
       background-position: center;
       height: 60px;

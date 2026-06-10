@@ -25,8 +25,8 @@
 </template>
 
 <script setup>
-import { ref, watch, onUnmounted, nextTick, reactive } from 'vue';
-import * as echarts from 'echarts';
+import { ref, watch, onUnmounted, onActivated, nextTick, reactive } from 'vue';
+import echarts from '@/utils/echarts';
 import AsyncState from '@/components/common/AsyncState.vue';
 import { useDrillFocus } from '@/composables/useDrillFocus';
 import { usePanelRefresh } from '@/composables/usePanelRefresh';
@@ -105,6 +105,11 @@ watch(
   },
   { flush: 'post' },
 );
+
+onActivated(async () => {
+  await nextTick();
+  renderChart();
+});
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);

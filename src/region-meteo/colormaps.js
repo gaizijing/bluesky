@@ -8,7 +8,7 @@ export const GRID_PRODUCTS = [
   { id: 'humidity', label: '湿度', unit: '%' },
   { id: 'cloud', label: '云量', unit: '%' },
   { id: 'pressure', label: '气压', unit: 'hPa' },
-  { id: 'rmet', label: 'R_met 风险', unit: '风险指数' },
+  { id: 'rmet', label: '风险', unit: '风险指数' },
 ];
 
 export const PRODUCT_COLORMAPS = {

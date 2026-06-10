@@ -38,7 +38,7 @@ import {
 import { initWeatherPick } from './weatherPick.js';
 import { flyToRegion } from './regionFly.js';
 import { createLoadContext } from './regionContext.js';
-import { invalidateBoundaryCache, getCachedBoundaryPack } from './boundaryCache.js';
+import { getCachedBoundaryPack } from './boundaryCache.js';
 import {
   initWindLayer,
   loadWindLayer,
@@ -188,6 +188,7 @@ export class RegionMeteoEngine {
     this.setStatus('加载地形…', 'loading');
     const terrain = await loadTerrain(viewer);
     if (this._destroyed) return;
+    viewer.scene?.requestRender?.();
 
     await this.reloadRegion({ fly: true, terrainLabel: terrain.label });
   }
@@ -243,8 +244,7 @@ export class RegionMeteoEngine {
 
     this.currentRegion = region;
     this.currentRegionId = region.regionId;
-    invalidateBoundaryCache();
-    this.boundaryPack = null;
+    this.boundaryPack = getCachedBoundaryPack(region.boundaryUrl);
 
     this.setStatus('加载 Region 图层…', 'loading');
     initRegionOverlays(this.viewer);
@@ -297,6 +297,7 @@ export class RegionMeteoEngine {
     }
 
     this.syncDrillHighlight();
+    this.viewer?.scene?.requestRender?.();
   }
 
   async loadGridLayer(opts = {}) {

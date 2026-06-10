@@ -6,9 +6,6 @@
     </div>
     <!-- 主体内容 -->
     <div class="layout-content" :class="{ 'layout-content--fullscreen': isFullscreenRoute }">
-      <!-- 侧边栏 -->
-      <!-- <Sidebar /> -->
-      <!-- 主内容区 -->
       <main class="main-content">
         <router-view />
       </main>
@@ -20,7 +17,6 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import Header from './Header.vue'
-import Sidebar from './Sidebar.vue'
 
 const route = useRoute()
 const isFullscreenRoute = computed(() => Boolean(route.meta.fullscreen))
@@ -72,6 +68,8 @@ const isFullscreenRoute = computed(() => Boolean(route.meta.fullscreen))
 
 .main-content {
   flex: 1;
+  min-height: 0;
+  height: 100%;
   padding: 0;
   overflow: hidden;
   box-sizing: border-box;

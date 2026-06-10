@@ -2,6 +2,24 @@ import request from '@/utils/request';
 import { setCurrentRegionId as setRegionIdInStorage } from '../regionContext';
 import { mapRegionToLegacyConfig } from '../lib/mappers';
 
+function buildMapLiftPayload(data) {
+  if (data.centerLng == null || data.centerLat == null) return undefined;
+  const height = data.mapLiftHeight ?? data.mapLift?.height;
+  const pitch = data.mapLiftPitch ?? data.mapLift?.pitch;
+  const heading = data.mapLiftHeading ?? data.mapLift?.heading;
+  if (height == null && pitch == null && heading == null && !data.mapLift) {
+    return undefined;
+  }
+  return {
+    longitude: Number(data.centerLng),
+    latitude: Number(data.centerLat),
+    height: Number(height ?? 12000),
+    pitch: Number(pitch ?? -50),
+    heading: Number(heading ?? 0),
+    terrainExaggeration: data.mapLift?.terrainExaggeration ?? 1.2,
+  };
+}
+
 export const fetchRegions = async () => {
   const data = await request.get('/regions');
   return (Array.isArray(data) ? data : []).map(mapRegionToLegacyConfig);
@@ -49,6 +67,8 @@ export const addRegionConfig = async (data) => {
     enabled: data.enabled !== false,
     isDefault: Boolean(data.isDefault),
   };
+  const mapLift = buildMapLiftPayload(data);
+  if (mapLift) payload.mapLift = mapLift;
   const response = await request.post('/regions', payload);
   return mapRegionToLegacyConfig(response);
 };
@@ -74,6 +94,8 @@ export const updateRegionConfig = async (data) => {
   if (data.boundarySourceUrl?.trim()) {
     payload.boundarySourceUrl = data.boundarySourceUrl.trim();
   }
+  const mapLift = buildMapLiftPayload(data);
+  if (mapLift) payload.mapLift = mapLift;
   const response = await request.put(`/regions/${regionId}`, payload);
   return mapRegionToLegacyConfig(response);
 };

@@ -26,7 +26,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
-import * as echarts from "echarts";
+import echarts from '@/utils/echarts';
 import { useModuleStore } from "@/store/modules/module";
 import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
 import ThreeHourForecast from "@/components/business/ThreeHourForecast/index.vue";

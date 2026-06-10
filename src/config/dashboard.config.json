@@ -209,12 +209,6 @@
   "legend": {
     "groups": ["noFly", "flyability"]
   },
-  "metViz": {
-    "enabled": false,
-    "defaultProduct": "temperature",
-    "products": ["wind", "temperature", "precipitation", "visibility", "humidity", "cloud", "pressure"],
-    "heightLevelsM": [100, 300, 500, 1000, 2000]
-  },
   "regionMeteo": {
     "enabled": true,
     "defaultLayers": {

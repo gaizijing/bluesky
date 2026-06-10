@@ -1,6 +1,10 @@
 /* 与 public/region-meteo-demo/index.html 控制面板 / 图例 / 弹窗样式一致 */
 
 .region-meteo-controls-root {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
   --accent: #00d4ff;
   --text: #f4fbff;
   --text-muted: #c8dce8;

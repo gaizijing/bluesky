@@ -5,13 +5,13 @@
     <div class="device-count-content">
       <div v-for="item in deviceStatus" :key="item.type" class="device-count-item">
         <div class="device-count">
-          <img src="@/assets/images/btn_img3.png" alt="" class="device-count-icon" />
+          <img src="@/assets/images/device-count-icon.png" alt="" class="device-count-icon" />
           <div class="device-count-number">
             {{ item.online }}/{{ item.total }}
           </div>
         </div>
         <div class="device-count-name">
-          <img src="@/assets/images/dividing_line.png" alt="" style="width:100%; height: 15px" />
+          <img src="@/assets/images/panel-divider-line.png" alt="" style="width:100%; height: 15px" />
 
           {{ item.name }}
         </div>
@@ -97,7 +97,7 @@ const deviceStatus = computed(() => {
 }
 
 .device-count-bg {
-  background-image: url("@/assets/images/percentage.png");
+  background-image: url("@/assets/images/device-count-percentage-bg.png");
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;

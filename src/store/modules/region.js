@@ -95,7 +95,17 @@ export const useRegionStore = defineStore('region', {
         if (!this.regions.length) {
           await this.fetchRegions();
         }
-        const data = await fetchDefaultRegion();
+        let data;
+        if (this.regionId) {
+          try {
+            data = await getRegionConfigById(this.regionId);
+          } catch (err) {
+            console.warn('[region] 按 id 拉取区域失败，回退默认区域', this.regionId, err);
+            data = await fetchDefaultRegion();
+          }
+        } else {
+          data = await fetchDefaultRegion();
+        }
         return this.applyRegionVo(data);
       } catch (error) {
         this.error = error?.message || '获取 Region 配置失败';

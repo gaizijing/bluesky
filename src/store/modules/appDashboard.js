@@ -5,8 +5,11 @@ import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus';
 import { useRegionStore } from '@/store/modules/region';
 import { useRegionLandingStore } from '@/store/modules/regionLanding';
 import { useRegionRoutesStore } from '@/store/modules/regionRoutes';
+import { getRegionConfigById } from '@/api';
 import { loadRegionCatalog } from '@/services/regionCatalog';
 import { fetchWarnings } from '@/api/v2/warning';
+import { prefetchLandingMatrix } from '@/api/flyability';
+import { FLYABILITY_OVERVIEW_HOURS } from '@/utils/flyabilityChart';
 
 const REGION_ID_KEY = 'currentRegionId';
 
@@ -53,10 +56,16 @@ export const useAppDashboardStore = defineStore('appDashboard', {
         await regionStore.fetchRegions();
         if (regionStore.regionId) {
           this.regionId = regionStore.regionId;
-          const region = regionStore.regions.find(
-            (r) => (r.regionId || r.id) === regionStore.regionId
-          );
-          if (region) regionStore.applyRegionVo(region);
+          try {
+            const region = await getRegionConfigById(regionStore.regionId);
+            regionStore.applyRegionVo(region);
+          } catch (err) {
+            console.warn('[appDashboard] fetch region by id failed, fallback to list', err);
+            const region = regionStore.regions.find(
+              (r) => (r.regionId || r.id) === regionStore.regionId
+            );
+            if (region) regionStore.applyRegionVo(region);
+          }
         } else if (regionStore.regions.length) {
           const def = regionStore.regions.find((r) => r.isDefault) || regionStore.regions[0];
           const id = def.regionId || def.id;
@@ -121,6 +130,12 @@ export const useAppDashboardStore = defineStore('appDashboard', {
       await loadRegionCatalog(id, { force: true });
 
       this.clearLandingMatrixCache();
+      prefetchLandingMatrix({
+        regionId: id,
+        time: this.timelineTime,
+        hours: FLYABILITY_OVERVIEW_HOURS,
+        appStore: this,
+      });
       dashboardEventBus.emit(DASHBOARD_EVENTS.REGION_CHANGED, { regionId: id });
       await this.refreshWarningCounts();
     },
@@ -129,6 +144,14 @@ export const useAppDashboardStore = defineStore('appDashboard', {
       const iso = time instanceof Date ? toShanghaiIso(time) : String(time);
       this.timelineTime = iso;
       this.timelineBucket = bucketFromIso(iso);
+      if (this.regionId) {
+        prefetchLandingMatrix({
+          regionId: this.regionId,
+          time: iso,
+          hours: FLYABILITY_OVERVIEW_HOURS,
+          appStore: this,
+        });
+      }
       dashboardEventBus.emit(DASHBOARD_EVENTS.MET_TIME_CHANGED, {
         timelineTime: iso,
         bucket: this.timelineBucket,

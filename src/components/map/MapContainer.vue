@@ -34,11 +34,7 @@ import eventManager from '@/cesium/core/eventManager'
 import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus'
 import { fetchWeatherPoint } from '@/api/v2/weather'
 import { ElMessage } from 'element-plus'
-import { attachMetViz } from '@/composables/useMetVizEngine'
-import { useMetVizStore } from '@/store/modules/metViz'
-import { MET_VIZ_WIND_OPTIONS } from '@/met-viz/constants'
-import { shouldAttachMetViz, shouldAttachRegionMeteo } from '@/config/metVizRuntime'
-import { flyToMapPoint } from '@/cesium/core/camera'
+import { shouldAttachRegionMeteo } from '@/config/metVizRuntime'
 
 // 地图容器ID
 const CESIUM_CONTAINER_ID = 'cesiumContainer'
@@ -47,10 +43,8 @@ const windStore = useWindStore()
 const routeStore = useRouteStore()
 const areaStore = useAreaStore()
 const appStore = useAppDashboardStore()
-const metVizStore = useMetVizStore()
 const route = useRoute()
 const regionMeteo = inject('regionMeteo', null)
-const metVizActive = computed(() => shouldAttachMetViz(route))
 const regionMeteoActive = computed(() => shouldAttachRegionMeteo(route))
 
 // 模式切换状态
@@ -59,8 +53,6 @@ const currentMode = ref('overview') // 默认概览模式
 // Cesium实例和控制方法
 let cesiumHooks = null
 let pickHandler = null
-let metVizHandle = null
-let lastMetVizSyncRegionId = null
 
 async function tryAttachRegionMeteo(viewer) {
   if (!regionMeteoActive.value || !regionMeteo || !viewer) return
@@ -69,32 +61,6 @@ async function tryAttachRegionMeteo(viewer) {
   const stepStart = performance.now()
   await regionMeteo.mountOnViewer(viewer)
   console.log(`[MapContainer][Perf] attachRegionMeteo — ${(performance.now() - stepStart).toFixed(1)}ms`)
-}
-
-function syncMetVizFromLayerSettings({ emitEvent = true } = {}) {
-  if (!metVizActive.value) return
-  if (metVizStore.enabled.wind) {
-    layerSettingsStore.setLayerVisibility('wind', true)
-    layerSettingsStore.updateWindOptions(MET_VIZ_WIND_OPTIONS)
-  } else {
-    layerSettingsStore.setLayerVisibility('wind', false)
-  }
-  if (emitEvent) {
-    dashboardEventBus.emit(DASHBOARD_EVENTS.MET_VIZ_CONFIG_CHANGED, {
-      product: metVizStore.product,
-      heightM: metVizStore.heightM,
-      enabled: { ...metVizStore.enabled },
-    })
-  }
-}
-
-async function runMetVizSync(reason) {
-  if (!metVizHandle || !appStore.regionId) return
-  if (appStore.regionId === lastMetVizSyncRegionId) return
-  const stepStart = performance.now()
-  await metVizHandle.sync().catch((err) => console.warn(`[MetViz] sync (${reason})`, err))
-  lastMetVizSyncRegionId = appStore.regionId
-  console.log(`[MapContainer][Perf] metViz sync (${reason}) — ${(performance.now() - stepStart).toFixed(1)}ms`)
 }
 
 // 根据图层配置设置图层显示状态
@@ -117,9 +83,6 @@ const applyLayerVisibilitySettings = () => {
           break
       }
     }
-    if (metVizActive.value) {
-      syncMetVizFromLayerSettings()
-    }
   }
 }
 const loading = ref(true)
@@ -128,7 +91,6 @@ const initializeMap = async () => {
   const mapInitStart = performance.now()
   try {
     cesiumHooks = useCesium(CESIUM_CONTAINER_ID, {
-      enableMetVizWind: metVizActive.value,
       deferRegionLayersToMeteo: regionMeteoActive.value,
     })
     let stepStart = performance.now()
@@ -138,12 +100,7 @@ const initializeMap = async () => {
 
     stepStart = performance.now()
     layerSettingsStore.loadSettingsFromLocal()
-    if (metVizActive.value) {
-      layerSettingsStore.setLayerVisibility('wind', false)
-      metVizStore.setLayerEnabled('wind', false)
-    } else {
-      layerSettingsStore.setLayerVisibility('wind', false)
-    }
+    layerSettingsStore.setLayerVisibility('wind', false)
     applyLayerVisibilitySettings()
     console.log(`[MapContainer][Perf] layerSettings — ${(performance.now() - stepStart).toFixed(1)}ms`)
 
@@ -156,17 +113,7 @@ const initializeMap = async () => {
     }
     console.log(`[MapContainer][Perf] viewerEvents + pickHandler — ${(performance.now() - stepStart).toFixed(1)}ms`)
 
-    if (metVizActive.value) {
-      stepStart = performance.now()
-      metVizHandle = attachMetViz(cesiumHooks.viewer.value)
-      console.log(`[MapContainer][Perf] attachMetViz — ${(performance.now() - stepStart).toFixed(1)}ms`)
-
-      stepStart = performance.now()
-      syncMetVizFromLayerSettings({ emitEvent: false })
-      console.log(`[MapContainer][Perf] syncMetVizFromLayerSettings — ${(performance.now() - stepStart).toFixed(1)}ms`)
-
-      await runMetVizSync('init')
-    } else if (regionMeteoActive.value && regionMeteo) {
+    if (regionMeteoActive.value && regionMeteo) {
       await tryAttachRegionMeteo(cesiumHooks.viewer.value)
     }
 
@@ -267,14 +214,6 @@ function setupPickHandler(viewer) {
       }
     }
 
-    if (metVizActive.value) {
-      const camH = viewer.camera.positionCartographic?.height
-      const focusHeight = Number.isFinite(camH)
-        ? Math.min(Math.max(camH * 0.35, 3000), 15000)
-        : 8000
-      flyToMapPoint(viewer, lng, lat, { height: focusHeight })
-    }
-
     if (regionMeteoActive.value) {
       if (!appStore.pickMode) return
       return
@@ -300,31 +239,6 @@ function destroyPickHandler() {
   pickHandler = null
 }
 
-async function handleMetVizWindChange(enabled) {
-  if (!metVizActive.value || !cesiumHooks) return
-
-  if (!enabled) {
-    layerSettingsStore.setLayerVisibility('wind', false)
-    cesiumHooks.setWindVisibility?.(false)
-    if (metVizHandle) {
-      await metVizHandle.sync().catch((err) => console.warn('[MetViz] wind off sync', err))
-    }
-    return
-  }
-
-  syncMetVizFromLayerSettings({ emitEvent: false })
-  try {
-    await cesiumHooks.ensureWindLayer()
-    if (metVizHandle) {
-      await metVizHandle.sync().catch((err) => console.warn('[MetViz] wind on sync', err))
-    }
-    cesiumHooks.setWindVisibility?.(true)
-    dashboardEventBus.emit(DASHBOARD_EVENTS.WIND_VISIBILITY_SYNC)
-  } catch (err) {
-    console.warn('[MetViz] 风场开启失败', err)
-  }
-}
-
 watch(
   () => appStore.regionId,
   async (id, prevId) => {
@@ -332,16 +246,6 @@ watch(
     if (regionMeteoActive.value && regionMeteo && cesiumHooks?.viewer?.value) {
       await tryAttachRegionMeteo(cesiumHooks.viewer.value)
     }
-    if (!metVizHandle || id === lastMetVizSyncRegionId) return
-    syncMetVizFromLayerSettings({ emitEvent: false })
-    await runMetVizSync('region-changed')
-  }
-)
-
-watch(
-  () => metVizStore.enabled.wind,
-  (on) => {
-    handleMetVizWindChange(on)
   }
 )
 
@@ -356,8 +260,6 @@ onMounted(() => {
 })
 onUnmounted(() => {
   destroyPickHandler()
-  metVizHandle?.destroy()
-  metVizHandle = null
   if (regionMeteoActive.value) {
     regionMeteo?.destroyMap()
   }

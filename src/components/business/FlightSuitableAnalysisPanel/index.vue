@@ -6,7 +6,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import * as echarts from 'echarts';
+import echarts from '@/utils/echarts';
 import { useModuleStore } from "@/store/modules/module";
 import { useDashboardWeatherStore } from "@/store/modules/dashboardWeather";
 import { FLYABILITY_BUCKET_MINUTES, chartStatusColor, chartStatusLabel } from "@/utils/flyabilityChart";

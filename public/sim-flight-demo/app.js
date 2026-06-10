@@ -1,15 +1,18 @@
 import { apiGet, hasAuthToken } from './api.js';
 
 const params = new URLSearchParams(location.search);
+const DEBUG = params.has('debug');
 const ROUTE_COLOR = '#39FF14';
 const PLANE_ID = 'sim_demo_plane';
 const ROUTE_ID = 'sim_demo_route';
+const MODEL_YAW_OFFSET_RAD = Cesium.Math.toRadians(-90);
 
 let viewer = null;
 let routePath = [];
 let mockTimer = null;
 let mockIndex = 0;
 let planeEntity = null;
+let regions = [];
 
 function $(id) {
   return document.getElementById(id);
@@ -20,6 +23,52 @@ function setHud(fields) {
     const el = $(key);
     if (el) el.textContent = value;
   });
+}
+
+function logDebug(...args) {
+  if (DEBUG) console.log('[sim-flight-demo]', ...args);
+}
+
+function resolveTiandituToken() {
+  const fromUrl = params.get('tiandituToken') || params.get('tk');
+  if (fromUrl?.trim()) return fromUrl.trim();
+  const fromInject = window.__SIM_FLIGHT_DEMO_CONFIG__?.tiandituToken;
+  if (fromInject?.trim()) return fromInject.trim();
+  try {
+    const fromStorage = localStorage.getItem('tiandituToken');
+    if (fromStorage?.trim()) return fromStorage.trim();
+  } catch { /* ignore */ }
+  return null;
+}
+
+function useTiandituProxy() {
+  return /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+}
+
+function buildTiandituWmtsUrl(layerKey, tk) {
+  const query =
+    'service=wmts&request=GetTile&version=1.0.0'
+    + '&LAYER=' + layerKey + '&tileMatrixSet=w&TileMatrix={TileMatrix}&TileRow={TileRow}&TileCol={TileCol}'
+    + '&style=default&format=tiles&tk=' + tk;
+  if (useTiandituProxy()) {
+    return '/tianditu-proxy/' + layerKey + '_w/wmts?' + query;
+  }
+  return 'https://{s}.tianditu.gov.cn/' + layerKey + '_w/wmts?' + query;
+}
+
+function computeGeodesicHeading(from, to) {
+  const start = Cesium.Cartographic.fromDegrees(from.lon, from.lat);
+  const end = Cesium.Cartographic.fromDegrees(to.lon, to.lat);
+  return new Cesium.EllipsoidGeodesic(start, end).startHeading;
+}
+
+function planeOrientationFromHeading(position, headingRad) {
+  const base = Cesium.Transforms.headingPitchRollQuaternion(
+    position,
+    new Cesium.HeadingPitchRoll(headingRad, 0, 0),
+  );
+  const modelFix = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, MODEL_YAW_OFFSET_RAD);
+  return Cesium.Quaternion.multiply(base, modelFix, new Cesium.Quaternion());
 }
 
 function catmullRom(p0, p1, p2, p3, t) {
@@ -70,12 +119,34 @@ function createViewer(containerId) {
     terrainProvider: new Cesium.EllipsoidTerrainProvider(),
   });
   viewerInstance.imageryLayers.removeAll();
-  viewerInstance.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    minimumLevel: 1,
-    maximumLevel: 18,
-    enablePickFeatures: false,
-  }));
+  const tk = resolveTiandituToken();
+  if (tk) {
+    viewerInstance.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+      url: buildTiandituWmtsUrl('img', tk),
+      subdomains: ['t0', 't1', 't2', 't3', 't4', 't5', 't6', 't7'],
+      tilingScheme: new Cesium.WebMercatorTilingScheme(),
+      minimumLevel: 1,
+      maximumLevel: 18,
+      enablePickFeatures: false,
+    }));
+    viewerInstance.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+      url: buildTiandituWmtsUrl('cia', tk),
+      subdomains: ['t0', 't1', 't2', 't3', 't4', 't5', 't6', 't7'],
+      tilingScheme: new Cesium.WebMercatorTilingScheme(),
+      minimumLevel: 1,
+      maximumLevel: 18,
+      enablePickFeatures: false,
+    }));
+    logDebug('imagery: tianditu');
+  } else {
+    viewerInstance.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      minimumLevel: 1,
+      maximumLevel: 18,
+      enablePickFeatures: false,
+    }));
+    logDebug('imagery: arcgis (no tianditu token)');
+  }
   viewerInstance.cesiumWidget.creditContainer.style.display = 'none';
   return viewerInstance;
 }
@@ -142,12 +213,10 @@ function startMockFlight() {
       return;
     }
     const next = routePath[Math.min(mockIndex + 1, routePath.length - 1)];
-    const heading = Math.atan2(next.lon - p.lon, next.lat - p.lat);
-    plane.position = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt);
-    plane.orientation = Cesium.Transforms.headingPitchRollQuaternion(
-      plane.position.getValue(Cesium.JulianDate.now()),
-      new Cesium.HeadingPitchRoll(heading, 0, 0),
-    );
+    const heading = computeGeodesicHeading(p, next);
+    const position = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt);
+    plane.position = position;
+    plane.orientation = planeOrientationFromHeading(position, heading);
     viewer.camera.setView({
       destination: Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt + 420),
       orientation: {
@@ -165,12 +234,34 @@ function startMockFlight() {
   }, 120);
 }
 
+function fillRegionSelect(regionId) {
+  const select = $('regionSelect');
+  if (!select) return;
+  select.innerHTML = '';
+  regions.forEach((r) => {
+    const id = r.regionId || r.id;
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = (r.name || id) + ' (' + id + ')';
+    select.appendChild(opt);
+  });
+  if (regionId) select.value = regionId;
+}
+
 async function loadRoutes(regionId) {
   const select = $('routeSelect');
   select.innerHTML = '<option value="">加载中…</option>';
   const page = await apiGet('/routes?regionId=' + encodeURIComponent(regionId) + '&page=1&size=50');
   const records = page?.records || page?.items || [];
+  logDebug('routes loaded', regionId, records.length);
   select.innerHTML = '';
+  if (!records.length) {
+    select.innerHTML = '<option value="">当前 Region 无航路</option>';
+    routePath = [];
+    clearRoute();
+    setHud({ hudStatus: '当前 Region 无航路' });
+    return;
+  }
   records.forEach((r) => {
     const id = r.routeId || r.id;
     const opt = document.createElement('option');
@@ -178,10 +269,8 @@ async function loadRoutes(regionId) {
     opt.textContent = (r.name || id) + ' (' + id + ')';
     select.appendChild(opt);
   });
-  if (records.length) {
-    select.value = records[0].routeId || records[0].id;
-    await loadRouteDetail(select.value);
-  }
+  select.value = records[0].routeId || records[0].id;
+  await loadRouteDetail(select.value);
 }
 
 async function loadRouteDetail(routeId) {
@@ -196,8 +285,9 @@ async function loadRouteDetail(routeId) {
     alt: Number(wp.height ?? wp.altitude ?? flightHeight),
   }));
   routePath = buildCatmullPath3D(control, 120);
+  logDebug('route detail', routeId, control.length, 'pts ->', routePath.length);
   renderRoute(routePath);
-  setHud({ hudStatus: '航路已加载' });
+  setHud({ hudStatus: '航路已加载 (' + routePath.length + ' 点)' });
 }
 
 async function bootstrap() {
@@ -209,17 +299,27 @@ async function bootstrap() {
   viewer = createViewer('map');
   setHud({ hudStatus: '初始化', hudSpeed: '—', hudAlt: '—' });
 
-  const regions = await apiGet('/regions');
+  regions = await apiGet('/regions');
   const list = Array.isArray(regions) ? regions : [];
   const regionId = params.get('regionId')
     || list.find((r) => r.isDefault)?.regionId
     || list[0]?.regionId;
   if (!regionId) throw new Error('无可用 Region');
 
+  fillRegionSelect(regionId);
   await loadRoutes(regionId);
 
+  $('regionSelect')?.addEventListener('change', (e) => {
+    loadRoutes(e.target.value).catch((err) => {
+      console.error('[sim-flight-demo]', err);
+      setHud({ hudStatus: err.message || '加载航路失败' });
+    });
+  });
   $('routeSelect')?.addEventListener('change', (e) => {
-    loadRouteDetail(e.target.value).catch(console.error);
+    loadRouteDetail(e.target.value).catch((err) => {
+      console.error('[sim-flight-demo]', err);
+      setHud({ hudStatus: err.message || '加载航路失败' });
+    });
   });
   $('btnMockStart')?.addEventListener('click', startMockFlight);
   $('btnMockStop')?.addEventListener('click', stopMockFlight);

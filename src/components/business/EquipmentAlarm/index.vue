@@ -30,7 +30,7 @@
 import { ref, onMounted, watch, nextTick } from "vue";
 
 // 导入 ECharts
-import * as echarts from 'echarts';
+import echarts from '@/utils/echarts';
 import { useDeviceStore } from "@/store/modules/device";
 import { computed } from 'vue';
 import { useModuleStore } from "@/store/modules/module";

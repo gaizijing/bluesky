@@ -10,7 +10,31 @@ import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus';
 import { getMapTilesConfig } from '@/config/mapTiles';
 import dashboardConfig from '@/config/dashboard.config.json';
 
+import { getRegionConfigById } from '@/api/v2/region';
+
 let cesiumWindPromise = null;
+
+async function ensureRegionConfigReady(regionStore, appStore) {
+  const regionId = appStore.regionId || regionStore.regionId;
+  if (!regionId) return;
+
+  if (regionStore.regionConfig?.boundaryUrl) return;
+
+  const fromList = regionStore.regions.find(
+    (r) => String(r.regionId || r.id) === String(regionId),
+  );
+  if (fromList?.boundaryUrl) {
+    regionStore.applyRegionVo(fromList);
+    return;
+  }
+
+  try {
+    const detail = await getRegionConfigById(regionId);
+    if (detail) regionStore.applyRegionVo(detail);
+  } catch (err) {
+    console.warn('[RegionMeteo] 拉取 Region 详情失败', regionId, err);
+  }
+}
 
 function ensureCesiumWindScript() {
   if (window.CesiumWind?.WindLayer) return Promise.resolve();
@@ -36,9 +60,21 @@ function buildEngineDeps(appStore, regionStore, attachMode = 'standalone') {
   return {
     attachMode,
     getRegion() {
-      const cfg = regionStore.regionConfig;
-      const regionId = appStore.regionId || cfg?.regionId;
+      const regionId = appStore.regionId || regionStore.regionId || regionStore.regionConfig?.regionId;
       if (!regionId) return null;
+
+      const cfg = regionStore.regionConfig;
+      if (cfg?.boundaryUrl) {
+        return normalizeRegion({ ...cfg, regionId });
+      }
+
+      const fromList = regionStore.regions.find(
+        (r) => String(r.regionId || r.id) === String(regionId),
+      );
+      if (fromList) {
+        return normalizeRegion({ ...fromList, regionId });
+      }
+
       return normalizeRegion({ ...cfg, regionId });
     },
     getTimelineTime: () => appStore.timelineTime,
@@ -58,7 +94,7 @@ function buildEngineDeps(appStore, regionStore, attachMode = 'standalone') {
       tiandituToken: getMapTilesConfig().cesium?.tianditu_token,
       defaultLayers: attachMode === 'dashboard'
         ? dashboardConfig.regionMeteo?.defaultLayers
-        : undefined,
+        : { scalar: true, wind: true },
     }),
   };
 }
@@ -86,7 +122,12 @@ export function useRegionMeteoEngine() {
 
   async function bindEngine(viewer, attachMode) {
     window.Cesium = Cesium;
-    await ensureCesiumWindScript();
+
+    try {
+      await ensureCesiumWindScript();
+    } catch (err) {
+      console.warn('[RegionMeteo] cesium-wind.js 加载失败，风场不可用', err);
+    }
 
     const meteoEngine = new RegionMeteoEngine();
     meteoEngine.onStatusChange = (text, type) => {
@@ -136,6 +177,15 @@ export function useRegionMeteoEngine() {
       })
       : null;
 
+    const offRegionReady = watch(
+      () => appStore.regionId,
+      (id) => {
+        if (id && !meteoEngine.currentRegionId) {
+          meteoEngine.scheduleRegionReload();
+        }
+      },
+    );
+
     return () => {
       offPick();
       offTime?.();
@@ -143,6 +193,7 @@ export function useRegionMeteoEngine() {
       offView();
       offViewEvent?.();
       offResetHome?.();
+      offRegionReady();
       meteoEngine.destroy();
       if (ownsViewer) {
         viewer.destroy();
@@ -157,6 +208,9 @@ export function useRegionMeteoEngine() {
 
   async function initMap(containerEl) {
     if (!containerEl) throw new Error('地图容器未就绪');
+    window.Cesium = Cesium;
+    await appStore.initialize();
+    await ensureRegionConfigReady(regionStore, appStore);
     if (teardown) teardown();
 
     const demoConfig = await loadDemoConfig({
@@ -164,12 +218,18 @@ export function useRegionMeteoEngine() {
     });
     const viewer = createMapViewer(containerEl, demoConfig);
     ownsViewer = true;
+    // 先画出底图，再异步挂载气象引擎（地形/Region 加载可能较慢）
+    viewer.resize();
+    viewer.scene.requestRender();
     teardown = await bindEngine(viewer, 'standalone');
+    viewer.resize();
+    viewer.scene.requestRender();
     return { viewer, engine: engine.value };
   }
 
   async function mountOnViewer(viewer) {
     if (!viewer) throw new Error('viewer 未就绪');
+    await appStore.initialize();
     if (teardown) teardown();
     ownsViewer = false;
     teardown = await bindEngine(viewer, 'dashboard');

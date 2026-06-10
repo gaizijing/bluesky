@@ -6,6 +6,7 @@ import { fetchWeatherPoint } from '@/api/weather';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
 import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus';
 import { useSimLiveGate } from '@/composables/useSimLiveGate';
+import { createCancellableRafScheduler } from '@/utils/rafSchedule';
 
 const IDLE = {
   windSpeedH: 0,
@@ -39,6 +40,7 @@ export function useSimDashboardData() {
   let prevSimTime = 0;
   let weatherTimer = null;
   let offFlight = null;
+  let scheduleSimUpdate = null;
 
   const hasLiveData = hasLiveFlight;
 
@@ -138,9 +140,13 @@ export function useSimDashboardData() {
     }, 800);
   }
 
+  scheduleSimUpdate = createCancellableRafScheduler((data) => {
+    if (hasLiveData.value && data) onSimUpdate(data);
+  });
+
   watch(simData, (val) => {
-    if (hasLiveData.value && val) onSimUpdate(val);
-  }, { deep: true });
+    if (hasLiveData.value && val) scheduleSimUpdate(val);
+  });
 
   onMounted(() => {
     if (hasLiveData.value && simData.value) onSimUpdate(simData.value);
@@ -151,6 +157,7 @@ export function useSimDashboardData() {
 
   onUnmounted(() => {
     offFlight?.();
+    scheduleSimUpdate?.cancel();
     if (weatherTimer) clearTimeout(weatherTimer);
   });
 
