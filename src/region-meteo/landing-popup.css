@@ -29,7 +29,7 @@
   z-index: 1;
   min-height: 168px;
   padding: 16px 34px 36px;
-  background: url('/region-meteo-demo/landing-popup-bg.png') center / 100% 100% no-repeat;
+  background: url('../assets/images/landing-popup-bg.png') center / 100% 100% no-repeat;
   box-sizing: border-box;
 }
 
@@ -77,4 +77,24 @@
 .landing-popup__badge.is-off {
   background: rgba(255, 120, 120, 0.16);
   color: #ffb4b4;
+}
+
+.landing-popup__badge--yellow {
+  background: rgba(249, 115, 22, 0.2);
+  color: #fdba74;
+}
+
+.landing-popup__badge--red {
+  background: rgba(226, 81, 81, 0.2);
+  color: #fca5a5;
+}
+
+.landing-popup__metric--yellow {
+  color: #f97316;
+  font-weight: 600;
+}
+
+.landing-popup__metric--red {
+  color: #e25151;
+  font-weight: 600;
 }

@@ -1,30 +1,36 @@
 <template>
   <div v-if="popup" class="pick-popup" :style="positionStyle">
-    <div class="pick-popup__header">
-      <span>拾取点气象</span>
-      <button type="button" class="pick-popup__close" @click="close">×</button>
-    </div>
-    <AsyncState
-      :loading="false"
-      :error="!!popup.error"
-      :error-message="popup.error"
-      :empty="!popup.weather && !popup.error"
-      empty-text="暂无数据"
-      :stale="popup.weather?.isStale"
-    >
-      <div v-if="popup.weather" class="pick-popup__body">
-        <p>坐标：{{ popup.lng?.toFixed(5) }}, {{ popup.lat?.toFixed(5) }}</p>
-        <p>高度：{{ Math.round(popup.heightM || 0) }} m</p>
-        <p>温度：{{ popup.weather.temperature ?? '—' }} °C</p>
-        <p>风速：{{ popup.weather.windSpeed ?? '—' }} m/s</p>
-        <p>能见度：{{ popup.weather.visibility ?? '—' }} km</p>
-        <div v-if="popup.weather.riskLevel" class="pick-popup__risk">
-          风险：{{ popup.weather.riskLevel }}
-        </div>
+    <div class="landing-popup">
+      <button type="button" class="landing-popup__close" aria-label="关闭" @click="close">×</button>
+      <div class="landing-popup__inner">
+        <h3 class="landing-popup__title">拾取点气象</h3>
+        <AsyncState
+          :loading="false"
+          :error="!!popup.error"
+          :error-message="popup.error"
+          :empty="!popup.weather && !popup.error"
+          empty-text="暂无数据"
+          :stale="popup.weather?.isStale"
+        >
+          <div v-if="popup.weather" class="pick-popup__body">
+            <p class="landing-popup__row">坐标：{{ popup.lng?.toFixed(5) }}, {{ popup.lat?.toFixed(5) }}</p>
+            <p class="landing-popup__row">高度：{{ Math.round(popup.heightM || 0) }} m</p>
+            <p
+              v-for="metric in metricRows"
+              :key="metric.key"
+              class="landing-popup__row"
+              :class="metric.levelClass"
+            >
+              {{ metric.label }}：{{ metric.text }}
+            </p>
+            <p v-if="riskBadge" class="landing-popup__row">
+              <span class="landing-popup__badge" :class="riskBadge.className">
+                R_met {{ riskBadge.text }}
+              </span>
+            </p>
+          </div>
+        </AsyncState>
       </div>
-    </AsyncState>
-    <div class="pick-popup__actions">
-      <el-button size="small" @click="close">关闭</el-button>
     </div>
   </div>
 </template>
@@ -33,6 +39,12 @@
 import { computed } from 'vue';
 import AsyncState from '@/components/common/AsyncState.vue';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
+import {
+  evaluateWeatherFlyability,
+  metricLevelClass,
+  riskBadgeClass,
+} from '@/utils/flyabilityEvaluate';
+import '@/region-meteo/landing-popup.css';
 
 const appStore = useAppDashboardStore();
 
@@ -41,8 +53,64 @@ const popup = computed(() => appStore.pickPopup);
 const positionStyle = computed(() => ({
   left: '50%',
   top: '120px',
-  transform: 'translateX(-50%)',
+  transform: 'translate(-50%, 0)',
 }));
+
+function formatMetric(value, unit = '') {
+  if (value == null || value === '') return '—';
+  const n = Number(value);
+  if (Number.isFinite(n)) return `${n.toFixed(1)}${unit ? ` ${unit}` : ''}`;
+  return String(value);
+}
+
+const metricRows = computed(() => {
+  const weather = popup.value?.weather;
+  if (!weather) return [];
+
+  const levels = evaluateWeatherFlyability(weather);
+  return [
+    {
+      key: 'temperature',
+      label: '温度',
+      text: formatMetric(weather.temperature, '°C'),
+      levelClass: metricLevelClass(levels.temperatureC),
+    },
+    {
+      key: 'windSpeed',
+      label: '风速',
+      text: formatMetric(weather.windSpeed, 'm/s'),
+      levelClass: metricLevelClass(levels.windSpeedMs),
+    },
+    {
+      key: 'visibility',
+      label: '能见度',
+      text: formatMetric(weather.visibility, 'km'),
+      levelClass: metricLevelClass(levels.visibilityKm),
+    },
+    {
+      key: 'humidity',
+      label: '湿度',
+      text: formatMetric(weather.humidity, '%'),
+      levelClass: '',
+    },
+    {
+      key: 'precipitation',
+      label: '降水',
+      text: formatMetric(weather.precipitation, 'mm/h'),
+      levelClass: metricLevelClass(levels.precipMmH),
+    },
+  ];
+});
+
+const riskBadge = computed(() => {
+  const risk = popup.value?.weather?.risk;
+  if (!risk) return null;
+  const text = risk.value != null ? formatMetric(risk.value, '') : (risk.level || '—');
+  return {
+    text,
+    className: riskBadgeClass(risk.level),
+  };
+});
 
 function close() {
   appStore.closePickPopup();
@@ -53,43 +121,13 @@ function close() {
 .pick-popup {
   position: absolute;
   z-index: 25;
-  width: 320px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: rgba(15, 23, 51, 0.95);
-  border: 1px solid rgba(96, 165, 250, 0.35);
-  color: #fff;
+  width: 220px;
+  max-width: min(220px, 78vw);
   pointer-events: auto;
 }
 
-.pick-popup__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-
-.pick-popup__close {
-  border: none;
-  background: transparent;
-  color: #fff;
-  font-size: 20px;
-  cursor: pointer;
-}
-
 .pick-popup__body {
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.pick-popup__risk {
-  margin-top: 6px;
-  color: #fbbf24;
-}
-
-.pick-popup__actions {
-  margin-top: 10px;
-  text-align: right;
+  font-size: 14px;
+  line-height: 1.45;
 }
 </style>

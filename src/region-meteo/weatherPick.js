@@ -1,4 +1,9 @@
 import { apiGet } from './apiAdapter.js';
+import {
+  evaluateWeatherFlyability,
+  metricLevelClass,
+  riskBadgeClass,
+} from '@/utils/flyabilityEvaluate.js';
 
 function fmtCoord(n) {
   return typeof n === 'number' && Number.isFinite(n) ? n.toFixed(5) : '—';
@@ -9,6 +14,14 @@ function fmtMetric(value, unit) {
   const n = Number(value);
   if (Number.isFinite(n)) return n.toFixed(1) + (unit ? ' ' + unit : '');
   return String(value);
+}
+
+function metricRow(label, valueText, level) {
+  const cls = metricLevelClass(level);
+  const valueHtml = cls
+    ? '<span class="' + cls + '">' + valueText + '</span>'
+    : valueText;
+  return { html: label + '：' + valueHtml };
 }
 
 export function initWeatherPick(viewer, popup, getHeightM, getTimelineTime) {
@@ -55,18 +68,24 @@ export function initWeatherPick(viewer, popup, getHeightM, getTimelineTime) {
         + '&includeRisk=true'
         + '&time=now';
       const data = await apiGet(q, { time });
+      const levels = evaluateWeatherFlyability(data);
       const rows = [
         { text: '坐标：' + fmtCoord(lng) + ', ' + fmtCoord(lat) },
         { text: '高度层：' + heightM + ' m' },
-        { text: '温度：' + fmtMetric(data?.temperature, '°C') },
-        { text: '风速：' + fmtMetric(data?.windSpeed, 'm/s') },
-        { text: '能见度：' + fmtMetric(data?.visibility, 'km') },
+        metricRow('温度', fmtMetric(data?.temperature, '°C'), levels.temperatureC),
+        metricRow('风速', fmtMetric(data?.windSpeed, 'm/s'), levels.windSpeedMs),
+        metricRow('能见度', fmtMetric(data?.visibility, 'km'), levels.visibilityKm),
         { text: '湿度：' + fmtMetric(data?.humidity, '%') },
-        { text: '降水：' + fmtMetric(data?.precipitation, 'mm/h') },
+        metricRow('降水', fmtMetric(data?.precipitation, 'mm/h'), levels.precipMmH),
       ];
-      if (data?.riskLevel || data?.rMet != null) {
-        const risk = data.rMet != null ? fmtMetric(data.rMet, '') : (data.riskLevel || '—');
-        rows.push({ html: '<span class="landing-popup__badge">R_met ' + risk + '</span>' });
+      const risk = data?.risk;
+      if (risk?.level || risk?.value != null) {
+        const riskText = risk.value != null ? fmtMetric(risk.value, '') : (risk.level || '—');
+        const badgeCls = 'landing-popup__badge ' + riskBadgeClass(risk.level);
+        rows.push({ html: '<span class="' + badgeCls.trim() + '">R_met ' + riskText + '</span>' });
+      } else if (data?.riskLevel || data?.rMet != null) {
+        const riskText = data.rMet != null ? fmtMetric(data.rMet, '') : (data.riskLevel || '—');
+        rows.push({ html: '<span class="landing-popup__badge">R_met ' + riskText + '</span>' });
       }
       if (data?.isStale) {
         rows.push({ text: '（数据可能滞后）' });
