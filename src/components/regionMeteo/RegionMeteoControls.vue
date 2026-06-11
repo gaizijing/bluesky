@@ -61,27 +61,22 @@
                   </div>
                 </div>
                 <div class="controls-col">
-                  <span class="ctrl-label">高度层</span>
-                  <div class="height-block">
-                    <div class="height-ticks">
-                      <span
-                        v-for="h in state?.heightLevelsM || []"
-                        :key="h"
-                        class="height-tick"
-                        :class="{ 'is-active': state?.currentHeightM === h }"
-                      >
-                        {{ h }}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      :min="0"
-                      :max="Math.max(0, (state?.heightLevelsM?.length || 1) - 1)"
-                      step="1"
-                      :value="heightSliderIndex"
-                      aria-label="选择高度层"
-                      @input="onHeightInput"
-                    />
+                  <span class="ctrl-label">高度层（可多选叠加）</span>
+                  <div class="height-multi">
+                    <label
+                      v-for="h in state?.heightLevelsM || []"
+                      :key="h"
+                      class="height-multi__item"
+                      :class="{ 'is-active': isHeightActive(h) }"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="isHeightActive(h)"
+                        :disabled="state?.meteoControlsDisabled || (isHeightActive(h) && activeHeightCount <= 1)"
+                        @change="onHeightToggle(h, $event.target.checked)"
+                      />
+                      <span>{{ h }}m</span>
+                    </label>
                   </div>
                 </div>
               </div>
@@ -163,11 +158,11 @@ const layerItems = [
   { key: 'wind', label: '风场' },
 ];
 
-const heightSliderIndex = computed(() => {
-  const levels = state.value?.heightLevelsM || [];
-  const idx = levels.indexOf(state.value?.currentHeightM);
-  return idx >= 0 ? idx : 0;
-});
+const activeHeightCount = computed(() => state.value?.activeHeightsM?.length || 0);
+
+function isHeightActive(heightM) {
+  return (state.value?.activeHeightsM || []).includes(heightM);
+}
 
 function onLayerToggle(key, enabled) {
   regionMeteo?.setLayerToggle(key, enabled)?.catch((err) => {
@@ -175,10 +170,7 @@ function onLayerToggle(key, enabled) {
   });
 }
 
-function onHeightInput(event) {
-  const idx = Number(event.target.value);
-  const levels = state.value?.heightLevelsM || [];
-  const heightM = levels[idx] ?? levels[0];
-  if (heightM != null) regionMeteo?.setHeightM(heightM);
+function onHeightToggle(heightM, enabled) {
+  regionMeteo?.toggleHeightM(heightM, enabled);
 }
 </script>

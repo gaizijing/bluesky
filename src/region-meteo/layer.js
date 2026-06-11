@@ -3,14 +3,31 @@ import { buildKrigingColors } from './colormaps.js';
 import { plotIsobands } from './isobands.js';
 
 let viewer = null;
-let primitive = null;
+/** @type {Map<string, { primitive: object|null, drawCache: object|null }>} */
+const layersByHeight = new Map();
 let offscreenCanvas = null;
-let drawCache = null;
 let alpha = 0.72;
 let showIsoSurface = true;
 let demoConfig = null;
 
 const colorRampCache = new Map();
+
+function layerKey(heightM) {
+  return String(heightM);
+}
+
+function getLayerEntry(heightM) {
+  const key = layerKey(heightM);
+  if (!layersByHeight.has(key)) {
+    layersByHeight.set(key, { primitive: null, drawCache: null });
+  }
+  return layersByHeight.get(key);
+}
+
+function effectiveLayerAlpha() {
+  const count = Math.max(1, layersByHeight.size);
+  return Math.max(0.18, alpha / count);
+}
 
 function getColors(product) {
   if (!colorRampCache.has(product)) {
@@ -26,7 +43,7 @@ function getCanvas(w, h) {
   return offscreenCanvas;
 }
 
-function paintCanvas() {
+function paintCanvas(drawCache) {
   if (!drawCache) return null;
   const {
     grid, xMin, xMax, yMin, yMax, colors, zlim, canvasW, canvasH,
@@ -42,18 +59,20 @@ function paintCanvas() {
   return canvas;
 }
 
-function removePrimitive() {
-  if (primitive && viewer && !viewer.isDestroyed()) {
-    viewer.scene.primitives.remove(primitive);
+function removePrimitiveForHeight(heightM) {
+  const entry = getLayerEntry(heightM);
+  if (entry.primitive && viewer && !viewer.isDestroyed()) {
+    viewer.scene.primitives.remove(entry.primitive);
   }
-  primitive = null;
+  entry.primitive = null;
 }
 
-function applyCanvas(canvas) {
-  if (!drawCache || !viewer) return;
-  const { xMin, yMin, xMax, yMax, heightM } = drawCache;
-  removePrimitive();
-  primitive = viewer.scene.primitives.add(
+function applyCanvasForHeight(heightM) {
+  const entry = getLayerEntry(heightM);
+  if (!entry.drawCache || !viewer) return;
+  const { xMin, yMin, xMax, yMax } = entry.drawCache;
+  removePrimitiveForHeight(heightM);
+  entry.primitive = viewer.scene.primitives.add(
     new Cesium.Primitive({
       geometryInstances: new Cesium.GeometryInstance({
         geometry: new Cesium.RectangleGeometry({
@@ -65,11 +84,13 @@ function applyCanvas(canvas) {
       appearance: new Cesium.EllipsoidSurfaceAppearance({ aboveGround: true }),
     }),
   );
-  primitive.appearance.material = new Cesium.Material({
+  const canvas = paintCanvas(entry.drawCache);
+  if (!canvas) return;
+  entry.primitive.appearance.material = new Cesium.Material({
     fabric: {
       type: 'Image',
       uniforms: {
-        color: { alpha },
+        color: { alpha: effectiveLayerAlpha() },
         image: canvas.toDataURL('image/png'),
       },
     },
@@ -83,8 +104,11 @@ export function initLayer(mapViewer, config) {
 
 export function setLayerAlpha(value) {
   alpha = value;
-  const uniforms = primitive?.appearance?.material?.uniforms;
-  if (uniforms?.color) uniforms.color.alpha = alpha;
+  const layerAlpha = effectiveLayerAlpha();
+  layersByHeight.forEach((entry) => {
+    const uniforms = entry.primitive?.appearance?.material?.uniforms;
+    if (uniforms?.color) uniforms.color.alpha = layerAlpha;
+  });
   viewer?.scene?.requestRender();
 }
 
@@ -93,12 +117,26 @@ export function setIsoSurface(enabled) {
 }
 
 export function clearLayerCache() {
-  drawCache = null;
+  layersByHeight.forEach((entry) => {
+    entry.drawCache = null;
+  });
 }
 
 export function refreshFromCache() {
-  const canvas = paintCanvas();
-  if (canvas) applyCanvas(canvas);
+  layersByHeight.forEach((entry, key) => {
+    if (!entry.drawCache) return;
+    const canvas = paintCanvas(entry.drawCache);
+    if (!canvas || !entry.primitive) return;
+    entry.primitive.appearance.material = new Cesium.Material({
+      fabric: {
+        type: 'Image',
+        uniforms: {
+          color: { alpha: effectiveLayerAlpha() },
+          image: canvas.toDataURL('image/png'),
+        },
+      },
+    });
+  });
   viewer?.scene?.requestRender();
 }
 
@@ -127,12 +165,12 @@ export function renderKrigingLayer(points, boundaryRing, heightM, product) {
   const variogram = kriging.train(values, lngs, lats, 'exponential', 0, 100);
   const grid = kriging.grid([boundaryRing], variogram, gridStep);
 
-  drawCache = {
-    grid, xMin, xMax, yMin, yMax, colors, zlim, heightM, canvasW, canvasH,
+  const entry = getLayerEntry(heightM);
+  entry.drawCache = {
+    grid, xMin, xMax, yMin, yMax, colors, zlim, heightM, canvasW, canvasH, product,
   };
 
-  const canvas = paintCanvas();
-  applyCanvas(canvas);
+  applyCanvasForHeight(heightM);
 
   return {
     samples: points.length,
@@ -142,12 +180,26 @@ export function renderKrigingLayer(points, boundaryRing, heightM, product) {
   };
 }
 
+export function removeLayerAtHeight(heightM) {
+  removePrimitiveForHeight(heightM);
+  layersByHeight.delete(layerKey(heightM));
+  viewer?.scene?.requestRender();
+}
+
 export function setLayerVisible(show) {
-  if (primitive) primitive.show = show;
+  layersByHeight.forEach((entry) => {
+    if (entry.primitive) entry.primitive.show = show;
+  });
 }
 
 export function destroyLayer() {
-  removePrimitive();
-  drawCache = null;
+  Array.from(layersByHeight.keys()).forEach((key) => {
+    removePrimitiveForHeight(Number(key));
+  });
+  layersByHeight.clear();
   viewer = null;
+}
+
+export function getActiveLayerHeights() {
+  return Array.from(layersByHeight.keys()).map(Number).sort((a, b) => a - b);
 }

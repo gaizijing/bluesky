@@ -118,6 +118,7 @@ export const useAppDashboardStore = defineStore('appDashboard', {
         this.view = 'home';
         this.focus = { type: 'none' };
         this.routeIdForSim = null;
+        this.simSessionId = null;
       }
 
       const regionStore = useRegionStore();

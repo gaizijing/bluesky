@@ -4,6 +4,13 @@ import { useIsimStore } from '@/components/business/IsimAnimation/isimStore';
 import { useHeatmapStore } from '@/store/modules/heatmap';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
 import { getRouteDetail } from '@/api/v2/route';
+import {
+  createSimSession,
+  bindSimRoute,
+  connectSimSession,
+  disconnectSimSession as disconnectSimSessionApi,
+  controlSimSession,
+} from '@/api/v2/sim';
 import request from '@/utils/request';
 
 const CONFIG_KEY = 'isim_connection_config';
@@ -52,6 +59,22 @@ function stopDebugSendingTimer() {
   }
 }
 
+async function ensureSimSession(appStore, routeId) {
+  const regionId = appStore.regionId;
+  if (!regionId) throw new Error('Region 未就绪');
+
+  if (!appStore.simSessionId) {
+    const session = await createSimSession(regionId, routeId || null);
+    appStore.simSessionId = session.sessionId;
+    return session.sessionId;
+  }
+
+  if (routeId) {
+    await bindSimRoute(appStore.simSessionId, routeId);
+  }
+  return appStore.simSessionId;
+}
+
 /** 断开 ISIM 联飞会话（供 goHome 等全局入口调用） */
 export async function disconnectSimSession() {
   const isimStore = useIsimStore();
@@ -64,7 +87,12 @@ export async function disconnectSimSession() {
   }
 
   try {
-    await request.post('/isim/disconnect', {}, ISIM_REQ);
+    if (appStore.simSessionId) {
+      await disconnectSimSessionApi(appStore.simSessionId);
+      appStore.simSessionId = null;
+    } else {
+      await request.post('/isim/disconnect', {}, ISIM_REQ);
+    }
     disconnect();
     appStore.simConnected = false;
     isimStore.updateConnectionStatus('disconnected');
@@ -155,7 +183,11 @@ export function useIsimConnection() {
     resetConnectPromise();
 
     try {
-      const data = await request.post('/isim/update-target', config.value, ISIM_REQ);
+      const routeId =
+        appStore.routeIdForSim
+        || (appStore.focus.type === 'route' ? appStore.focus.id : null);
+      const sessionId = await ensureSimSession(appStore, routeId);
+      const data = await connectSimSession(sessionId, config.value);
 
       try {
         await connect();
@@ -236,7 +268,12 @@ export function useIsimConnection() {
   async function controlIsim(command) {
     isControlling.value = true;
     try {
-      const data = await request.post('/isim/control', { command }, ISIM_REQ);
+      let data;
+      if (appStore.simSessionId) {
+        data = await controlSimSession(appStore.simSessionId, command);
+      } else {
+        data = await request.post('/isim/control', { command }, ISIM_REQ);
+      }
       sendingStatus.value = data?.status ?? sendingStatus.value;
       sendStatusMessage.value =
         data?.message || CONTROL_STATUS_MESSAGES[data?.status] || '';

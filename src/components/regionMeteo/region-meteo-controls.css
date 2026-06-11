@@ -241,6 +241,29 @@
   text-shadow: var(--shadow), 0 0 12px rgba(0, 212, 255, 0.35);
 }
 
+.region-meteo-controls-root .height-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.region-meteo-controls-root .height-multi__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.region-meteo-controls-root .height-multi__item.is-active {
+  color: var(--accent);
+}
+
+.region-meteo-controls-root .height-multi__item input {
+  accent-color: var(--accent);
+}
+
 .region-meteo-controls-root .height-block {
   display: flex;
   flex-direction: column;

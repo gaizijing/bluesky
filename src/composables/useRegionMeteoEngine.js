@@ -11,6 +11,7 @@ import { getMapTilesConfig } from '@/config/mapTiles';
 import dashboardConfig from '@/config/dashboard.config.json';
 
 import { getRegionConfigById } from '@/api/v2/region';
+import { locateWarningTarget } from '@/region-meteo/regionOverlays';
 
 let cesiumWindPromise = null;
 
@@ -177,6 +178,12 @@ export function useRegionMeteoEngine() {
       })
       : null;
 
+    const offWarningLocate = attachMode === 'dashboard'
+      ? dashboardEventBus.on(DASHBOARD_EVENTS.WARNING_LOCATE, (payload) => {
+        locateWarningTarget(payload);
+      })
+      : null;
+
     const offRegionReady = watch(
       () => appStore.regionId,
       (id) => {
@@ -193,6 +200,7 @@ export function useRegionMeteoEngine() {
       offView();
       offViewEvent?.();
       offResetHome?.();
+      offWarningLocate?.();
       offRegionReady();
       meteoEngine.destroy();
       if (ownsViewer) {
@@ -257,6 +265,16 @@ export function useRegionMeteoEngine() {
     syncEngineState();
   }
 
+  function setActiveHeights(heights) {
+    engine.value?.setActiveHeights(heights);
+    syncEngineState();
+  }
+
+  function toggleHeightM(heightM, enabled) {
+    engine.value?.toggleHeightM(heightM, enabled);
+    syncEngineState();
+  }
+
   function setAlpha(value) {
     engine.value?.setAlpha(value);
     syncEngineState();
@@ -282,6 +300,8 @@ export function useRegionMeteoEngine() {
     setLayerToggle,
     setProduct,
     setHeightM,
+    setActiveHeights,
+    toggleHeightM,
     setAlpha,
     setIsoSurface,
     togglePickMode,

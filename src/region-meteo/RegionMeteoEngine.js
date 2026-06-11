@@ -15,7 +15,9 @@ import {
   clearLayerCache,
   refreshFromCache,
   renderKrigingLayer,
+  removeLayerAtHeight,
   destroyLayer,
+  getActiveLayerHeights,
 } from './layer.js';
 import {
   buildKrigingColors,
@@ -81,6 +83,7 @@ export class RegionMeteoEngine {
     this.currentRegionId = '';
     this.currentProduct = 'temperature';
     this.currentHeightM = 100;
+    this.activeHeightsM = [100];
     this.alpha = 0.72;
     this.showIsoSurface = true;
     this.gridLoadSeq = 0;
@@ -119,6 +122,7 @@ export class RegionMeteoEngine {
       layers: { ...this.layers },
       currentProduct: this.currentProduct,
       currentHeightM: this.currentHeightM,
+      activeHeightsM: [...this.activeHeightsM],
       alpha: this.alpha,
       showIsoSurface: this.showIsoSurface,
       productOptions: this.demoConfig?.productOptions ?? [],
@@ -159,6 +163,7 @@ export class RegionMeteoEngine {
 
     this.currentProduct = normalizeProduct(this.demoConfig.defaultProduct || 'temperature');
     this.currentHeightM = this.demoConfig.heightLevelsM[0] ?? 100;
+    this.activeHeightsM = [this.currentHeightM];
 
     initLayer(viewer, this.demoConfig);
     setLayerAlpha(this.alpha);
@@ -217,7 +222,7 @@ export class RegionMeteoEngine {
     if (!this.layers.scalar) return;
     clearTimeout(this.reloadTimer);
     this.reloadTimer = setTimeout(() => {
-      this.loadGridLayer().catch((err) => {
+      this.loadGridLayers().catch((err) => {
         if (err.name === 'AbortError') return;
         console.error('[region-meteo]', err);
         this.setStatus(err.message || '标量场加载失败', 'error');
@@ -282,7 +287,7 @@ export class RegionMeteoEngine {
     this.setStatus(statusText, result.parts.length ? 'ok' : 'error');
 
     if (this.layers.scalar) {
-      await this.loadGridLayer().catch((err) => {
+      await this.loadGridLayers().catch((err) => {
         this.setStatus(err.message || '标量场加载失败', 'error');
       });
     }
@@ -300,11 +305,13 @@ export class RegionMeteoEngine {
     this.viewer?.scene?.requestRender?.();
   }
 
-  async loadGridLayer(opts = {}) {
+  async loadGridLayers(opts = {}) {
     if (!this.layers.scalar) return;
 
     const product = normalizeProduct(opts.product ?? this.currentProduct);
-    const heightM = opts.heightM ?? this.currentHeightM;
+    const heights = opts.heights ?? this.activeHeightsM;
+    if (!heights.length) return;
+
     const req = ++this.gridLoadSeq;
     const time = this.resolveTime();
 
@@ -313,100 +320,87 @@ export class RegionMeteoEngine {
     const { signal } = this.abortController;
 
     this.currentProduct = product;
-    this.currentHeightM = heightM;
 
     const meta = getProductMeta(product);
-    this.setStatus(heightM + 'm · ' + meta.label + ' 加载中…', 'loading');
+    const heightLabel = heights.length > 1 ? heights.join('/') + 'm' : heights[0] + 'm';
+    this.setStatus(heightLabel + ' · ' + meta.label + ' 加载中…', 'loading');
 
     const region = this.currentRegion;
     if (!region?.boundaryUrl) throw new Error('Region 无 boundaryUrl');
 
-    let points;
-    if (product === 'rmet') {
-      const riskPath =
-        '/risk/heatmap?regionId=' + encodeURIComponent(this.currentRegionId)
-        + '&heightM=' + heightM
-        + '&time=now';
-      const [riskData, boundaryRing] = await Promise.all([
-        apiGet(riskPath, { signal, time }),
-        fetchBoundaryRing(region.boundaryUrl),
-      ]);
+    const boundaryRing = await fetchBoundaryRing(region.boundaryUrl);
+    if (req !== this.gridLoadSeq || !this.layers.scalar) return;
+
+    const staleHeights = getActiveLayerHeights().filter((h) => !heights.includes(h));
+    staleHeights.forEach((h) => removeLayerAtHeight(h));
+
+    const results = [];
+    for (const heightM of heights) {
       if (req !== this.gridLoadSeq || !this.layers.scalar) return;
 
-      const cells = Array.isArray(riskData?.cells) ? riskData.cells : [];
-      if (!cells.length) {
-        throw new Error(
-          'R_met 风险格点为空，请确认后端风险热力已计算（POST /api/scheduler/recompute?regionId='
-          + this.currentRegionId + '）',
-        );
-      }
-      points = subsamplePoints(riskCellsToFeatures(cells), this.demoConfig.maxKrigingSamples);
-      if (points.length < 4) throw new Error('R_met 有效格点不足: ' + points.length);
+      let points;
+      if (product === 'rmet') {
+        const riskPath =
+          '/risk/heatmap?regionId=' + encodeURIComponent(this.currentRegionId)
+          + '&heightM=' + heightM
+          + '&time=now';
+        const riskData = await apiGet(riskPath, { signal, time });
+        if (req !== this.gridLoadSeq || !this.layers.scalar) return;
 
-      this.setStatus(heightM + 'm · 计算 R_met 插值…', 'loading');
+        const cells = Array.isArray(riskData?.cells) ? riskData.cells : [];
+        if (!cells.length) {
+          throw new Error(
+            'R_met 风险格点为空，请确认后端风险热力已计算（POST /api/scheduler/recompute?regionId='
+            + this.currentRegionId + '）',
+          );
+        }
+        points = subsamplePoints(riskCellsToFeatures(cells), this.demoConfig.maxKrigingSamples);
+        if (points.length < 4) throw new Error('R_met 有效格点不足: ' + points.length);
+      } else {
+        const apiProduct = toApiProduct(product);
+        const gridPath =
+          '/weather/grid-field?regionId=' + encodeURIComponent(this.currentRegionId)
+          + '&product=' + encodeURIComponent(apiProduct)
+          + '&heightM=' + heightM
+          + '&time=now';
+        const gridData = await apiGet(gridPath, { signal, time });
+        if (req !== this.gridLoadSeq || !this.layers.scalar) return;
+
+        if (gridData?.cacheMiss || !gridData?.grid?.length) {
+          throw new Error(
+            meta.label + ' 格点缓存未命中，请重启后端触发 Flyway V21 或 POST /api/scheduler/recompute?regionId='
+            + this.currentRegionId,
+          );
+        }
+        points = subsamplePoints(
+          gridToFeatures(gridData.grid),
+          this.demoConfig.maxKrigingSamples,
+        );
+        if (points.length < 4) throw new Error('有效格点不足: ' + points.length);
+      }
+
+      this.setStatus(heightM + 'm · 计算插值…', 'loading');
       await yieldToMain();
       if (req !== this.gridLoadSeq || !this.layers.scalar) return;
 
       const t0 = performance.now();
       renderKrigingLayer(points, boundaryRing, heightM, product);
-      setLayerVisible(true);
-      this.viewer?.scene?.requestRender();
       const ms = (performance.now() - t0).toFixed(0);
       const vals = points.map((p) => p.value);
-      this.setStatus(
-        heightM + 'm · R_met · '
-        + formatLegendValue(Math.min(...vals), product) + ' ~ '
-        + formatLegendValue(Math.max(...vals), product)
-        + ' · ' + ms + 'ms',
-        'ok',
-      );
-      return;
+      results.push({
+        heightM,
+        min: formatLegendValue(Math.min(...vals), product),
+        max: formatLegendValue(Math.max(...vals), product),
+        ms,
+      });
     }
 
-    const apiProduct = toApiProduct(product);
-    const gridPath =
-      '/weather/grid-field?regionId=' + encodeURIComponent(this.currentRegionId)
-      + '&product=' + encodeURIComponent(apiProduct)
-      + '&heightM=' + heightM
-      + '&time=now';
-
-    const [gridData, boundaryRing] = await Promise.all([
-      apiGet(gridPath, { signal, time }),
-      fetchBoundaryRing(region.boundaryUrl),
-    ]);
-    if (req !== this.gridLoadSeq || !this.layers.scalar) return;
-
-    if (gridData?.cacheMiss || !gridData?.grid?.length) {
-      throw new Error(
-        meta.label + ' 格点缓存未命中，请重启后端触发 Flyway V21 或 POST /api/scheduler/recompute?regionId='
-        + this.currentRegionId,
-      );
-    }
-
-    points = subsamplePoints(
-      gridToFeatures(gridData.grid),
-      this.demoConfig.maxKrigingSamples,
-    );
-    if (points.length < 4) throw new Error('有效格点不足: ' + points.length);
-
-    this.setStatus(heightM + 'm · 计算插值…', 'loading');
-    await yieldToMain();
-    if (req !== this.gridLoadSeq || !this.layers.scalar) return;
-
-    const t0 = performance.now();
-    renderKrigingLayer(points, boundaryRing, heightM, product);
+    setLayerAlpha(this.alpha);
     setLayerVisible(true);
     this.viewer?.scene?.requestRender();
-    const ms = (performance.now() - t0).toFixed(0);
 
-    const vals = points.map((p) => p.value);
-    this.setStatus(
-      heightM + 'm · ' + meta.label + ' · '
-      + formatLegendValue(Math.min(...vals), product) + ' ~ '
-      + formatLegendValue(Math.max(...vals), product)
-      + ' · ' + ms + 'ms',
-      'ok',
-    );
+    const summary = results.map((r) => r.heightM + 'm ' + r.min + '~' + r.max).join(' · ');
+    this.setStatus(heightLabel + ' · ' + meta.label + ' · ' + summary, 'ok');
   }
 
   async loadWindIfEnabled() {
@@ -440,7 +434,7 @@ export class RegionMeteoEngine {
           initLayer(this.viewer, this.demoConfig);
           setLayerAlpha(this.alpha);
           setIsoSurface(this.showIsoSurface);
-          await this.loadGridLayer().catch((err) => {
+          await this.loadGridLayers().catch((err) => {
             this.setStatus(err.message || '标量场加载失败', 'error');
           });
         } else {
@@ -479,9 +473,25 @@ export class RegionMeteoEngine {
   }
 
   setHeightM(heightM) {
-    this.currentHeightM = heightM;
+    this.setActiveHeights([heightM]);
+  }
+
+  setActiveHeights(heights) {
+    const sorted = [...new Set(heights.map((h) => Number(h)).filter((h) => Number.isFinite(h)))].sort((a, b) => a - b);
+    if (!sorted.length) return;
+    this.activeHeightsM = sorted;
+    this.currentHeightM = sorted[0];
     if (this.layers.scalar) this.scheduleTimeReload();
-    if (this.layers.wind && isWindLayerActive()) setWindHeightM(heightM);
+    if (this.layers.wind && isWindLayerActive()) setWindHeightM(this.currentHeightM);
+  }
+
+  toggleHeightM(heightM, enabled) {
+    const h = Number(heightM);
+    const next = enabled
+      ? [...new Set([...this.activeHeightsM, h])].sort((a, b) => a - b)
+      : this.activeHeightsM.filter((item) => item !== h);
+    if (!next.length) return;
+    this.setActiveHeights(next);
   }
 
   setAlpha(value) {

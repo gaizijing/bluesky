@@ -106,7 +106,7 @@
                 "id": "windVerticalProfile",
                 "title": "垂直剖面",
                 "visible": true,
-                "height": "58%",
+                "height": "45%",
                 "order": 1,
                 "component": "components/dashboard/panels/drillLanding/WindVerticalProfilePanel.vue"
               },
@@ -114,9 +114,17 @@
                 "id": "surveillanceFootage",
                 "title": "实时监控",
                 "visible": true,
-                "height": "40%",
+                "height": "30%",
                 "order": 2,
                 "component": "components/dashboard/panels/drillLanding/SurveillanceFootagePanel.vue"
+              },
+              {
+                "id": "landingWarnings",
+                "title": "关联预警",
+                "visible": true,
+                "height": "15%",
+                "order": 3,
+                "component": "components/dashboard/panels/drillLanding/LandingWarningsPanel.vue"
               }
             ]
           }
@@ -140,7 +148,30 @@
               }
             ]
           },
-        
+          {
+            "id": "drill-route-right",
+            "module": "routeRisk",
+            "region": "right",
+            "width": "25%",
+            "panels": [
+              {
+                "id": "avoidanceInfo",
+                "title": "避险信息",
+                "visible": true,
+                "height": "38%",
+                "order": 1,
+                "component": "components/dashboard/panels/drillRoute/RouteAvoidancePanel.vue"
+              },
+              {
+                "id": "routeWarnings",
+                "title": "关联预警",
+                "visible": true,
+                "height": "30%",
+                "order": 2,
+                "component": "components/dashboard/panels/drillRoute/RouteWarningsPanel.vue"
+              }
+            ]
+          },
           {
             "id": "drill-route-bottom",
             "module": "routeProfile",

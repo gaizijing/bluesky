@@ -72,6 +72,26 @@ export function syncDrillMapHighlight({ view, focusType, focusId } = {}) {
   }
 }
 
+/** 预警 Drawer / 避险面板：按 targetType + targetId 飞到地图目标 */
+export function locateWarningTarget({ targetType, targetId } = {}) {
+  if (!targetId) return;
+  const type = String(targetType || '').toUpperCase();
+  landingLayer?.clearHighlight();
+  routeLayer?.clearHighlight();
+  landingLayer?.setDimmed(false);
+  routeLayer?.setDimmed(false);
+
+  if (type === 'LANDING_POINT' || type === 'TAKEOFF') {
+    routeLayer?.setDimmed(true);
+    landingLayer?.setHighlight(targetId, { fly: true });
+    return;
+  }
+  if (type === 'ROUTE') {
+    landingLayer?.setDimmed(true);
+    routeLayer?.setHighlight(targetId, { fly: true });
+  }
+}
+
 function ensureRegionOverlaysReady() {
   if (!viewer) {
     throw new Error('Region 图层未初始化');

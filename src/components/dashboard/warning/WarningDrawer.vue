@@ -180,8 +180,19 @@ async function reload() {
   }
 }
 
+function locateWarning(item) {
+  const raw = item?.raw || {};
+  if (!raw.targetId) return;
+  dashboardEventBus.emit(DASHBOARD_EVENTS.WARNING_LOCATE, {
+    targetType: raw.targetType,
+    targetId: raw.targetId,
+    warningId: item.warningId,
+  });
+}
+
 function selectItem(item) {
   selectedId.value = item.warningId;
+  locateWarning(item);
 }
 
 async function markAsReadIfNeeded(item) {

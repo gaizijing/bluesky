@@ -20,6 +20,7 @@
     <TimelineBar v-if="config.main.timeline.visible" />
     <RegionMeteoControls v-if="regionMeteoOnDashboard" />
     <WarningDrawer />
+    <WarningToast />
   </div>
 </template>
 
@@ -38,6 +39,7 @@ import TimelineBar from '@/components/dashboard/timeline/TimelineBar.vue';
 import RegionMeteoControls from '@/components/regionMeteo/RegionMeteoControls.vue';
 import { isRegionMeteoEnabledOnDashboard } from '@/config/metVizRuntime';
 import WarningDrawer from '@/components/dashboard/warning/WarningDrawer.vue';
+import WarningToast from '@/components/dashboard/warning/WarningToast.vue';
 import MapContainer from '@/components/map/MapContainer.vue';
 import SimFlightMapBridge from '@/components/dashboard/panels/simFlight/SimFlightMapBridge.vue';
 
