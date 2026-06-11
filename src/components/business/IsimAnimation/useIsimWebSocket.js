@@ -1,76 +1,157 @@
-import { ref, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import { useIsimStore } from './isimStore'
+import { useAppDashboardStore } from '@/store/modules/appDashboard'
+import { parseIsimData } from './isimDataParser'
 
+const WS_CONNECT_TIMEOUT_MS = 12000
+
+/** 模块级单例，避免多处调用 hook 时 WS 状态不一致 */
+const ws = ref(null)
+const isConnected = ref(false)
+const isConnecting = ref(false)
+const reconnectAttempts = ref(0)
+const maxReconnectAttempts = 5
+const reconnectTimeout = ref(null)
+const isUserDisconnect = ref(false)
+let connectPromise = null
+let connectTimeoutId = null
+
+function getWebSocketUrl() {
+  const envUrl = import.meta.env.VITE_ISIM_WS_URL
+  if (envUrl) return envUrl
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const apiBase = import.meta.env.VITE_API_BASE_URL || '/api'
+  if (apiBase.startsWith('http://') || apiBase.startsWith('https://')) {
+    const wsOrigin = apiBase.replace(/^http/i, protocol === 'wss:' ? 'wss' : 'ws')
+    return `${wsOrigin}/ws/isim-data`
+  }
+  return `${protocol}//${window.location.host}${apiBase}/ws/isim-data`
+}
+
+function clearConnectTimeout() {
+  if (connectTimeoutId) {
+    clearTimeout(connectTimeoutId)
+    connectTimeoutId = null
+  }
+}
+
+function resetConnectPromise() {
+  clearConnectTimeout()
+  connectPromise = null
+}
+
+function markWsConnected(isimStore) {
+  isConnected.value = true
+  isConnecting.value = false
+  isimStore.updateConnectionStatus('connected')
+  try {
+    useAppDashboardStore().simConnected = true
+  } catch {
+    /* pinia 未就绪 */
+  }
+}
+
+function clearConnectingState(isimStore) {
+  isConnecting.value = false
+  if (!isConnected.value) {
+    isimStore.updateConnectionStatus('disconnected')
+  }
+}
+  
 /**
- * ISIM WebSocket Hook
- * 管理ISIM WebSocket连接和数据接收
+ * ISIM WebSocket Hook（单例连接）
  */
 export function useIsimWebSocket() {
   const isimStore = useIsimStore()
-  
-  // WebSocket状态
-  const ws = ref(null)
-  const isConnected = ref(false)
-  const isConnecting = ref(false)
-  const reconnectAttempts = ref(0)
-  const maxReconnectAttempts = 5
-  const reconnectTimeout = ref(null)
-  const isUserDisconnect = ref(false)
-  
-  // WebSocket URL配置
-  // 注意：这里需要根据实际后端地址配置
-  // 开发环境使用localhost，生产环境使用实际域名
-  const getWebSocketUrl = () => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.hostname
-    const port = window.location.port ? `:${window.location.port}` : ''
-    
-    // 如果配置了环境变量，使用环境变量
-    if (import.meta.env.VITE_ISIM_WS_URL) {
-      return import.meta.env.VITE_ISIM_WS_URL
-    }
-    
-    // 默认配置：假设后端运行在8080端口
-    // 注意：这里可能需要根据实际部署调整
-    return `${protocol}//${host}${port ? port : ':8080'}/api/ws/isim-data`
-  }
-  
-  const wsUrl = getWebSocketUrl()
-  
+
   /**
    * 连接WebSocket
    */
   const connect = () => {
-    if (isConnecting.value || isConnected.value) {
-      console.log('[ISIM] WebSocket已在连接或已连接')
+    if (ws.value?.readyState === WebSocket.OPEN) {
+      markWsConnected(isimStore)
       return Promise.resolve()
     }
-    
-    return new Promise((resolve, reject) => {
+    if (isConnected.value) {
+      return Promise.resolve()
+    }
+    if (connectPromise) {
+      return connectPromise
+    }
+    if (ws.value?.readyState === WebSocket.CONNECTING) {
+      try {
+        ws.value.close()
+      } catch {
+        /* ignore */
+      }
+      ws.value = null
+    }
+
+    const url = getWebSocketUrl()
+
+    connectPromise = new Promise((resolve, reject) => {
       isConnecting.value = true
       isimStore.updateConnectionStatus('connecting')
-      
+      isUserDisconnect.value = false
+
+      let settled = false
+      const resolveOnce = () => {
+        if (settled) return
+        settled = true
+        resetConnectPromise()
+        resolve()
+      }
+      const rejectOnce = (err) => {
+        if (settled) return
+        settled = true
+        isConnecting.value = false
+        resetConnectPromise()
+        reject(err instanceof Error ? err : new Error('WebSocket 连接失败'))
+      }
+
       try {
-        console.log(`[ISIM] 正在连接WebSocket: ${wsUrl}`)
-        ws.value = new WebSocket(wsUrl)
-        
+        console.log(`[ISIM] 正在连接WebSocket: ${url}`)
+
+        if (ws.value) {
+          ws.value.onopen = null
+          ws.value.onclose = null
+          ws.value.onerror = null
+          ws.value.onmessage = null
+          try {
+            ws.value.close()
+          } catch {
+            /* ignore */
+          }
+          ws.value = null
+        }
+
+        ws.value = new WebSocket(url)
+
+        connectTimeoutId = setTimeout(() => {
+          rejectOnce(new Error('WebSocket 连接超时'))
+          try {
+            ws.value?.close()
+          } catch {
+            /* ignore */
+          }
+        }, WS_CONNECT_TIMEOUT_MS)
+
         ws.value.onopen = () => {
+          clearConnectTimeout()
           console.log('[ISIM] WebSocket连接成功')
-          isConnected.value = true
-          isConnecting.value = false
+          markWsConnected(isimStore)
           reconnectAttempts.value = 0
-          isimStore.updateConnectionStatus('connected')
-          
-          // 发送连接成功消息
+
           sendMessage({
             type: 'connection',
             status: 'connected',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           })
-          
-          resolve()
+
+          resolveOnce()
         }
-        
+
         ws.value.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data)
@@ -79,63 +160,60 @@ export function useIsimWebSocket() {
             console.error('[ISIM] 解析WebSocket消息失败:', error, event.data)
           }
         }
-        
+
         ws.value.onerror = (error) => {
           console.error('[ISIM] WebSocket错误:', error)
-          isConnecting.value = false
           isimStore.updateConnectionStatus('error')
-          reject(error)
+          rejectOnce(new Error('WebSocket 连接失败'))
         }
-        
+
         ws.value.onclose = (event) => {
-          console.log(`[ISIM] WebSocket连接关闭，代码: ${event.code}, 原因: ${event.reason}`)
+          clearConnectTimeout()
+          const wasConnected = isConnected.value
           isConnected.value = false
           isConnecting.value = false
           isimStore.updateConnectionStatus('disconnected')
-          
-          // 清理重连定时器
+
+          if (!settled) {
+            rejectOnce(new Error(`WebSocket 连接关闭 (${event.code})`))
+          }
+
           if (reconnectTimeout.value) {
             clearTimeout(reconnectTimeout.value)
             reconnectTimeout.value = null
           }
-          
-          // 自动重连（排除用户主动断开的情况）
-          if (!isUserDisconnect.value && reconnectAttempts.value < maxReconnectAttempts) {
+
+          // 仅曾成功连上后再自动重连，避免初次失败时一直「握手中」
+          if (wasConnected && !isUserDisconnect.value && reconnectAttempts.value < maxReconnectAttempts) {
             reconnectAttempts.value++
             const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.value), 30000)
-            
             console.log(`[ISIM] ${delay}ms后尝试重连 (${reconnectAttempts.value}/${maxReconnectAttempts})`)
-            
             reconnectTimeout.value = setTimeout(() => {
-              console.log(`[ISIM] 开始重连尝试...`)
-              connect().catch(err => {
+              connect().catch((err) => {
                 console.error('[ISIM] 重连失败:', err)
               })
             }, delay)
           } else if (isUserDisconnect.value) {
-            console.log('[ISIM] 用户主动断开连接，停止重连')
-            isUserDisconnect.value = false // 重置标志，以便下次连接
-          } else {
-            console.log('[ISIM] 已达到最大重连次数，停止重连')
+            isUserDisconnect.value = false
           }
         }
       } catch (error) {
-        isConnecting.value = false
         isimStore.updateConnectionStatus('error')
         console.error('[ISIM] 创建WebSocket失败:', error)
-        reject(error)
+        rejectOnce(error)
       }
     })
+
+    return connectPromise
   }
   
   /**
    * 断开WebSocket连接
    */
   const disconnect = () => {
-    // 设置用户主动断开标志
     isUserDisconnect.value = true
-    
-    // 清理重连定时器
+    resetConnectPromise()
+
     if (reconnectTimeout.value) {
       clearTimeout(reconnectTimeout.value)
       reconnectTimeout.value = null
@@ -185,6 +263,13 @@ export function useIsimWebSocket() {
     const messageType = data.type || (data.header === 'UE5_SIM_DATA' ? 'sim_data' : 'unknown')
     
     switch (messageType) {
+      case 'connected':
+        markWsConnected(isimStore)
+        break
+
+      case 'ack':
+        break
+
       case 'sim_data':
         // ISIM姿态数据
         handleSimData(data)
@@ -232,31 +317,36 @@ export function useIsimWebSocket() {
    * 处理ISIM姿态数据
    */
   const handleSimData = (data) => {
+    markWsConnected(isimStore)
+    const parsed = parseIsimData(data) || data
     // 更新状态存储
-    isimStore.updateSimData(data)
+    isimStore.updateSimData(parsed)
     
     // 记录飞行轨迹
-    if (data.aircraftLon && data.aircraftLat && data.aircraftAlt) {
+    const lon = Number(parsed.aircraftLon);
+    const lat = Number(parsed.aircraftLat);
+    const alt = Number(parsed.aircraftAlt);
+    if (Number.isFinite(lon) && Number.isFinite(lat) && Number.isFinite(alt)) {
       if (isimStore.recordFlightPath) {
         isimStore.addFlightPathPoint({
-          lon: data.aircraftLon,
-          lat: data.aircraftLat,
-          alt: data.aircraftAlt,
-          roll: data.aircraftRoll,
-          pitch: data.aircraftPitch,
-          heading: data.aircraftHeading,
-          timestamp: data.timestamp || new Date().toISOString()
+          lon,
+          lat,
+          alt,
+          roll: parsed.aircraftRoll,
+          pitch: parsed.aircraftPitch,
+          heading: parsed.aircraftHeading,
+          timestamp: parsed.timestamp || new Date().toISOString()
         })
       }
     }
     
     // 触发数据更新事件（供其他组件监听）
-    const event = new CustomEvent('isim-data-update', { detail: data })
+    const event = new CustomEvent('isim-data-update', { detail: parsed })
     window.dispatchEvent(event)
     
-    // 调试信息
-    if (isimStore.debugMode) {
-      console.log('[ISIM] 收到姿态数据:', data)
+    // 调试信息（高频数据默认不刷屏）
+    if (isimStore.debugMode && import.meta.env.DEV) {
+      console.debug('[ISIM] 收到姿态数据:', data)
     }
   }
   
@@ -434,23 +524,18 @@ export function useIsimWebSocket() {
     })
   }
   
-  /**
-   * 组件卸载时清理
-   */
-  onUnmounted(() => {
-    disconnect()
-  })
-  
   return {
     // 状态
     ws,
     isConnected,
     isConnecting,
     reconnectAttempts,
-    
+
     // 方法
     connect,
     disconnect,
+    resetConnectPromise,
+    clearConnectingState,
     sendMessage,
     sendCommand,
     activateIsim,

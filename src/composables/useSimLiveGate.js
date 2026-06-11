@@ -2,8 +2,9 @@ import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useIsimStore } from '@/components/business/IsimAnimation/isimStore';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
+import { extractAircraftPose } from '@/utils/isimPose';
 
-/** ISIM 已连接且飞机开始飞行（有有效姿态数据） */
+/** ISIM 已连接且收到有效飞机位姿 */
 export function useSimLiveGate() {
   const isimStore = useIsimStore();
   const appStore = useAppDashboardStore();
@@ -11,10 +12,9 @@ export function useSimLiveGate() {
 
   const hasLiveFlight = computed(() => {
     if (appStore.view !== 'simFlight') return false;
-    if (!isimStore.isConnected || !isimStore.isFlying) return false;
-    if (isimStore.isDataStale || !simData.value) return false;
-    const d = simData.value;
-    return Number.isFinite(Number(d.aircraftLon)) && Number.isFinite(Number(d.aircraftLat));
+    if (!isimStore.isConnected && !appStore.simConnected) return false;
+    if (!simData.value) return false;
+    return !!extractAircraftPose(simData.value);
   });
 
   return { hasLiveFlight };

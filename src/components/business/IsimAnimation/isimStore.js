@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus'
 
 /**
  * ISIM状态管理Store
@@ -29,8 +30,8 @@ export const useIsimStore = defineStore('isim', () => {
   // 命令状态
   const commandStatus = ref({})
   
-  // 调试模式
-  const debugMode = ref(true)
+  // 调试模式（默认关闭，避免 WS 高频数据刷屏）
+  const debugMode = ref(false)
   
   // ========== 计算属性 ==========
   
@@ -90,7 +91,9 @@ export const useIsimStore = defineStore('isim', () => {
     }
     
     lastReceivedTime.value = Date.now()
-    
+
+    dashboardEventBus.emit(DASHBOARD_EVENTS.FLIGHT_POSITION_UPDATED, simData.value)
+
     // 触发数据更新事件
     window.dispatchEvent(new CustomEvent('isim-data-updated', { detail: data }))
   }

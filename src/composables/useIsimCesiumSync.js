@@ -3,255 +3,340 @@ import * as Cesium from 'cesium';
 import { storeToRefs } from 'pinia';
 import { useIsimStore } from '@/components/business/IsimAnimation/isimStore';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
-import { PlaneModel } from '@/cesium/entities/routes/PlaneModel';
-import { FollowCameraController } from '@/cesium/core/followCamera';
 import { AircraftTrailController } from '@/cesium/visualization/aircraftTrail';
-import { AircraftHeadingLineController } from '@/cesium/visualization/aircraftHeadingLine';
-import { createCancellableRafScheduler } from '@/utils/rafSchedule';
+import {
+  flyToPoseAndFollow,
+  releaseAircraftCamera,
+  loadIsimConnectionStartPose,
+} from '@/cesium/core/aircraftTopCamera';
+import { extractAircraftPose } from '@/utils/isimPose';
+import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus';
 
-const ISIM_PLANE_ID = 'isim_live_aircraft';
+const PLANE_ID = 'isim_live_aircraft';
+const TRACK_ID = 'isim_flight_track';
+const MODEL_URI = '/cesium/model/plane/plane.glb';
+const MODEL_HEADING_OFFSET_DEG = 90;
 
-function setAircraftVisible(entity, visible) {
-  if (!entity) return;
-  entity.show = visible;
-  if (entity.model) entity.model.show = visible;
-  if (entity.billboard) entity.billboard.show = visible;
-  if (entity.point) entity.point.show = visible;
+const planeLabelState = {
+  lon: 0,
+  lat: 0,
+  alt: 0,
+  windSpeed: '0.0',
+  windDirection: '0.0',
+  windDirectionText: '北',
+};
+
+function windDirectionLabel(deg) {
+  const directions = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+  return directions[Math.round(Number(deg) / 45) % 8] ?? '北';
 }
 
-function isTrailEnabled(data) {
-  return !Number(data?.trailHide);
+function buildPlaneLabelText() {
+  const s = planeLabelState;
+  return `经：${Number(s.lon).toFixed(4)}° 纬：${Number(s.lat).toFixed(4)}°
+高：${Math.round(Number(s.alt) || 0)}m 风速：${s.windSpeed}m/s
+风向：${s.windDirectionText}(${s.windDirection}°)`;
 }
 
-/** 主地图 ISIM 飞机实体、尾迹、航向线与第三/第一人称跟机 */
+function syncPlaneLabel(pose, weatherImpact) {
+  planeLabelState.lon = pose.lon;
+  planeLabelState.lat = pose.lat;
+  planeLabelState.alt = pose.alt;
+  if (weatherImpact) {
+    planeLabelState.windSpeed = Number(weatherImpact.windSpeed ?? 0).toFixed(1);
+    const dir = Number(weatherImpact.windDirection ?? 0);
+    planeLabelState.windDirection = dir.toFixed(1);
+    planeLabelState.windDirectionText = windDirectionLabel(dir);
+  }
+}
+
+function getViewer() {
+  const viewer = window.viewer || null;
+  if (!viewer) return null;
+  if (typeof viewer.isDestroyed === 'function' && viewer.isDestroyed()) return null;
+  return viewer;
+}
+
+function planeOrientationFromHeading(position, headingDeg) {
+  const hpr = new Cesium.HeadingPitchRoll(
+    Cesium.Math.toRadians(Number(headingDeg || 0) + MODEL_HEADING_OFFSET_DEG),
+    0,
+    0,
+  );
+  return Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
+}
+
+function resolvePose(data) {
+  return extractAircraftPose(data) || loadIsimConnectionStartPose();
+}
+
+function ensurePlane(viewer) {
+  let entity = viewer.entities.getById(PLANE_ID);
+  if (entity) {
+    entity.show = true;
+    if (entity.model) entity.model.show = true;
+    return entity;
+  }
+
+  entity = viewer.entities.add({
+    id: PLANE_ID,
+    name: 'ISIM实时飞机',
+    show: true,
+    position: Cesium.Cartesian3.fromDegrees(120.22, 36.04, 300),
+    model: {
+      uri: MODEL_URI,
+      scale: 18,
+      minimumPixelSize: 36,
+      maximumScale: 2000,
+      runAnimations: true,
+      show: true,
+      enableVerticalExaggeration: false,
+    },
+    label: {
+      text: new Cesium.CallbackProperty(() => buildPlaneLabelText(), false),
+      font: '12px sans-serif',
+      fillColor: Cesium.Color.WHITE,
+      outlineColor: Cesium.Color.BLACK,
+      outlineWidth: 2,
+      showBackground: true,
+      backgroundColor: Cesium.Color.fromCssColorString('rgba(0, 0, 0, 0.7)'),
+      backgroundPadding: new Cesium.Cartesian2(10, 5),
+      horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset: new Cesium.Cartesian2(0, -60),
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    },
+  });
+  return entity;
+}
+
+function updateFlightTrack(viewer, flightPath) {
+  if (!viewer) return;
+  const track = viewer.entities.getById(TRACK_ID);
+  const positions = (flightPath || [])
+    .map((p) => {
+      const lon = Number(p.lon);
+      const lat = Number(p.lat);
+      const alt = Number(p.alt ?? 0);
+      if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+      return Cesium.Cartesian3.fromDegrees(lon, lat, alt);
+    })
+    .filter(Boolean);
+
+  if (positions.length < 2) {
+    if (track) track.show = false;
+    return;
+  }
+
+  if (!track) {
+    viewer.entities.add({
+      id: TRACK_ID,
+      polyline: {
+        positions,
+        width: 4,
+        material: Cesium.Color.fromCssColorString('#10b981').withAlpha(0.9),
+        arcType: Cesium.ArcType.NONE,
+      },
+    });
+    return;
+  }
+  track.polyline.positions = positions;
+  track.show = true;
+}
+
+function clearFlightTrack(viewer) {
+  const track = viewer?.entities.getById(TRACK_ID);
+  if (track) viewer.entities.remove(track);
+}
+
+function focusCameraOnPlane(viewer, plane, pose) {
+  if (!viewer || !plane || !pose) return;
+  try {
+    flyToPoseAndFollow(viewer, plane, pose.lon, pose.lat, pose.alt);
+  } catch (err) {
+    console.warn('[useIsimCesiumSync] 相机聚焦失败', err);
+  }
+}
+
+/** 主地图 ISIM 飞机同步 */
 export function useIsimCesiumSync() {
   const isimStore = useIsimStore();
   const appStore = useAppDashboardStore();
-  const { simData, isConnected } = storeToRefs(isimStore);
-  const planeModel = ref(null);
-  const followCamera = ref(null);
+  const { simData, isConnected, flightPath, recordFlightPath, weatherImpact } = storeToRefs(isimStore);
   const trailController = ref(null);
-  const headingLineController = ref(null);
   let viewerWaitTimer = null;
-  let scheduleAircraftUpdate = null;
+  let offClearTrail = null;
+  let offFlightPos = null;
+  let offFocusAircraft = null;
 
-  function getViewer() {
-    return window.viewer || null;
+  function isLive() {
+    return appStore.view === 'simFlight' && (isConnected.value || appStore.simConnected);
   }
 
-  function ensureFollowCamera() {
+  function ensureTrail(viewer) {
+    if (!viewer) return null;
+    const stale = trailController.value && trailController.value.viewer !== viewer;
+    if (stale) {
+      trailController.value.destroy();
+      trailController.value = null;
+    }
+    if (!trailController.value) {
+      trailController.value = markRaw(new AircraftTrailController(viewer));
+    }
+    return trailController.value;
+  }
+
+  function applyPoseToPlane(viewer, plane, pose) {
+    const position = Cesium.Cartesian3.fromDegrees(
+      pose.lon,
+      pose.lat,
+      Math.max(0, pose.alt),
+    );
+    plane.position = position;
+    plane.orientation = planeOrientationFromHeading(position, pose.heading);
+    syncPlaneLabel(pose, weatherImpact.value);
+    return position;
+  }
+
+  function updateAircraft(data) {
+    if (!isLive()) return;
     const viewer = getViewer();
-    if (!viewer || followCamera.value) return Boolean(followCamera.value);
-    followCamera.value = markRaw(new FollowCameraController(viewer));
-    return true;
+    if (!viewer) return;
+
+    const pose = data ? resolvePose(data) : loadIsimConnectionStartPose();
+    if (!pose) return;
+
+    const plane = ensurePlane(viewer);
+    const position = applyPoseToPlane(viewer, plane, pose);
+
+    if (recordFlightPath.value) {
+      updateFlightTrack(viewer, flightPath.value);
+    }
+
+    if (extractAircraftPose(data)) {
+      const trail = ensureTrail(viewer);
+      trail?.apply(
+        { enabled: true, append: true, clear: false },
+        position,
+        pose.heading,
+        pose.roll,
+      );
+    }
+
+    viewer.scene.requestRender();
   }
 
-  function ensureTrailController() {
+  function refocusCamera() {
+    if (!isLive()) return;
     const viewer = getViewer();
-    if (!viewer || trailController.value) return Boolean(trailController.value);
-    trailController.value = markRaw(new AircraftTrailController(viewer));
-    return true;
+    if (!viewer) return;
+    const pose = resolvePose(simData.value ?? isimStore.simData);
+    if (!pose) return;
+    const plane = ensurePlane(viewer);
+    applyPoseToPlane(viewer, plane, pose);
+    releaseAircraftCamera(viewer);
+    focusCameraOnPlane(viewer, plane, pose);
+    viewer.scene.requestRender();
   }
 
-  function ensureHeadingLineController() {
+  function flushLatest() {
+    updateAircraft(simData.value ?? isimStore.simData);
+  }
+
+  function onConnected() {
+    if (!isLive()) return;
+    updateAircraft(simData.value ?? isimStore.simData);
+  }
+
+  function clearAll() {
+    releaseAircraftCamera(getViewer());
+    trailController.value?.reset();
+
     const viewer = getViewer();
-    if (!viewer || headingLineController.value) return Boolean(headingLineController.value);
-    headingLineController.value = markRaw(new AircraftHeadingLineController(viewer));
-    return true;
-  }
+    if (!viewer) return;
 
-  function ensurePlaneModel() {
-    const viewer = getViewer();
-    if (!viewer || planeModel.value) return Boolean(planeModel.value);
-    planeModel.value = markRaw(new PlaneModel(viewer));
-    return true;
-  }
-
-  function ensureVisualControllers() {
-    return ensureFollowCamera() && ensureTrailController() && ensureHeadingLineController();
+    const plane = viewer.entities.getById(PLANE_ID);
+    if (plane) {
+      plane.show = false;
+    }
+    clearFlightTrack(viewer);
+    viewer.scene.requestRender();
   }
 
   function waitForViewer() {
-    if (ensurePlaneModel() && ensureVisualControllers()) return;
+    const ready = () => {
+      if (!getViewer()) return false;
+      if (isLive()) flushLatest();
+      return true;
+    };
+    if (ready()) return;
     viewerWaitTimer = setInterval(() => {
-      if (ensurePlaneModel() && ensureVisualControllers()) {
+      if (ready()) {
         clearInterval(viewerWaitTimer);
         viewerWaitTimer = null;
       }
     }, 400);
   }
 
-  function applyCameraMode(mode, pose) {
-    const fc = followCamera.value;
-    const viewer = getViewer();
-    if (!fc || !viewer) return;
-
-    const entity = viewer.entities.getById(ISIM_PLANE_ID);
-
-    if (mode === 'firstPerson' && pose) {
-      fc.setFirstPersonMode(true);
-      setAircraftVisible(entity, false);
-      fc.applyFirstPerson(pose.lat, pose.lon, pose.alt, pose.heading, pose.pitch, pose.roll);
-    } else if (mode === 'thirdPerson' && pose) {
-      fc.setFirstPersonMode(false);
-      fc.setThirdPersonMode(true, pose.heading);
-      setAircraftVisible(entity, true);
-      fc.applyThirdPerson(pose.lat, pose.lon, pose.alt, pose.heading);
-    } else {
-      fc.release();
-      setAircraftVisible(entity, true);
-    }
-  }
-
-  function applyFlightVisuals(data, sm, mode) {
-    const trail = trailController.value;
-    const headingLine = headingLineController.value;
-    if (!trail || !headingLine || !sm) return;
-
-    const trailOn = isTrailEnabled(data);
-    const firstPerson = mode === 'firstPerson';
-    const entPos = Cesium.Cartesian3.fromDegrees(sm.lon, sm.lat, sm.alt);
-
-    if (firstPerson) {
-      headingLine.setVisible(ISIM_PLANE_ID, false);
-      if (trailOn) {
-        trail.apply({ enabled: true, append: true }, entPos, sm.heading, sm.roll);
-      } else {
-        trail.apply({ enabled: false }, entPos, sm.heading, sm.roll);
-      }
-    } else {
-      trail.apply(
-        { enabled: trailOn, append: trailOn },
-        entPos,
-        sm.heading,
-        sm.roll,
-      );
-      if (trailOn) {
-        headingLine.upsert(ISIM_PLANE_ID, sm.lat, sm.lon, sm.alt, sm.heading, sm.pitch);
-        headingLine.setVisible(ISIM_PLANE_ID, true);
-      } else {
-        headingLine.setVisible(ISIM_PLANE_ID, false);
-      }
-    }
-  }
-
-  function updateCesiumAircraft(data) {
-    if (!data || !ensurePlaneModel()) return;
-    const viewer = getViewer();
-    if (!viewer) return;
-
-    const lon = data.aircraftLon;
-    const lat = data.aircraftLat;
-    const alt = data.aircraftAlt;
-    if (lon == null || lat == null) return;
-
-    const heading = Number(data.aircraftHeading ?? 0);
-    const pitch = Number(data.aircraftPitch ?? 0);
-    const roll = Number(data.aircraftRoll ?? 0);
-    const position = Cesium.Cartesian3.fromDegrees(lon, lat, alt ?? 0);
-    const existingEntity = viewer.entities.getById(ISIM_PLANE_ID);
-
-    if (!existingEntity) {
-      planeModel.value.createRoutePlane(ISIM_PLANE_ID, position, {
-        getAttitude: () => ({
-          heading,
-          pitch,
-          roll,
-        }),
-        getAltitude: () => alt ?? 0,
-        getFlightPath: () => [],
-        getRecordFlightPath: () => false,
-      });
-    } else {
-      planeModel.value.updatePlanePosition(ISIM_PLANE_ID, position);
-    }
-
-    if (ensureVisualControllers()) {
-      const sm = followCamera.value.getSmoothedPose(
-        ISIM_PLANE_ID,
-        lat,
-        lon,
-        alt ?? 0,
-        heading,
-        pitch,
-        roll,
-      );
-      const mode = appStore.cameraMode;
-
-      applyFlightVisuals(data, sm, mode);
-
-      if (mode === 'thirdPerson' || mode === 'firstPerson') {
-        applyCameraMode(mode, sm);
-      }
-    }
-
-    viewer.scene.requestRender();
-  }
-
-  function clearCesiumAircraft() {
-    followCamera.value?.release();
-    trailController.value?.reset();
-    headingLineController.value?.remove(ISIM_PLANE_ID);
-    if (planeModel.value) {
-      planeModel.value.removePlane(ISIM_PLANE_ID);
-    }
-    const viewer = getViewer();
-    if (viewer) viewer.trackedEntity = undefined;
-  }
-
-  function focusOnAircraft() {
-    if (!isConnected.value) return;
-    appStore.setCameraMode('thirdPerson');
-    const data = simData.value;
-    if (data) updateCesiumAircraft(data);
-  }
-
-  scheduleAircraftUpdate = createCancellableRafScheduler((data) => {
-    if (isConnected.value && data) updateCesiumAircraft(data);
-  });
-
   watch(simData, (data) => {
-    if (isConnected.value && data) scheduleAircraftUpdate(data);
+    updateAircraft(data);
   });
+
+  watch(weatherImpact, (impact) => {
+    if (!isLive()) return;
+    const pose = resolvePose(simData.value);
+    if (!pose) return;
+    syncPlaneLabel(pose, impact);
+    getViewer()?.scene.requestRender();
+  });
+
+  watch(flightPath, (path) => {
+    if (!isLive() || !recordFlightPath.value) return;
+    updateFlightTrack(getViewer(), path);
+    getViewer()?.scene.requestRender();
+  }, { deep: true });
 
   watch(isConnected, (connected) => {
-    if (!connected) {
-      clearCesiumAircraft();
-      appStore.setCameraMode('free');
-    }
+    if (connected) onConnected();
+    else if (!appStore.simConnected) clearAll();
   });
 
-  watch(
-    () => appStore.cameraMode,
-    (mode) => {
-      const data = simData.value;
-      if (!isConnected.value || !data) {
-        applyCameraMode('free');
-        return;
-      }
-      if (mode === 'free') {
-        applyCameraMode('free');
-      }
-      updateCesiumAircraft(data);
-    },
-  );
+  watch(() => appStore.simConnected, (connected) => {
+    if (connected) onConnected();
+    else if (!isConnected.value) clearAll();
+  });
+
+  watch(() => appStore.view, (view) => {
+    if (view === 'simFlight' && (isConnected.value || appStore.simConnected)) {
+      onConnected();
+    } else if (view !== 'simFlight') {
+      clearAll();
+    }
+  });
 
   onMounted(() => {
     waitForViewer();
+    offClearTrail = dashboardEventBus.on(DASHBOARD_EVENTS.CLEAR_ISIM_TRAIL, () => {
+      trailController.value?.markManuallyCleared();
+      getViewer()?.scene.requestRender();
+    });
+    offFocusAircraft = dashboardEventBus.on(DASHBOARD_EVENTS.FOCUS_ISIM_AIRCRAFT, () => {
+      refocusCamera();
+    });
+    offFlightPos = dashboardEventBus.on(DASHBOARD_EVENTS.FLIGHT_POSITION_UPDATED, (payload) => {
+      if (isLive() && payload) updateAircraft(payload);
+    });
   });
 
   onUnmounted(() => {
+    offClearTrail?.();
+    offFocusAircraft?.();
+    offFlightPos?.();
     if (viewerWaitTimer) clearInterval(viewerWaitTimer);
-    scheduleAircraftUpdate?.cancel();
-    scheduleAircraftUpdate = null;
-    followCamera.value?.destroy();
-    followCamera.value = null;
     trailController.value?.destroy();
     trailController.value = null;
-    headingLineController.value?.destroy();
-    headingLineController.value = null;
-    clearCesiumAircraft();
+    clearAll();
   });
 
-  return { focusOnAircraft, clearCesiumAircraft };
+  return { clearAll };
 }

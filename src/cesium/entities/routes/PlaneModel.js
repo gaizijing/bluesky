@@ -37,9 +37,8 @@ export class PlaneModel {
         // 使用优化的姿态更新
         orientation: new Cesium.CallbackProperty((time) => {
           try {
-            // 从选项中获取姿态数据
-            const attitude = options.getAttitude ? options.getAttitude() : { heading: 0, pitch: 0, roll: 0 }
-            // 将角度转换为弧度
+            const stored = this.#planeAttitudes.get(routeId)
+            const attitude = stored ?? (options.getAttitude ? options.getAttitude() : { heading: 0, pitch: 0, roll: 0 })
             const heading = Cesium.Math.toRadians(attitude.heading || 0)
             const pitch = Cesium.Math.toRadians(attitude.pitch || 0)
             const roll = Cesium.Math.toRadians(attitude.roll || 0)
@@ -196,8 +195,11 @@ export class PlaneModel {
         }
       })
       
-      // 存储实体引用
+      // 存储实体引用与初始姿态
       this.#entities.set(routeId, entity)
+      if (options.getAttitude) {
+        this.#planeAttitudes.set(routeId, options.getAttitude())
+      }
       
       console.log('[DEBUG] 增强飞机实体创建成功')
       return entity
@@ -213,14 +215,13 @@ export class PlaneModel {
    * @param {Cesium.Cartesian3} position 新位置
    */
   updatePlanePosition(routeId, position) {
+    const entity = this.#entities.get(routeId)
+    if (!entity) {
+      throw new Error(`PlaneModel: Entity not found for routeId: ${routeId}`)
+    }
 
-    const entity = this.#entities.get(routeId);
-
-    // 直接更新实体的position属性
-    entity.position = position;
-
-    // 触发场景重绘
-    this.viewer.scene.requestRender();
+    entity.position = position
+    this.viewer.scene.requestRender()
   }
 
   /**

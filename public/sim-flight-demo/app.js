@@ -1,11 +1,17 @@
 import { apiGet, hasAuthToken } from './api.js';
+import { SimTrailController } from './flightVisual.js';
 
 const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
 const ROUTE_COLOR = '#39FF14';
+const SHOW_ROUTE_POLYLINE = false;
 const PLANE_ID = 'sim_demo_plane';
 const ROUTE_ID = 'sim_demo_route';
-const MODEL_YAW_OFFSET_RAD = Cesium.Math.toRadians(-90);
+/** Mock 沿航路插值步进间隔（越大越慢） */
+const MOCK_TICK_MS = 380;
+const MOCK_HUD_SPEED_MPS = 45;
+/** 与 feng-demo aircraft_model_heading_offset_deg 一致 */
+const MODEL_HEADING_OFFSET_DEG = -90;
 
 let viewer = null;
 let routePath = [];
@@ -13,6 +19,9 @@ let mockTimer = null;
 let mockIndex = 0;
 let planeEntity = null;
 let regions = [];
+let trailController = null;
+/** 当前飞机位姿 { lon, lat, alt, heading(rad), pitch?, roll? } */
+let currentPose = null;
 
 function $(id) {
   return document.getElementById(id);
@@ -62,13 +71,14 @@ function computeGeodesicHeading(from, to) {
   return new Cesium.EllipsoidGeodesic(start, end).startHeading;
 }
 
-function planeOrientationFromHeading(position, headingRad) {
-  const base = Cesium.Transforms.headingPitchRollQuaternion(
-    position,
-    new Cesium.HeadingPitchRoll(headingRad, 0, 0),
+function planeOrientationFromHeading(position, headingRad, pitchDeg = 0, rollDeg = 0) {
+  const headingDeg = Cesium.Math.toDegrees(headingRad);
+  const hpr = new Cesium.HeadingPitchRoll(
+    Cesium.Math.toRadians(headingDeg + MODEL_HEADING_OFFSET_DEG),
+    Cesium.Math.toRadians(pitchDeg),
+    Cesium.Math.toRadians(rollDeg),
   );
-  const modelFix = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, MODEL_YAW_OFFSET_RAD);
-  return Cesium.Quaternion.multiply(base, modelFix, new Cesium.Quaternion());
+  return Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
 }
 
 function catmullRom(p0, p1, p2, p3, t) {
@@ -101,12 +111,100 @@ function buildCatmullPath3D(control, samples = 120) {
   return out;
 }
 
-function createViewer(containerId) {
+function addArcgisBasemap(viewerInstance) {
+  const layer = viewerInstance.imageryLayers.addImageryProvider(
+    new Cesium.UrlTemplateImageryProvider({
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      minimumLevel: 1,
+      maximumLevel: 18,
+      enablePickFeatures: false,
+    }),
+  );
+  layer.brightness = 1.05;
+  logDebug('imagery: arcgis');
+}
+
+function buildTiandituProbeUrl(layerKey, tk) {
+  let path = buildTiandituWmtsUrl(layerKey, tk)
+    .replace('{TileMatrix}', '1')
+    .replace('{TileRow}', '0')
+    .replace('{TileCol}', '1');
+  if (path.includes('{s}')) path = path.replace('{s}', 't0');
+  if (path.startsWith('http')) return path;
+  return location.origin + path;
+}
+
+async function probeTiandituAvailable(tk) {
+  try {
+    const res = await fetch(buildTiandituProbeUrl('img', tk), { method: 'GET', cache: 'no-store' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function addTiandituBasemapWithToken(viewerInstance, tk) {
+  const maxLevel = useTiandituProxy() ? 16 : 18;
+  const wmtsCommon = {
+    style: 'default',
+    format: 'tiles',
+    tileMatrixSetID: 'w',
+    maximumLevel: maxLevel,
+    enablePickFeatures: false,
+  };
+  const imgOpts = { url: buildTiandituWmtsUrl('img', tk), layer: 'img', ...wmtsCommon };
+  const ciaOpts = { url: buildTiandituWmtsUrl('cia', tk), layer: 'cia', ...wmtsCommon };
+  if (!useTiandituProxy()) {
+    const subs = ['t0', 't1', 't2', 't3', 't4', 't5', 't6', 't7'];
+    imgOpts.subdomains = subs;
+    ciaOpts.subdomains = subs;
+  }
+
+  const imgLayer = viewerInstance.imageryLayers.addImageryProvider(
+    new Cesium.WebMapTileServiceImageryProvider(imgOpts),
+  );
+  imgLayer.brightness = 1.0;
+  imgLayer.contrast = 1.1;
+  imgLayer.saturation = 1.1;
+
+  const ciaLayer = viewerInstance.imageryLayers.addImageryProvider(
+    new Cesium.WebMapTileServiceImageryProvider(ciaOpts),
+  );
+  ciaLayer.alpha = 0.85;
+  logDebug('imagery: tianditu maxLevel=', maxLevel);
+}
+
+async function addBasemap(viewerInstance) {
+  viewerInstance.imageryLayers.removeAll();
+  const base = params.get('base');
+  if (base === 'arcgis') {
+    addArcgisBasemap(viewerInstance);
+    return 'arcgis';
+  }
+
+  const tk = resolveTiandituToken();
+  if (tk && base !== 'arcgis') {
+    const ok = await probeTiandituAvailable(tk);
+    if (ok) {
+      addTiandituBasemapWithToken(viewerInstance, tk);
+      return 'tianditu';
+    }
+    console.warn('[sim-flight-demo] 天地图瓦片请求失败，已回退 ArcGIS 卫星底图');
+  } else if (!tk) {
+    console.warn('[sim-flight-demo] 未配置天地图 token，已回退 ArcGIS 卫星底图');
+  }
+
+  addArcgisBasemap(viewerInstance);
+  return 'arcgis';
+}
+
+async function createViewer(containerId) {
   if (Cesium.Ion) Cesium.Ion.defaultAccessToken = undefined;
   const viewerInstance = new Cesium.Viewer(containerId, {
     animation: false,
     timeline: false,
     baseLayerPicker: false,
+    baseLayer: false,
     geocoder: false,
     homeButton: false,
     sceneModePicker: false,
@@ -118,37 +216,98 @@ function createViewer(containerId) {
     maximumRenderTimeChange: Infinity,
     terrainProvider: new Cesium.EllipsoidTerrainProvider(),
   });
-  viewerInstance.imageryLayers.removeAll();
-  const tk = resolveTiandituToken();
-  if (tk) {
-    viewerInstance.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
-      url: buildTiandituWmtsUrl('img', tk),
-      subdomains: ['t0', 't1', 't2', 't3', 't4', 't5', 't6', 't7'],
-      tilingScheme: new Cesium.WebMercatorTilingScheme(),
-      minimumLevel: 1,
-      maximumLevel: 18,
-      enablePickFeatures: false,
-    }));
-    viewerInstance.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
-      url: buildTiandituWmtsUrl('cia', tk),
-      subdomains: ['t0', 't1', 't2', 't3', 't4', 't5', 't6', 't7'],
-      tilingScheme: new Cesium.WebMercatorTilingScheme(),
-      minimumLevel: 1,
-      maximumLevel: 18,
-      enablePickFeatures: false,
-    }));
-    logDebug('imagery: tianditu');
-  } else {
-    viewerInstance.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      minimumLevel: 1,
-      maximumLevel: 18,
-      enablePickFeatures: false,
-    }));
-    logDebug('imagery: arcgis (no tianditu token)');
-  }
+  const basemapType = await addBasemap(viewerInstance);
+  logDebug('basemap ready:', basemapType);
   viewerInstance.cesiumWidget.creditContainer.style.display = 'none';
+  viewerInstance.scene.globe.depthTestAgainstTerrain = false;
+  viewerInstance.scene.fog.enabled = false;
+  // requestRenderMode 下瓦片到达后需持续触发渲染
+  viewerInstance.scene.globe.tileLoadProgressEvent.addEventListener((remaining) => {
+    viewerInstance.scene.requestRender();
+    if (remaining === 0) logDebug('basemap tiles loaded');
+  });
+  viewerInstance.scene.requestRender();
   return viewerInstance;
+}
+
+function requestSceneRender() {
+  if (viewer?.scene) viewer.scene.requestRender();
+}
+
+function headingDegFromPose(pose) {
+  return Cesium.Math.toDegrees(Number(pose?.heading ?? 0));
+}
+
+function resolvePoseAtRouteIndex(index = 0) {
+  if (routePath.length < 1) return null;
+  const p = routePath[index];
+  const next = routePath[Math.min(index + 1, routePath.length - 1)];
+  const heading = routePath.length > 1 ? computeGeodesicHeading(p, next) : 0;
+  return { lon: p.lon, lat: p.lat, alt: p.alt, heading };
+}
+
+function initFlightVisuals() {
+  trailController = new SimTrailController(viewer);
+}
+
+function isMockFlying() {
+  return mockTimer != null;
+}
+
+function applyFlightVisuals(positionCartesian, pose) {
+  if (!trailController || !pose || !positionCartesian || !isMockFlying()) return;
+
+  trailController.apply(
+    { enabled: true, append: true, clear: false },
+    positionCartesian,
+    headingDegFromPose(pose),
+    Number(pose.roll ?? 0),
+  );
+  requestSceneRender();
+}
+
+function resetFlightVisuals() {
+  trailController?.reset();
+}
+
+function clearFlightTrail() {
+  trailController?.markManuallyCleared();
+  requestSceneRender();
+}
+
+function placePlaneAtRoutePoint(index = 0) {
+  const pose = resolvePoseAtRouteIndex(index);
+  if (!pose) return;
+  currentPose = pose;
+  const position = Cesium.Cartesian3.fromDegrees(pose.lon, pose.lat, pose.alt);
+  const plane = ensurePlane();
+  plane.position = position;
+  plane.orientation = planeOrientationFromHeading(position, pose.heading);
+  requestSceneRender();
+}
+
+function watchPlaneModelReady() {
+  if (!planeEntity?.model) return;
+  let frames = 0;
+  const maxFrames = 3600;
+  const tick = () => {
+    if (!planeEntity || frames >= maxFrames) return;
+    frames += 1;
+    const ready = planeEntity.model?.ready;
+    if (ready === true) {
+      setHud({ hudStatus: '飞机模型已就绪' });
+      requestSceneRender();
+      return;
+    }
+    if (ready === false) {
+      setHud({ hudStatus: '飞机模型加载失败，请检查 plane.glb' });
+      console.error('[sim-flight-demo] plane.glb load failed');
+      return;
+    }
+    requestSceneRender();
+    requestAnimationFrame(tick);
+  };
+  tick();
 }
 
 function clearRoute() {
@@ -160,19 +319,22 @@ function renderRoute(path3d) {
   clearRoute();
   if (path3d.length < 2) return;
   const positions = path3d.map((p) => Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt));
-  viewer.entities.add({
-    id: ROUTE_ID,
-    polyline: {
-      positions,
-      width: 3,
-      material: Cesium.Color.fromCssColorString(ROUTE_COLOR),
-      arcType: Cesium.ArcType.GEODESIC,
-    },
-  });
+  if (SHOW_ROUTE_POLYLINE) {
+    viewer.entities.add({
+      id: ROUTE_ID,
+      polyline: {
+        positions,
+        width: 3,
+        material: Cesium.Color.fromCssColorString(ROUTE_COLOR),
+        arcType: Cesium.ArcType.GEODESIC,
+      },
+    });
+  }
   const bs = Cesium.BoundingSphere.fromPoints(positions);
   viewer.camera.flyToBoundingSphere(bs, {
     duration: 1.2,
     offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-42), Math.max(bs.radius * 2.4, 1800)),
+    complete: () => placePlaneAtRoutePoint(0),
   });
 }
 
@@ -185,8 +347,12 @@ function ensurePlane() {
       uri: '/cesium/model/plane/plane.glb',
       scale: 18,
       minimumPixelSize: 36,
+      maximumScale: 2000,
+      runAnimations: true,
     },
   });
+  setHud({ hudStatus: '飞机模型加载中（约 448MB，首次较慢）…' });
+  watchPlaneModelReady();
   return planeEntity;
 }
 
@@ -202,6 +368,7 @@ function startMockFlight() {
   stopMockFlight();
   if (routePath.length < 2) return;
   mockIndex = 0;
+  resetFlightVisuals();
   const plane = ensurePlane();
   setHud({ hudStatus: 'Mock 联飞中', hudSpeed: '0 m/s', hudAlt: '—' });
 
@@ -214,24 +381,18 @@ function startMockFlight() {
     }
     const next = routePath[Math.min(mockIndex + 1, routePath.length - 1)];
     const heading = computeGeodesicHeading(p, next);
+    currentPose = { lon: p.lon, lat: p.lat, alt: p.alt, heading };
     const position = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt);
     plane.position = position;
     plane.orientation = planeOrientationFromHeading(position, heading);
-    viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt + 420),
-      orientation: {
-        heading,
-        pitch: Cesium.Math.toRadians(-28),
-        roll: 0,
-      },
-    });
+    applyFlightVisuals(position, currentPose);
     setHud({
-      hudSpeed: '120 m/s',
+      hudSpeed: MOCK_HUD_SPEED_MPS + ' m/s',
       hudAlt: Math.round(p.alt) + ' m',
     });
     mockIndex += 1;
     viewer.scene.requestRender();
-  }, 120);
+  }, MOCK_TICK_MS);
 }
 
 function fillRegionSelect(regionId) {
@@ -276,6 +437,7 @@ async function loadRoutes(regionId) {
 async function loadRouteDetail(routeId) {
   if (!routeId) return;
   stopMockFlight();
+  resetFlightVisuals();
   const detail = await apiGet('/routes/' + encodeURIComponent(routeId));
   const waypoints = detail?.waypoints || [];
   const flightHeight = detail?.flightHeight ?? 300;
@@ -287,7 +449,9 @@ async function loadRouteDetail(routeId) {
   routePath = buildCatmullPath3D(control, 120);
   logDebug('route detail', routeId, control.length, 'pts ->', routePath.length);
   renderRoute(routePath);
-  setHud({ hudStatus: '航路已加载 (' + routePath.length + ' 点)' });
+  setHud({
+    hudStatus: '航路已加载 (' + routePath.length + ' 点)，点击 Mock 起飞 沿航路飞行',
+  });
 }
 
 async function bootstrap() {
@@ -296,7 +460,8 @@ async function bootstrap() {
     throw new Error('未检测到 Token');
   }
 
-  viewer = createViewer('map');
+  viewer = await createViewer('map');
+  initFlightVisuals();
   setHud({ hudStatus: '初始化', hudSpeed: '—', hudAlt: '—' });
 
   regions = await apiGet('/regions');
@@ -323,6 +488,7 @@ async function bootstrap() {
   });
   $('btnMockStart')?.addEventListener('click', startMockFlight);
   $('btnMockStop')?.addEventListener('click', stopMockFlight);
+  $('btnClearTrail')?.addEventListener('click', clearFlightTrail);
 }
 
 bootstrap().catch((err) => {
@@ -330,4 +496,7 @@ bootstrap().catch((err) => {
   setHud({ hudStatus: err.message || '初始化失败' });
 });
 
-window.addEventListener('beforeunload', stopMockFlight);
+window.addEventListener('beforeunload', () => {
+  stopMockFlight();
+  trailController?.destroy();
+});

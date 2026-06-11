@@ -49,7 +49,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, toValue } from 'vue';
 
 const props = defineProps({
   value: { type: Number, default: 0 },
@@ -68,10 +68,12 @@ const CY = H / 2;
 const boxW = 34;
 const boxX = (W - boxW) / 2;
 
-const displayValue = computed(() => {
-  if (props.step < 1) return Number(props.value).toFixed(1);
-  return Number(props.value).toFixed(1);
+const safeValue = computed(() => {
+  const n = Number(toValue(props.value));
+  return Number.isFinite(n) ? n : 0;
 });
+
+const displayValue = computed(() => safeValue.value.toFixed(1));
 
 function nearMultiple(val, every) {
   const snapped = Math.round(val / every) * every;
@@ -79,7 +81,7 @@ function nearMultiple(val, every) {
 }
 
 const ticks = computed(() => {
-  const center = props.value;
+  const center = safeValue.value;
   const min = center - props.span;
   const max = center + props.span;
   const count = Math.ceil((max - min) / props.step) + 2;
@@ -149,15 +151,17 @@ const pointerPoints = computed(() => {
   font-size: 10px;
   font-weight: 600;
   font-family: 'AiDeepFont', sans-serif;
+  pointer-events: none;
 }
 
 .vtape__cap {
-  margin-top: 6px;
-  font-size: 9px;
-  line-height: 1.2;
+  margin-top: 4px;
+  font-size: 8px;
+  line-height: 1.25;
   color: rgba(255, 255, 255, 0.45);
   text-align: center;
   white-space: nowrap;
   flex-shrink: 0;
+  overflow: visible;
 }
 </style>

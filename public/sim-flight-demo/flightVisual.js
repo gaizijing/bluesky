@@ -1,17 +1,33 @@
-import * as Cesium from 'cesium';
-import { clamp, offsetLatLonMeters } from '@/cesium/utils/geo';
+/** 飞行尾迹（对齐 feng-demo map.js / aircraftTrail.js） */
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function offsetLatLonMeters(lat, lon, bearingDeg, distanceM) {
+  const r = 6378137.0;
+  const br = (bearingDeg * Math.PI) / 180.0;
+  const dByR = distanceM / r;
+  const lat1 = (lat * Math.PI) / 180.0;
+  const lon1 = (lon * Math.PI) / 180.0;
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(dByR) + Math.cos(lat1) * Math.sin(dByR) * Math.cos(br),
+  );
+  const lon2 = lon1 + Math.atan2(
+    Math.sin(br) * Math.sin(dByR) * Math.cos(lat1),
+    Math.cos(dByR) - Math.sin(lat1) * Math.sin(lat2),
+  );
+  return { lat: (lat2 * 180.0) / Math.PI, lon: (lon2 * 180.0) / Math.PI };
+}
 
 const VISUAL_LIME = 'lime';
 const TRAIL_BASE_HALF_WIDTH_M = 5.4;
 const TRAIL_DROP_LINE_STEP_M = 10.0;
 const TRAIL_DROP_LINE_WIDTH = 0.5;
-
-/** 带状尾迹 + 离地垂直线（与 sim-flight-demo/flightVisual.js 一致） */
-export class AircraftTrailController {
+export class SimTrailController {
   constructor(viewer) {
     this.viewer = viewer;
     this.trailEntity = null;
-    this.trailCenterLine = null;
     this.trailPositions = [];
     this.trailLeftPositions = [];
     this.trailRightPositions = [];
@@ -22,12 +38,8 @@ export class AircraftTrailController {
   }
 
   setVisualVisible(visible) {
-    const showRibbon = !!visible && this.trailLeftPositions.length >= 2;
     if (this.trailEntity) {
-      this.trailEntity.show = showRibbon;
-    }
-    if (this.trailCenterLine) {
-      this.trailCenterLine.show = !!visible && this.trailPositions.length >= 2;
+      this.trailEntity.show = !!visible && this.trailLeftPositions.length >= 2;
     }
     this.trailDropLines.forEach((it) => {
       if (it?.entity) it.entity.show = !!visible;
@@ -54,10 +66,6 @@ export class AircraftTrailController {
       this.viewer.entities.remove(this.trailEntity);
       this.trailEntity = null;
     }
-    if (this.trailCenterLine && this.viewer) {
-      this.viewer.entities.remove(this.trailCenterLine);
-      this.trailCenterLine = null;
-    }
   }
 
   markManuallyCleared() {
@@ -70,27 +78,9 @@ export class AircraftTrailController {
   }
 
   ensureEntity() {
-    if (!this.viewer) return;
+    if (!this.viewer || this.trailEntity) return;
     const leftPositions = this.trailLeftPositions;
     const rightPositions = this.trailRightPositions;
-    const centerPositions = this.trailPositions;
-
-    if (!this.trailCenterLine) {
-      this.trailCenterLine = this.viewer.entities.add({
-        polyline: {
-          positions: new Cesium.CallbackProperty(() => {
-            if (centerPositions.length < 2) return [];
-            return centerPositions.slice();
-          }, false),
-          width: 5,
-          material: Cesium.Color.fromCssColorString(VISUAL_LIME).withAlpha(0.92),
-          depthFailMaterial: Cesium.Color.fromCssColorString(VISUAL_LIME).withAlpha(0.75),
-          arcType: Cesium.ArcType.NONE,
-        },
-      });
-    }
-
-    if (this.trailEntity) return;
     this.trailEntity = this.viewer.entities.add({
       polygon: {
         hierarchy: new Cesium.CallbackProperty(() => {
@@ -133,10 +123,7 @@ export class AircraftTrailController {
       this.markManuallyCleared();
       return;
     }
-    if (this.isAppendBlocked()) {
-      this.setVisualVisible(this.trailDropLines.length > 0 || this.trailLeftPositions.length >= 2);
-      return;
-    }
+    if (this.isAppendBlocked()) return;
 
     if (!this.viewer || !trail || trail.enabled === false) {
       this.setVisualVisible(false);
@@ -179,9 +166,6 @@ export class AircraftTrailController {
 
     if (this.trailEntity) {
       this.trailEntity.show = this.trailLeftPositions.length >= 2;
-    }
-    if (this.trailCenterLine) {
-      this.trailCenterLine.show = this.trailPositions.length >= 2;
     }
   }
 

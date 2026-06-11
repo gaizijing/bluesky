@@ -2,7 +2,7 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useIsimStore } from '@/components/business/IsimAnimation/isimStore';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
-import { useSimLiveGate } from '@/composables/useSimLiveGate';
+import { extractAircraftPose } from '@/utils/isimPose';
 import { getRouteDetail, fetchRoutes } from '@/api/v2/route';
 import {
   buildRouteLonLatPath,
@@ -37,17 +37,24 @@ export function useSimMinimapData() {
   const isimStore = useIsimStore();
   const appStore = useAppDashboardStore();
   const { simData, flightPath } = storeToRefs(isimStore);
-  const { hasLiveFlight } = useSimLiveGate();
 
   const routePath = ref([]);
   const loadingRoute = ref(false);
   const routeId = ref(null);
   let resolvingRoute = false;
 
-  const hasLiveData = hasLiveFlight;
+  const hasSimSession = computed(() => {
+    if (appStore.view !== 'simFlight') return false;
+    return isimStore.isConnected || appStore.simConnected;
+  });
+
+  const hasLiveFlight = computed(() => {
+    if (!hasSimSession.value || !simData.value) return false;
+    return !!extractAircraftPose(simData.value);
+  });
 
   const aircraft = computed(() => {
-    if (!hasLiveData.value || !simData.value) return null;
+    if (!hasLiveFlight.value || !simData.value) return null;
     const d = simData.value;
     const lon = Number(d.aircraftLon);
     const lat = Number(d.aircraftLat);
@@ -60,25 +67,26 @@ export function useSimMinimapData() {
   });
 
   const trailPath = computed(() => {
-    if (!hasLiveData.value) return [];
-    return (flightPath.value || [])
+    if (appStore.view !== 'simFlight' || !hasSimSession.value) return [];
+    const pts = (flightPath.value || [])
       .map((p) => ({ lon: Number(p.lon), lat: Number(p.lat) }))
       .filter((p) => Number.isFinite(p.lon) && Number.isFinite(p.lat));
+    const ac = aircraft.value;
+    if (ac) {
+      const last = pts[pts.length - 1];
+      if (!last || last.lon !== ac.lon || last.lat !== ac.lat) {
+        pts.push({ lon: ac.lon, lat: ac.lat });
+      }
+    }
+    return pts;
   });
 
   const bounds = computed(() => {
-    const basePts = routePath.value.length ? routePath.value : trailPath.value;
-    const raw = collectBounds(basePts);
+    const pts = [...routePath.value, ...trailPath.value];
+    if (aircraft.value) pts.push(aircraft.value);
+    const raw = collectBounds(pts);
     if (!raw) return null;
-    const expanded = expandBounds(raw);
-    const ac = aircraft.value;
-    if (ac && Number.isFinite(ac.lon) && Number.isFinite(ac.lat)) {
-      if (ac.lon < expanded.minLon || ac.lon > expanded.maxLon
-        || ac.lat < expanded.minLat || ac.lat > expanded.maxLat) {
-        return expandBounds(collectBounds([...basePts, ac]), 0.08);
-      }
-    }
-    return expanded;
+    return expandBounds(raw);
   });
 
   async function loadRoute(id) {
@@ -132,7 +140,7 @@ export function useSimMinimapData() {
     trailPath,
     aircraft,
     bounds,
-    hasLiveData,
+    hasLiveData: hasLiveFlight,
     loadingRoute,
     routeId,
   };

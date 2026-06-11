@@ -18,7 +18,7 @@ function boundsCenter(bounds) {
 }
 
 /**
- * 初始化高德小地图：计划航路虚线 + 实时航迹 + 飞机 Marker
+ * 初始化高德小地图：计划航路虚线 + 真实飞行轨迹 + 飞机 Marker
  */
 export function useAmapSimMinimap(mapElRef, {
   routePath,
@@ -87,9 +87,10 @@ export function useAmapSimMinimap(mapElRef, {
 
       trailLine = new AMapRef.Polyline({
         path: [],
-        strokeColor: '#ffc840',
-        strokeOpacity: 0.95,
+        strokeColor: '#10b981',
+        strokeOpacity: 0.9,
         strokeWeight: 3,
+        strokeStyle: 'solid',
         lineJoin: 'round',
         lineCap: 'round',
         zIndex: 60,
@@ -99,10 +100,10 @@ export function useAmapSimMinimap(mapElRef, {
         position: boundsCenter(bounds.value) || [120.28, 36.08],
         icon: new AMapRef.Icon({
           image: planeIcon,
-          size: new AMapRef.Size(32, 32),
-          imageSize: new AMapRef.Size(32, 32),
+          size: new AMapRef.Size(36, 36),
+          imageSize: new AMapRef.Size(36, 36),
         }),
-        offset: new AMapRef.Pixel(-16, -16),
+        offset: new AMapRef.Pixel(-18, -18),
         angle: 0,
         zIndex: 100,
       });
@@ -134,7 +135,8 @@ export function useAmapSimMinimap(mapElRef, {
     const overlays = [routeLine, trailLine].filter(Boolean);
     if (!overlays.length) return;
     const route = toLngLatPath(routePath.value);
-    if (!route.length) return;
+    const trail = toLngLatPath(trailPath.value);
+    if (!route.length && !trail.length) return;
     map.setFitView(overlays, false, [24, 24, 24, 24]);
     fitDone = true;
   }
@@ -142,19 +144,36 @@ export function useAmapSimMinimap(mapElRef, {
   function syncRoute(allowFit = false) {
     if (!routeLine) return;
     const path = toLngLatPath(routePath.value);
-    routeLine.setPath(path);
-    if (allowFit && path.length) fitToContent();
+    if (path.length < 2) {
+      routeLine.setPath([]);
+      routeLine.setOptions({ strokeOpacity: 0 });
+    } else {
+      routeLine.setPath(path);
+      routeLine.setOptions({ strokeOpacity: 0.75 });
+    }
+    if (allowFit && path.length >= 2) fitToContent();
   }
 
   function syncTrail() {
     if (!trailLine) return;
-    trailLine.setPath(toLngLatPath(trailPath.value));
+    const path = toLngLatPath(trailPath.value);
+    if (path.length < 2) {
+      trailLine.setPath([]);
+      trailLine.setOptions({ strokeOpacity: 0 });
+      return;
+    }
+    trailLine.setPath(path);
+    trailLine.setOptions({ strokeOpacity: 0.9 });
   }
 
   function syncPlane(animate) {
     if (!planeMarker) return;
     const ac = aircraft.value;
-    if (!ac) return;
+    if (!ac) {
+      planeMarker.hide?.();
+      return;
+    }
+    planeMarker.show?.();
     const pos = [ac.lon, ac.lat];
     const heading = Number(ac.heading) || 0;
 
@@ -171,12 +190,8 @@ export function useAmapSimMinimap(mapElRef, {
   }
 
   watch(mapElRef, (el) => {
-    if (el && hasLiveData.value) ensureMap();
+    if (el) ensureMap();
   }, { immediate: true });
-
-  watch(hasLiveData, (live) => {
-    if (live && mapElRef.value) ensureMap();
-  });
 
   watch(routePath, () => {
     syncRoute(!fitDone);

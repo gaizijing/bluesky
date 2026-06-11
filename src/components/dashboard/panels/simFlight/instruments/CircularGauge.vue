@@ -89,7 +89,12 @@ function polarXY(angle, radius) {
   };
 }
 
-const needleAngle = computed(() => tickAngle(props.value));
+const safeValue = computed(() => {
+  const n = Number(props.value);
+  return Number.isFinite(n) ? Math.max(0, Math.min(props.max, n)) : 0;
+});
+
+const needleAngle = computed(() => tickAngle(safeValue.value));
 
 const labelPositions = computed(() =>
   props.ticks.map((val) => {

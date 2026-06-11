@@ -14,19 +14,20 @@ export function validateIsimData(data) {
     return false
   }
   
-  // 检查必需字段（至少需要有header或aircraftLon）
+  // 检查必需字段（至少需要有 header、type=sim_data 或经纬度）
   const hasHeader = data.header && typeof data.header === 'string'
+  const hasSimType = data.type === 'sim_data'
   const hasPosition = data.aircraftLon !== undefined && data.aircraftLat !== undefined
-  
-  if (!hasHeader && !hasPosition) {
+  if (!hasHeader && !hasSimType && !hasPosition) {
     console.warn('[ISIM Parser] 数据缺少必需字段')
     return false
   }
-  
-  // 验证数值类型
+
   const numericFields = [
     'aircraftRoll', 'aircraftPitch', 'aircraftHeading',
     'aircraftLon', 'aircraftLat', 'aircraftAlt',
+    'groundSpeed', 'verticalSpeed',
+    'battery', 'batteryPercent',
     'eyeLon', 'eyeLat', 'eyeAlt',
     'observeLon', 'observeLat', 'observeAlt',
     'observePitch', 'observeHeading',
@@ -34,12 +35,15 @@ export function validateIsimData(data) {
   ]
   
   for (const field of numericFields) {
-    if (data[field] !== undefined && typeof data[field] !== 'number') {
-      console.warn(`[ISIM Parser] 字段 ${field} 不是数字类型:`, data[field])
+    if (data[field] === undefined || data[field] === null || data[field] === '') continue
+    const n = Number(data[field])
+    if (!Number.isFinite(n)) {
+      console.warn(`[ISIM Parser] 字段 ${field} 不是有效数字:`, data[field])
       return false
     }
+    data[field] = n
   }
-  
+
   return true
 }
 
@@ -90,22 +94,56 @@ export function parseIsimData(rawData) {
 }
 
 /**
+ * WeatherBridge 短格式（无 header）
+ * roll;pitch;heading;lon;lat;alt[;groundSpeed;verticalSpeed[;batteryPercent]]
+ */
+function parseWeatherBridgeFormat(parts) {
+  if (parts.length < 6) return null
+
+  const data = {
+    aircraftRoll: parseFloat(parts[0]) || 0,
+    aircraftPitch: parseFloat(parts[1]) || 0,
+    aircraftHeading: parseFloat(parts[2]) || 0,
+    aircraftLon: parseFloat(parts[3]) || 0,
+    aircraftLat: parseFloat(parts[4]) || 0,
+    aircraftAlt: parseFloat(parts[5]) || 0,
+  }
+
+  if (parts.length > 6) data.groundSpeed = parseFloat(parts[6]) || 0
+  if (parts.length > 7) data.verticalSpeed = parseFloat(parts[7]) || 0
+  if (parts.length > 8) data.batteryPercent = parseFloat(parts[8]) || 0
+
+  return data
+}
+
+/**
  * 解析字符串格式的ISIM数据
- * 格式: header;roll;pitch;heading;lon;lat;alt;eyeLon;eyeLat;eyeAlt;...
+ * - WeatherBridge: roll;pitch;heading;lon;lat;alt;groundSpeed;verticalSpeed;batteryPercent
+ * - UE5 长格式: header;roll;pitch;heading;lon;lat;alt;eyeLon;eyeLat;eyeAlt;...
  * @param {string} str - 分号分隔的字符串
- * @returns {Object} 解析后的对象
+ * @returns {Object|null} 解析后的对象
  */
 function parseStringFormat(str) {
   if (!str || typeof str !== 'string') {
     return null
   }
-  
-  const parts = str.split(';')
-  if (parts.length < 7) { // 至少需要header+6个核心字段
+
+  const parts = str.split(';').filter((p) => p !== '')
+  if (parts.length < 6) {
     console.warn('[ISIM Parser] 字符串格式字段不足:', parts.length)
     return null
   }
-  
+
+  const firstIsNumeric = Number.isFinite(parseFloat(parts[0]))
+  if (firstIsNumeric && parts.length <= 8) {
+    return parseWeatherBridgeFormat(parts)
+  }
+
+  if (parts.length < 7) {
+    console.warn('[ISIM Parser] UE5 字符串格式字段不足:', parts.length)
+    return null
+  }
+
   try {
     const data = {
       header: parts[0],
@@ -114,10 +152,9 @@ function parseStringFormat(str) {
       aircraftHeading: parseFloat(parts[3]) || 0,
       aircraftLon: parseFloat(parts[4]) || 0,
       aircraftLat: parseFloat(parts[5]) || 0,
-      aircraftAlt: parseFloat(parts[6]) || 0
+      aircraftAlt: parseFloat(parts[6]) || 0,
     }
-    
-    // 可选字段
+
     if (parts.length > 7) data.eyeLon = parseFloat(parts[7]) || 0
     if (parts.length > 8) data.eyeLat = parseFloat(parts[8]) || 0
     if (parts.length > 9) data.eyeAlt = parseFloat(parts[9]) || 0
@@ -126,10 +163,10 @@ function parseStringFormat(str) {
     if (parts.length > 12) data.observeAlt = parseFloat(parts[12]) || 0
     if (parts.length > 13) data.observePitch = parseFloat(parts[13]) || 0
     if (parts.length > 14) data.observeHeading = parseFloat(parts[14]) || 0
-    if (parts.length > 15) data.trailHide = parseInt(parts[15]) || 0
-    if (parts.length > 16) data.airwayHide = parseInt(parts[16]) || 0
-    if (parts.length > 17) data.ownshipLight = parseInt(parts[17]) || 0
-    
+    if (parts.length > 15) data.trailHide = parseInt(parts[15], 10) || 0
+    if (parts.length > 16) data.airwayHide = parseInt(parts[16], 10) || 0
+    if (parts.length > 17) data.ownshipLight = parseInt(parts[17], 10) || 0
+
     return data
   } catch (error) {
     console.error('[ISIM Parser] 解析字符串格式失败:', error)
@@ -146,10 +183,10 @@ function parseStringFormat(str) {
  * @returns {Object} 速度信息
  */
 export function calculateAircraftSpeed(prevData, currData, timeDiff = 1) {
-  if (!prevData || !currData || timeDiff <= 0) {
+  if (!prevData || !currData || !Number.isFinite(timeDiff) || timeDiff < 0.05) {
     return { groundSpeed: 0, verticalSpeed: 0, totalSpeed: 0 }
   }
-  
+
   try {
     // 计算地面距离（简化球面距离）
     const earthRadius = 6371000 // 地球半径（米）
@@ -173,10 +210,11 @@ export function calculateAircraftSpeed(prevData, currData, timeDiff = 1) {
     const verticalSpeed = verticalDistance / timeDiff
     const totalSpeed = Math.sqrt(groundSpeed * groundSpeed + verticalSpeed * verticalSpeed)
     
+    const clamp = (v, max) => Math.max(-max, Math.min(max, v))
     return {
-      groundSpeed: parseFloat(groundSpeed.toFixed(2)),
-      verticalSpeed: parseFloat(verticalSpeed.toFixed(2)),
-      totalSpeed: parseFloat(totalSpeed.toFixed(2)),
+      groundSpeed: parseFloat(clamp(groundSpeed, 150).toFixed(2)),
+      verticalSpeed: parseFloat(clamp(verticalSpeed, 80).toFixed(2)),
+      totalSpeed: parseFloat(clamp(totalSpeed, 150).toFixed(2)),
       distance: parseFloat(groundDistance.toFixed(2))
     }
   } catch (error) {

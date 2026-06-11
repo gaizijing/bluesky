@@ -1,87 +1,80 @@
 # 航线风险分析接口契约
 
-本文档对应当前已经落地的前后端联调版本，用于说明 `RouterRisk`、航线列表、航线详情与后端 `/routes` 接口的真实返回口径。
+本文档对应当前 V2 后端 `/routes` 接口实现，供 `RouterRisk`、航线列表、航线详情与风险分析面板联调使用。
 
 ## 已实现接口
 
-- `GET /routes`
-- `GET /routes/{routeId}`
-- `POST /routes`
+- `GET /routes?regionId=&page=&size=`
+- `GET /routes/{routeId}?routeVersionId=`
+- `GET /routes/{routeId}/versions`
+- `POST /routes?regionId=`
+- `POST /routes/import?regionId=`
 - `POST /routes/{routeId}/analyze`
-- `DELETE /routes/clear-history`
+- `DELETE /routes?regionId=`
+- `DELETE /routes/{routeId}`
 
 统一说明：
 
 - 风险值 `risk / averageRisk / overallRisk` 统一为 `0 ~ 1`
 - Cesium 着色数组 `dangers` 统一为 `0 ~ 10`
-- 顶层响应仍通过后端 `Result.success(...)` 包裹，业务数据在 `data`
+- 顶层响应通过后端 `Result.success(...)` 包裹，业务数据在 `data`
 
 ## 数据来源
 
-当前后端已经改为真实微尺度天气采样，不再使用随机数模拟：
+航线分析从 **`risk_field_cache`** 格点快照双线性插值采样（V1 的 `microscale_weather` 表已废弃）：
 
 - 航线按途经点拆分为多个航段
-- 每个航段沿线做多点采样
-- 每个采样点匹配覆盖该区域的监测点
-- 从 `MicroscaleWeather` 最新可用格点快照中插值获取
-  - `riskLevel`
-  - `windSpeed`
-  - `windShear`
-  - `turbulence`
+- 每个航段沿线做 7 点采样（`SEGMENT_SAMPLE_COUNT = 7`）
+- 每个采样点匹配覆盖该区域的起降点 bbox
+- 从对应 Region 的 `risk_field_cache` 最新 bucket 插值获取：
+  - `risk`（由 `value` 归一化到 0~1）
   - `reason`
 
-当前仍未接入的独立接口：
+**缓存来源（二选一）：**
 
-- `windDir`
-- `rainfall`
+1. **调度任务**（`RiskCacheJob`）：基于和风 API 按 Region 边界格点采样后写入，`rule_version` 不含 `-seed`
+2. **Flyway 种子**（V4/V22）：公式生成的演示格点，`rule_version` 含 `RS001-v1-seed`
 
-这两个字段当前不会伪造真实值，统一返回：
+开发环境若未执行调度重算，默认读到的是种子数据。触发真实采样：
 
-- `windDir = 0`
-- `rainfall = 0`
+```bash
+POST /api/scheduler/recompute?regionId=R2
+```
 
-同时会在 `dataCompleteness.missingInterfaces` 中明确声明缺失项。
+### 当前未接入 / 未填充的字段
+
+| 字段 | 当前返回值 | 原因 |
+|------|------------|------|
+| `windDir` | `0` | 无独立风向格点接口 |
+| `rainfall` | `0` | 无沿航线降水格点接口 |
+| `windSpeed` | `0` | `buildGridSnapshot` 未从缓存填充该维度 |
+| `windShear` | `0` | 同上 |
+| `turbulence` | `0` | 同上 |
+
+上述缺失会在 `dataCompleteness.missingInterfaces` 与 `notes` 中声明。
 
 ## `GET /routes`
 
-返回最近的历史航线列表。每条数据已经包含首屏可直接使用的航段信息。
+按 Region 分页返回航路列表。演示数据含 Flyway V15 种子「顺丰-黄岛保税」（`route-sf-huangdao`）。
 
-列表项当前字段：
+列表项主要字段：
 
-- `id`
-- `routeId`
-- `name`
-- `routeName`
-- `startName`
-- `endName`
-- `length`
-- `distance`
-- `segments`
-- `segmentCount`
-- `averageRisk`
-- `overallRisk`
-- `riskLevel`
-- `highestRisk`
-- `highestRiskSegment`
-- `segmentData`
-- `dangers`
-- `waypoints`
-- `aircraftModel`
-- `flightHeight`
-- `estimatedMinutes`
-- `estimatedTime`
-- `startTime`
-- `endTime`
+- `id` / `routeId` / `name` / `routeName`
+- `startName` / `endName`
+- `length` / `distance` / `segments` / `segmentCount`
+- `averageRisk` / `overallRisk` / `riskLevel`
+- `highestRisk` / `highestRiskSegment`
+- `segmentData` / `dangers` / `waypoints`
+- `aircraftModel` / `flightHeight`
+- `estimatedMinutes` / `estimatedTime`
+- `startTime` / `endTime`
 - `dataCompleteness`
 
 ## `GET /routes/{routeId}`
 
-返回单条航线完整详情，当前实现与列表项字段保持同口径，并额外返回：
+返回单条航线完整详情，字段与列表项同口径。
 
-- `success`
-- `message`（仅失败时）
-
-航线不存在时返回：
+航线不存在时：
 
 ```json
 {
@@ -91,9 +84,9 @@
 }
 ```
 
-## `POST /routes`
+## `POST /routes?regionId=`
 
-请求体当前支持：
+请求体示例：
 
 ```json
 {
@@ -104,11 +97,7 @@
   "endLon": 117.288,
   "endLat": 36.758,
   "waypoints": [
-    {
-      "name": "途经点 1",
-      "lon": 117.202,
-      "lat": 36.706
-    }
+    { "name": "途经点 1", "lon": 117.202, "lat": 36.706 }
   ],
   "aircraftModel": "DJI Mavic 3",
   "flightHeight": 300,
@@ -117,18 +106,11 @@
 }
 ```
 
-成功返回：
-
-- `success`
-- `routeId`
-- `message`
-- `route`
-
-其中 `route` 已经是完整航线 payload，可直接用于前端回填详情与首屏渲染。
+成功返回 `success`、`routeId`、`message`、`route`（完整 payload）。
 
 ## `POST /routes/{routeId}/analyze`
 
-请求体支持：
+请求体：
 
 ```json
 {
@@ -138,136 +120,58 @@
 
 `currentTime` 可为空；为空时优先使用航线起飞时间，否则退回当前时间。
 
-当前已实现返回字段：
+主要返回字段：
 
-- `success`
-- `routeId`
-- `routeName`
-- `analysisTime`
-- `currentAnalysisTime`
-- `averageRisk`
-- `overallRisk`
-- `riskLevel`
-- `highestRisk`
-- `highestRiskSegment`
-- `segmentData`
-- `segments`
-- `dangers`
-- `waypoints`
-- `flightHeight`
-- `aircraftModel`
-- `estimatedMinutes`
-- `estimatedTime`
-- `riskDimensions`
-- `overallAssessment`
-- `segmentAnalysis`
-- `measures`
-- `recommendations`
-- `alternativeRoutes`
-- `alternatives`
-- `riskChart`
-- `dataCompleteness`
-- `routeStartTime`
-- `routeEndTime`
-- `startTime`
-- `endTime`
+- `success` / `routeId` / `routeName` / `analysisTime` / `currentAnalysisTime`
+- `averageRisk` / `overallRisk` / `riskLevel`
+- `highestRisk` / `highestRiskSegment`
+- `segmentData` / `segments` / `dangers` / `waypoints`
+- `flightHeight` / `aircraftModel` / `estimatedMinutes` / `estimatedTime`
+- `riskDimensions` / `overallAssessment` / `segmentAnalysis`
+- `measures` / `recommendations`
+- `alternativeRoutes` / `alternatives`
+- `riskChart` / `dataCompleteness`
+- `routeStartTime` / `routeEndTime` / `startTime` / `endTime`
 
 ## `segmentData[]`
 
-这是风险图表、地图高亮、提示框和统计面板的核心数据。
+风险图表、地图高亮、提示框的核心数据。
 
-当前字段：
-
-- `segment`
-- `distance`
-- `segmentLength`
-- `risk`
-- `riskLevel`
-- `windSpeed`
-- `windDir`
-- `windShear`
-- `turbulence`
-- `rainfall`
-- `startCoordinates`
-- `endCoordinates`
-- `pathCoordinates`
-- `reason`
-
-说明：
-
-- `distance` 是累计距离
-- `segmentLength` 是当前航段长度
-- `pathCoordinates` 是用于地图绘制的沿线坐标
+| 字段 | 说明 |
+|------|------|
+| `segment` | 航段序号 |
+| `distance` | 累计距离 |
+| `segmentLength` | 当前航段长度 |
+| `risk` / `riskLevel` | 来自 risk_field_cache 插值 |
+| `windSpeed` / `windShear` / `turbulence` | 当前为 0 |
+| `windDir` / `rainfall` | 当前为 0 |
+| `startCoordinates` / `endCoordinates` / `pathCoordinates` | 地图绘制坐标 |
+| `reason` | 风险原因文案 |
 
 ## `measures[]`
 
-当前字段：
-
-- `id`
-- `title`
-- `description`
-- `priority`
-- `level`
-- `content`
-
-说明：
-
-- `priority` 与 `level` 含义一致，都是 `low | medium | high`
-- `content` 为 `description` 的兼容字段
+- `id` / `title` / `description`
+- `priority` / `level`（`low` \| `medium` \| `high`）
+- `content`（`description` 的兼容字段）
 
 ## `alternativeRoutes[]`
 
-备选航线当前不是数据库表查询结果，而是基于主航线高风险段自动生成的绕飞方案。
+非数据库查询，基于主航线高风险段算法生成的绕飞方案。
 
-生成规则：
+生成条件：
 
-- 主航线至少有两个航点
+- 主航线至少两个航点
 - 存在有效最高风险航段
-- `highestRisk >= 0.3` 才生成
-
-当前字段：
-
-- `id`
-- `routeId`
-- `name`
-- `startName`
-- `endName`
-- `distance`
-- `length`
-- `estimatedMinutes`
-- `estimatedTime`
-- `flightHeight`
-- `averageRisk`
-- `overallRisk`
-- `riskLevel`
-- `segmentCount`
-- `description`
-- `advantage`
-- `waypoints`
-- `segmentData`
-- `segments`
-- `dangers`
-- `dataCompleteness`
-
-兼容说明：
-
-- 备选航线里的 `segments` 当前仍保留为数组，兼容前端已有读取逻辑
-- 主航线 payload 里的 `segments` 为数量
+- `highestRisk >= 0.3`
 
 ## `riskChart`
 
-当前后端会基于航线时间窗口按多个时间点重新采样，返回：
+基于航线时间窗口多时间点重新采样：
 
-- `timeLabels`
-- `riskValues`
-- `stats.max`
-- `stats.min`
-- `stats.average`
-- `stats.durationMinutes`
+- `timeLabels` / `riskValues`
+- `stats.max` / `stats.min` / `stats.average` / `stats.durationMinutes`
 
 ## `dataCompleteness`
-
-当前返回结构：
 
 ```json
 {
@@ -283,16 +187,15 @@
 }
 ```
 
-## 当前缺的后端气象接口
+## 后续补齐建议
 
-如果要把组件里的所有字段都补成真实数据，当前还需要至少补这两类源：
+若要补全 segment 上的风/降水字段，建议：
 
-- 沿航线风向格点或矢量风场接口
-- 沿航线降水格点接口
+1. 在 `RouteService.buildGridSnapshot` 中从 `risk_field_cache.factors_json` 或独立气象格点填充 `windSpeed` 等
+2. 接入沿航线风向矢量场（可复用 `/wind-field` NetCDF 插值）
+3. 接入降水格点（可复用 `/weather/grid-field?product=precip`）
 
-补齐后建议直接替换：
+## 相关文档
 
-- `segmentData[].windDir`
-- `segmentData[].rainfall`
-
-其余主链路字段目前都已经接到真实微尺度天气采样逻辑上。
+- [后端 API 与数据来源](../../server/doc/API-接口与数据来源.md)
+- [后端接口文档 V2](../../server/doc/后端接口文档.md)

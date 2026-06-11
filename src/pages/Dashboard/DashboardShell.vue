@@ -12,9 +12,9 @@
     <div v-if="mapVisible" class="dashboard-shell__map">
       <MapContainer />
     </div>
-    <DashboardLayout v-if="!appStore.panelsHidden" />
+    <DashboardLayout v-show="!appStore.panelsHidden" class="dashboard-shell__panels" />
     <MapToolbar v-if="config.toolbar.visible" />
-    <SimFlightMapBridge v-if="appStore.view === 'simFlight' && mapVisible" />
+    <SimFlightMapBridge v-if="mapVisible" />
     <LegendPanel v-if="appStore.legendOpen && !regionMeteoOnDashboard" />
     <PickPopup v-if="appStore.pickPopup && !regionMeteoOnDashboard" />
     <TimelineBar v-if="config.main.timeline.visible" />
@@ -79,6 +79,11 @@ onMounted(async () => {
   position: absolute;
   inset: 0;
   z-index: 0;
+}
+
+.dashboard-shell__panels {
+  /* v-show 隐藏：保留 DOM / 组件实例，仅不显示 */
+  pointer-events: auto;
 }
 
 .dashboard-shell--pick :deep(.cesium-container),

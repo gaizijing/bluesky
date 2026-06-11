@@ -12,7 +12,7 @@
         <div class="sim-dashboard__side-gauge">
           <div class="sim-dashboard__gauge-box">
           <CircularGauge
-            :value="animBattery"
+            :value="flight.battery"
             :max="100"
             :apex-value="60"
             :ticks="[0, 20, 40, 60, 80, 100]"
@@ -23,16 +23,17 @@
         </div>
 
       <AttitudeIndicator
-        :roll="animRoll"
-        :pitch="animPitch"
-        :altitude="animAltitude"
-        :vertical-speed="animVerticalSpeed"
+        :heading="flight.heading"
+        :roll="flight.roll"
+        :pitch="flight.pitch"
+        :altitude="flight.altitude"
+        :vertical-speed="flight.verticalSpeed"
       />
 
         <div class="sim-dashboard__side-gauge">
           <div class="sim-dashboard__gauge-box">
           <CircularGauge
-            :value="animSpeed"
+            :value="flight.speed"
             :max="120"
             :ticks="[0, 20, 40, 60, 80, 100, 120]"
             label="飞行速度"
@@ -52,7 +53,6 @@ import CircularGauge from './instruments/CircularGauge.vue';
 import AttitudeIndicator from './instruments/AttitudeIndicator.vue';
 import SimConnectBar from './SimConnectBar.vue';
 import { useSimDashboardData } from '@/composables/useSimDashboardData';
-import { useAnimatedFlight } from '@/composables/useAnimatedNumber';
 
 defineProps({
   panelId: { type: String, default: 'simDashboard' },
@@ -60,14 +60,6 @@ defineProps({
 });
 
 const { flight, weatherStrip } = useSimDashboardData();
-const {
-  roll: animRoll,
-  pitch: animPitch,
-  altitude: animAltitude,
-  verticalSpeed: animVerticalSpeed,
-  speed: animSpeed,
-  battery: animBattery,
-} = useAnimatedFlight(flight);
 </script>
 
 <style scoped lang="scss">
@@ -76,7 +68,7 @@ const {
   width: 100%;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   background: #1e2338;
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
@@ -86,13 +78,15 @@ const {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
   height: 100%;
   min-height: 0;
-  padding: 18px 22px 10px;
-  gap: 2px;
+  padding: 10px 16px 8px;
+  gap: 4px;
   color: #fff;
   font-family: 'AiDeepFont', 'Microsoft YaHei', sans-serif;
+  overflow: visible;
+  box-sizing: border-box;
 }
 
 .sim-dashboard__weather {
@@ -127,13 +121,13 @@ const {
 
 .sim-dashboard__instruments {
   flex: 1 1 auto;
-  min-height: 210px;
+  min-height: 200px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 36px;
+  gap: 28px;
   overflow: visible;
-  padding-bottom: 2px;
+  padding-bottom: 4px;
 }
 
 .sim-dashboard__side-gauge {
@@ -152,11 +146,12 @@ const {
 }
 
 .sim-dashboard__gauge-caption {
-  margin-top: 6px;
-  font-size: 10px;
-  line-height: 1.2;
+  margin-top: 4px;
+  font-size: 9px;
+  line-height: 1.25;
   color: rgba(255, 255, 255, 0.48);
   flex-shrink: 0;
+  white-space: nowrap;
 }
 </style>
 

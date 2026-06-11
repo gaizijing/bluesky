@@ -10,6 +10,7 @@ import { loadRegionCatalog } from '@/services/regionCatalog';
 import { fetchWarnings } from '@/api/v2/warning';
 import { prefetchLandingMatrix } from '@/api/flyability';
 import { FLYABILITY_OVERVIEW_HOURS } from '@/utils/flyabilityChart';
+import { disconnectSimSession } from '@/composables/useIsimConnection';
 
 const REGION_ID_KEY = 'currentRegionId';
 
@@ -23,7 +24,6 @@ export const useAppDashboardStore = defineStore('appDashboard', {
     routeIdForSim: null,
     simSessionId: null,
     simConnected: false,
-    cameraMode: 'thirdPerson',
     panelsHidden: false,
     legendOpen: false,
     pickMode: false,
@@ -163,9 +163,6 @@ export const useAppDashboardStore = defineStore('appDashboard', {
     },
 
     setView(view) {
-      if (this.view === 'simFlight' && view !== 'simFlight') {
-        this.cameraMode = 'free';
-      }
       this.view = view;
       if (view === 'home') {
         this.focus = { type: 'none' };
@@ -178,16 +175,17 @@ export const useAppDashboardStore = defineStore('appDashboard', {
 
     /** 工具栏「首页」：非 home 则切回；已在 home 则重置地图默认视角 */
     goHome() {
-      if (this.view === 'simFlight') this.cameraMode = 'free';
       if (this.view === 'home') {
         dashboardEventBus.emit(DASHBOARD_EVENTS.RESET_HOME_CAMERA);
         return;
+      }
+      if (this.view === 'simFlight') {
+        disconnectSimSession();
       }
       this.setView('home');
     },
 
     drillLanding(id) {
-      if (this.view === 'simFlight') this.cameraMode = 'free';
       this.view = 'drillLanding';
       this.focus = { type: 'landingPoint', id };
       dashboardEventBus.emit(DASHBOARD_EVENTS.VIEW_CHANGED, {
@@ -197,7 +195,6 @@ export const useAppDashboardStore = defineStore('appDashboard', {
     },
 
     drillRoute(id) {
-      if (this.view === 'simFlight') this.cameraMode = 'free';
       this.view = 'drillRoute';
       this.focus = { type: 'route', id };
       this.routeIdForSim = id;
@@ -212,13 +209,6 @@ export const useAppDashboardStore = defineStore('appDashboard', {
         routeId || (this.focus.type === 'route' ? this.focus.id : null) || this.routeIdForSim;
       if (resolved) this.routeIdForSim = resolved;
       this.view = 'simFlight';
-      this.cameraMode = 'thirdPerson';
-    },
-
-    setCameraMode(mode) {
-      if (['thirdPerson', 'firstPerson', 'free'].includes(mode)) {
-        this.cameraMode = mode;
-      }
     },
 
     togglePanelsHidden() {

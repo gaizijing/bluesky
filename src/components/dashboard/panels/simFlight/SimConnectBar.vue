@@ -2,7 +2,7 @@
   <div class="sim-connect">
     <div class="sim-connect__dock">
       <div class="sim-connect__group sim-connect__group--route">
-        <span class="sim-connect__dot" :class="{ 'sim-connect__dot--on': isConnected }" />
+        <span class="sim-connect__dot" :class="{ 'sim-connect__dot--on': isLinkUp }" />
         <span class="sim-connect__label">航路</span>
         <el-select
           v-model="selectedRouteId"
@@ -11,7 +11,7 @@
           placeholder="选择航路"
           size="small"
           :loading="loadingRoutes"
-          :disabled="isConnected"
+          :disabled="isLinkUp"
           filterable
         >
           <el-option
@@ -29,8 +29,8 @@
         <button
           type="button"
           class="sim-connect__chip"
-          :class="isConnected ? 'sim-connect__chip--danger' : 'sim-connect__chip--primary'"
-          :disabled="isUpdating || isConnecting || !selectedRouteId"
+          :class="isLinkUp ? 'sim-connect__chip--danger' : 'sim-connect__chip--primary'"
+          :disabled="isUpdating || (isConnecting && !isLinkUp) || !selectedRouteId"
           @click="toggleConnect"
         >
           {{ connectLabel }}
@@ -39,7 +39,7 @@
         <button
           type="button"
           class="sim-connect__chip sim-connect__chip--success"
-          :disabled="isControlling || !isConnected || sendingStatus === 'started'"
+          :disabled="isControlling || !isLinkUp || sendingStatus === 'started'"
           @click="controlIsim('START_SENDING')"
         >
           开始发送气象
@@ -47,14 +47,14 @@
         <button
           type="button"
           class="sim-connect__chip sim-connect__chip--muted"
-          :disabled="isControlling || !isConnected || sendingStatus !== 'started'"
+          :disabled="isControlling || !isLinkUp || sendingStatus !== 'started'"
           @click="controlIsim('STOP_SENDING')"
         >
           停止发送
         </button>
 
         <span
-          v-if="isConnected"
+          v-if="isLinkUp"
           class="sim-connect__status"
           :class="isSendingWindData ? 'is-active' : ''"
         >
@@ -81,27 +81,27 @@
           <div class="sim-connect__settings-grid">
             <label class="sim-connect__field">
               <span>主机</span>
-              <input v-model="config.host" class="sim-connect__input" :disabled="isConnected" @change="persistConfig" />
+              <input v-model="config.host" class="sim-connect__input" :disabled="isLinkUp" @change="persistConfig" />
             </label>
             <label class="sim-connect__field">
               <span>发送端口</span>
-              <input v-model.number="config.sendPort" type="number" class="sim-connect__input" :disabled="isConnected" @change="persistConfig" />
+              <input v-model.number="config.sendPort" type="number" class="sim-connect__input" :disabled="isLinkUp" @change="persistConfig" />
             </label>
             <label class="sim-connect__field">
               <span>接收端口</span>
-              <input v-model.number="config.receivePort" type="number" class="sim-connect__input" :disabled="isConnected" @change="persistConfig" />
+              <input v-model.number="config.receivePort" type="number" class="sim-connect__input" :disabled="isLinkUp" @change="persistConfig" />
             </label>
             <label class="sim-connect__field">
               <span>经度</span>
-              <input v-model.number="config.longitude" type="number" step="0.0001" class="sim-connect__input" :disabled="isConnected" @change="persistConfig" />
+              <input v-model.number="config.longitude" type="number" step="0.0001" class="sim-connect__input" :disabled="isLinkUp" @change="persistConfig" />
             </label>
             <label class="sim-connect__field">
               <span>纬度</span>
-              <input v-model.number="config.latitude" type="number" step="0.0001" class="sim-connect__input" :disabled="isConnected" @change="persistConfig" />
+              <input v-model.number="config.latitude" type="number" step="0.0001" class="sim-connect__input" :disabled="isLinkUp" @change="persistConfig" />
             </label>
             <label class="sim-connect__field">
               <span>高度 m</span>
-              <input v-model.number="config.altitude" type="number" class="sim-connect__input" :disabled="isConnected" @change="persistConfig" />
+              <input v-model.number="config.altitude" type="number" class="sim-connect__input" :disabled="isLinkUp" @change="persistConfig" />
             </label>
           </div>
           <button
@@ -115,10 +115,6 @@
         </div>
       </el-popover>
     </div>
-
-    <div v-if="sendStatusMessage" class="sim-connect__msg" :class="sendStatusClass">
-      {{ sendStatusMessage }}
-    </div>
   </div>
 </template>
 
@@ -127,46 +123,57 @@ import { computed, watch, onMounted, onUnmounted } from 'vue';
 import { Setting } from '@element-plus/icons-vue';
 import { useIsimConnection } from '@/composables/useIsimConnection';
 import { useSimRouteSelect } from '@/composables/useSimRouteSelect';
+import { useAppDashboardStore } from '@/store/modules/appDashboard';
 
 const {
   config,
-  isConnected,
+  isLinkUp,
   isConnecting,
   isUpdating,
   isControlling,
   isDebugSending,
   isSendingWindData,
   sendingStatus,
-  sendStatusMessage,
-  sendStatusClass,
   toggleConnect,
   controlIsim,
   toggleDebugSending,
   applyRouteStartPosition,
   persistConfig,
+  handleDisconnect,
   dispose,
 } = useIsimConnection();
 
+const appStore = useAppDashboardStore();
+
 const { routes, loadingRoutes, selectedRouteId } = useSimRouteSelect((id) => {
-  if (!isConnected.value) applyRouteStartPosition(id);
+  if (!isLinkUp.value) applyRouteStartPosition(id);
 });
 
 const connectLabel = computed(() => {
   if (isUpdating.value) return '连接中…';
-  if (isConnecting.value) return '握手中…';
-  return isConnected.value ? '断开' : '连接';
+  if (isConnecting.value && !isLinkUp.value) return '握手中…';
+  return isLinkUp.value ? '断开' : '连接';
 });
 
 watch(
   selectedRouteId,
   (id) => {
-    if (id && !isConnected.value) applyRouteStartPosition(id);
+    if (id && !isLinkUp.value) applyRouteStartPosition(id);
   },
   { immediate: true },
 );
 
+watch(
+  () => appStore.view,
+  (view, prev) => {
+    if (prev === 'simFlight' && view !== 'simFlight' && isLinkUp.value) {
+      handleDisconnect();
+    }
+  },
+);
+
 onMounted(() => {
-  if (selectedRouteId.value && !isConnected.value) {
+  if (selectedRouteId.value && !isLinkUp.value) {
     applyRouteStartPosition(selectedRouteId.value);
   }
 });
@@ -179,7 +186,8 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .sim-connect {
   flex: 0 0 auto;
-  margin-top: 2px;
+  margin-top: auto;
+  padding-top: 2px;
 }
 
 .sim-connect__dock {
@@ -346,24 +354,6 @@ onUnmounted(() => {
   }
 }
 
-.sim-connect__msg {
-  margin-top: 4px;
-  padding: 3px 8px;
-  border-radius: 2px;
-  font-size: 10px;
-  text-align: center;
-
-  &.success {
-    color: #34d399;
-    background: rgba(52, 211, 153, 0.08);
-  }
-
-  &.info {
-    color: #93c5fd;
-    background: rgba(96, 165, 250, 0.08);
-  }
-}
-
 .sim-connect__settings-title {
   font-size: 12px;
   color: #00e8ff;
@@ -388,7 +378,7 @@ onUnmounted(() => {
 }
 
 .sim-connect__input {
-  width: 100%;
+  width: 85%;
   padding: 4px 8px;
   border: 1px solid rgba(0, 232, 255, 0.2);
   border-radius: 3px;

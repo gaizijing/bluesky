@@ -41,11 +41,6 @@ export function getMapTilesConfig() {
       terrain_exaggeration: Number(env.VITE_MAP_TERRAIN_EXAGGERATION) || 1.25,
       tianditu_token: tiandituToken,
       aircraft_model_heading_offset_deg: Number(env.VITE_AIRCRAFT_HEADING_OFFSET_DEG) || -90,
-      third_person_distance_m: Number(env.VITE_THIRD_PERSON_DISTANCE_M) || 300,
-      third_person_left_front_deg: Number(env.VITE_THIRD_PERSON_LEFT_FRONT_DEG) || 45,
-      third_person_target_up_m: Number(env.VITE_THIRD_PERSON_TARGET_UP_M) || 4,
-      pose_smooth_alpha: Number(env.VITE_POSE_SMOOTH_ALPHA) || 0.4,
-      camera_smooth_alpha: Number(env.VITE_CAMERA_SMOOTH_ALPHA) || 0.22,
     },
     tile_layer: {
       url_template: tileUrl,

@@ -62,7 +62,7 @@ function flyToRoute(viewer, positions) {
   }
 }
 
-function renderSimRoute(viewer, path3d) {
+function renderSimRoute(viewer, path3d, { flyTo = true } = {}) {
   clearSimRoute(viewer);
   if (!viewer || path3d.length < 2) return;
 
@@ -76,7 +76,7 @@ function renderSimRoute(viewer, path3d) {
       arcType: Cesium.ArcType.GEODESIC,
     },
   });
-  flyToRoute(viewer, positions);
+  if (flyTo) flyToRoute(viewer, positions);
   viewer.scene.requestRender();
 }
 
@@ -103,7 +103,7 @@ export function useSimRouteCesiumSync() {
       const flightHeight = detail?.flightHeight ?? 300;
       const control = waypointsToControl(waypoints, flightHeight);
       const path3d = buildCatmullPath3D(control, 120);
-      renderSimRoute(viewer, path3d);
+      renderSimRoute(viewer, path3d, { flyTo: !appStore.simConnected });
       routeIdLoaded = routeId;
     } catch (err) {
       console.warn('[SimRouteCesium] load route failed', err);

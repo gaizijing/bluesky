@@ -27,22 +27,18 @@ import {
   Collection,
   Aim,
   Promotion,
-  LocationFilled,
+  Delete,
   VideoCamera,
-  View,
-  Unlock,
 } from '@element-plus/icons-vue';
 import dashboardConfig from '@/config/dashboard.config.json';
 import { useAppDashboardStore } from '@/store/modules/appDashboard';
-import { useIsimStore } from '@/components/business/IsimAnimation/isimStore';
 import { getMapToolbarRightInset } from '@/utils/dashboardLayout';
 import { dashboardEventBus, DASHBOARD_EVENTS } from '@/utils/eventBus';
 
 const appStore = useAppDashboardStore();
-const isimStore = useIsimStore();
 const configuredItems = dashboardConfig.toolbar.items || [];
 /** 仅联飞视图显示的工具（离开 simFlight 即隐藏） */
-const SIM_FLIGHT_TOOL_KEYS = ['focusAircraft', 'cameraThird', 'cameraFirst', 'cameraFree'];
+const SIM_FLIGHT_TOOL_KEYS = ['focusAircraft', 'clearTrail'];
 
 const toolbarStyle = computed(() => {
   if (appStore.panelsHidden) {
@@ -78,25 +74,15 @@ const actionMap = {
     icon: Promotion,
     onClick: () => appStore.enterSimFlight(appStore.routeIdForSim),
   },
+  clearTrail: {
+    label: '清除尾迹',
+    icon: Delete,
+    onClick: () => dashboardEventBus.emit(DASHBOARD_EVENTS.CLEAR_ISIM_TRAIL),
+  },
   focusAircraft: {
     label: '聚焦飞机',
-    icon: LocationFilled,
-    onClick: () => dashboardEventBus.emit(DASHBOARD_EVENTS.FOCUS_ISIM_AIRCRAFT),
-  },
-  cameraThird: {
-    label: '第三人称',
     icon: VideoCamera,
-    onClick: () => appStore.setCameraMode('thirdPerson'),
-  },
-  cameraFirst: {
-    label: '第一人称',
-    icon: View,
-    onClick: () => appStore.setCameraMode('firstPerson'),
-  },
-  cameraFree: {
-    label: '自由视角',
-    icon: Unlock,
-    onClick: () => appStore.setCameraMode('free'),
+    onClick: () => dashboardEventBus.emit(DASHBOARD_EVENTS.FOCUS_ISIM_AIRCRAFT),
   },
 };
 
@@ -115,12 +101,10 @@ const toolbarItems = computed(() => {
     .map((key) => {
       const base = actionMap[key];
       if (!base) return null;
-      const needsConnection = ['focusAircraft', 'cameraThird', 'cameraFirst'].includes(key);
-      const disabled = needsConnection ? !isimStore.isConnected : false;
       return {
         key,
         ...base,
-        disabled,
+        disabled: key === 'focusAircraft' ? !appStore.simConnected : false,
         label: key === 'hide'
           ? (appStore.panelsHidden ? '显示面板' : '隐藏面板')
           : base.label,
@@ -130,9 +114,6 @@ const toolbarItems = computed(() => {
           : key === 'legend' ? appStore.legendOpen
           : key === 'pick' ? appStore.pickMode
           : key === 'simFlight' ? appStore.view === 'simFlight'
-          : key === 'cameraThird' ? appStore.cameraMode === 'thirdPerson'
-          : key === 'cameraFirst' ? appStore.cameraMode === 'firstPerson'
-          : key === 'cameraFree' ? appStore.cameraMode === 'free'
           : false,
       };
     })
