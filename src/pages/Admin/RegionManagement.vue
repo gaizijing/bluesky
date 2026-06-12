@@ -161,7 +161,7 @@
           <h4 class="admin-section-title">默认视角（mapLift）</h4>
           <div class="admin-form-grid">
             <el-form-item label="相机高度 (m)" prop="mapLiftHeight">
-              <el-input-number v-model="formModel.mapLiftHeight" :min="2500" :max="80000" :step="500"
+              <el-input-number v-model="formModel.mapLiftHeight" :min="2500" :max="10000000" :step="500"
                 controls-position="right" />
             </el-form-item>
 
@@ -176,7 +176,7 @@
             </el-form-item>
           </div>
           <div class="admin-form-hint">
-            高度越小视角越低（离地面越近）；Pitch 越负越俯视（如 -55 比 -40 更「低头」）。保存后刷新 Dashboard 或点「首页」生效。
+            高度越小视角越低；Pitch 越接近 0 越平视（如 -35 比 -55 更能看到地平线）。全国视角可用数百万米高度。保存后刷新 Dashboard 或点「首页」生效。
           </div>
         </section>
 
@@ -289,8 +289,8 @@ const createRegionForm = () => ({
   boundaryUrl: '',
   modelUrl: '',
   isDefault: false,
-  mapLiftHeight: 12000,
-  mapLiftPitch: -50,
+  mapLiftHeight: 18000,
+  mapLiftPitch: -35,
   mapLiftHeading: 0,
 })
 
@@ -366,8 +366,8 @@ const applyFormModel = async (payload) => {
   Object.assign(formModel, createRegionForm(), payload)
   formModel.adcode = payload?.adcode || ''
   formModel.boundarySourceUrl = ''
-  formModel.mapLiftHeight = payload?.mapLift?.height ?? payload?.mapLiftHeight ?? 12000
-  formModel.mapLiftPitch = payload?.mapLift?.pitch ?? payload?.mapLiftPitch ?? -50
+  formModel.mapLiftHeight = payload?.mapLift?.height ?? payload?.mapLiftHeight ?? 18000
+  formModel.mapLiftPitch = payload?.mapLift?.pitch ?? payload?.mapLiftPitch ?? -35
   formModel.mapLiftHeading = payload?.mapLift?.heading ?? payload?.mapLiftHeading ?? 0
   selectedAreaLabel.value = ''
   await syncAreaCascaderFromAdcode(formModel.adcode)

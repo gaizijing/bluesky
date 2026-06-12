@@ -11,9 +11,11 @@
 
   const FLY = {
     rangeFactor: 1.5,
-    pitchDeg: -40,
+    pitchDeg: -35,
     rangeMinM: 2500,
     rangeMaxM: 28000,
+    heightMinM: 2500,
+    heightMaxM: 10000000,
     durationS: 1.6,
   };
 
@@ -183,6 +185,11 @@
 
   function capFlyRange(rangeMeters) {
     return Math.min(Math.max(rangeMeters, FLY.rangeMinM), FLY.rangeMaxM);
+  }
+
+  function resolveFlyHeight(heightMeters) {
+    const height = Number(heightMeters ?? 18000);
+    return Math.min(Math.max(height, FLY.heightMinM), FLY.heightMaxM);
   }
 
   // --- Basemap & terrain ---
@@ -571,7 +578,7 @@
         destination: Cesium.Cartesian3.fromDegrees(
           centerLng,
           centerLat,
-          capFlyRange(lift.height ?? 18000),
+          resolveFlyHeight(lift.height),
         ),
         orientation: {
           heading: Cesium.Math.toRadians(lift.heading ?? 0),

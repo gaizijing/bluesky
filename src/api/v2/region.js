@@ -14,7 +14,7 @@ function buildMapLiftPayload(data) {
     longitude: Number(data.centerLng),
     latitude: Number(data.centerLat),
     height: Number(height ?? 12000),
-    pitch: Number(pitch ?? -50),
+    pitch: Number(pitch ?? -35),
     heading: Number(heading ?? 0),
     terrainExaggeration: data.mapLift?.terrainExaggeration ?? 1.2,
   };

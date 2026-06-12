@@ -20,7 +20,7 @@ export const getRegionConfig = () => {
     ) : null,
     defaultHeight: mapLift?.height ?? 18000,
     heading: mapLift?.heading ?? 0,
-    pitch: mapLift?.pitch ?? -45,
+    pitch: mapLift?.pitch ?? -35,
     terrainExaggeration: mapLift?.terrainExaggeration ?? 1,
   };
 };
@@ -53,7 +53,7 @@ export const flyToLandingPointsOverview = (viewer, points = [], options = {}) =>
 
   const boundingSphere = Cesium.BoundingSphere.fromPoints(positions);
   const range = Math.max(boundingSphere.radius * 2.8, 3000);
-  const pitch = options.pitch ?? -45;
+  const pitch = options.pitch ?? -35;
 
   console.log(LOG_PREFIX, 'flyToLandingPointsOverview', {
     pointCount: positions.length,
@@ -81,7 +81,7 @@ export const flyToMapPoint = (viewer, lng, lat, options = {}) => {
     destination: Cesium.Cartesian3.fromDegrees(lng, lat, height),
     orientation: {
       heading: Cesium.Math.toRadians(options.heading ?? 0),
-      pitch: Cesium.Math.toRadians(options.pitch ?? -45),
+      pitch: Cesium.Math.toRadians(options.pitch ?? -35),
       roll: 0,
     },
     duration: options.duration ?? 1.2,
@@ -156,7 +156,7 @@ export const getFlyToOptions = (options) => ({
   duration: options.duration || (options.isRegion ? 1.5 : 2),
   orientation: {
     heading: Cesium.Math.toRadians(options.heading || 0),
-    pitch: Cesium.Math.toRadians(options.pitch || (options.isRegion ? -30 : -45)),
+    pitch: Cesium.Math.toRadians(options.pitch || (options.isRegion ? -35 : -35)),
     roll: Cesium.Math.toRadians(options.roll || 0)
   },
   easingFunction: options.easingFunction || Cesium.EasingFunction.CUBIC_IN_OUT,
@@ -188,7 +188,7 @@ export const flyToRegionOverview = (viewer, options = {}) => {
       ),
       orientation: {
         heading: Cesium.Math.toRadians(regionConfig.heading ?? 0),
-        pitch: Cesium.Math.toRadians(regionConfig.pitch ?? -45),
+        pitch: Cesium.Math.toRadians(regionConfig.pitch ?? -35),
         roll: 0,
       },
       duration: options.duration ?? 2,
@@ -216,7 +216,7 @@ export const flyToRegionOverview = (viewer, options = {}) => {
     destination: regionConfig.rectangle,
     orientation: {
       heading: Cesium.Math.toRadians(regionConfig.heading ?? 0),
-      pitch: Cesium.Math.toRadians(regionConfig.pitch ?? -45),
+      pitch: Cesium.Math.toRadians(regionConfig.pitch ?? -35),
       roll: 0,
     },
     duration: options.duration ?? 2,

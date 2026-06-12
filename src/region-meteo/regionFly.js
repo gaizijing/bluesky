@@ -8,6 +8,8 @@ const FLY_RANGE = {
   rangeFactor: 1.5,
   rangeMinM: 2500,
   rangeMaxM: 28000,
+  heightMinM: 2500,
+  heightMaxM: 10_000_000,
   durationS: 1.6,
 };
 
@@ -15,6 +17,11 @@ const LOG_PREFIX = '[Dashboard/Camera]';
 
 function capFlyRange(rangeMeters) {
   return Math.min(Math.max(rangeMeters, FLY_RANGE.rangeMinM), FLY_RANGE.rangeMaxM);
+}
+
+function resolveFlyHeight(heightMeters) {
+  const height = Number(heightMeters ?? 18000);
+  return Math.min(Math.max(height, FLY_RANGE.heightMinM), FLY_RANGE.heightMaxM);
 }
 
 function flyToBoundingSphereWithPitch(viewer, boundingSphere, rangeMeters, duration) {
@@ -57,7 +64,7 @@ function flyToRegionCenter(viewer, region) {
     destination: Cesium.Cartesian3.fromDegrees(
       center.centerLng,
       center.centerLat,
-      capFlyRange(center.lift.height ?? 18000),
+      resolveFlyHeight(center.lift.height),
     ),
     orientation: {
       heading: Cesium.Math.toRadians(center.lift.heading ?? 0),

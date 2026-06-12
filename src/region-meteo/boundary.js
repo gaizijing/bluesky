@@ -9,7 +9,7 @@ const BOUNDARY_FADE = {
   throttleMs: 120,
 };
 
-const FLY = { pitchDeg: -40 };
+const FLY = { pitchDeg: -35 };
 
 let viewer = null;
 let boundaryDataSource = null;
