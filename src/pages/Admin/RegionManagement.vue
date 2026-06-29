@@ -4,7 +4,6 @@
     <section class="admin-panel">
       <div class="admin-panel__header">
         <div>
-          <h2 class="admin-panel__title">区域管理</h2>
         </div>
         <div class="admin-toolbar">
           <el-button class="admin-secondary-button" :loading="loading" @click="loadRegionConfigs">

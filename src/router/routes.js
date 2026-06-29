@@ -77,31 +77,27 @@ export const routes = [
     children: [
       {
         path: '/setting/threshold',
-        redirect: '/setting/flyability-rules'
+        redirect: '/setting/rule-sets'
+      },
+      {
+        path: '/setting/rule-sets',
+        name: 'RuleSetManagement',
+        component: () => import('@/pages/Admin/RuleSetManagement.vue'),
+        meta: {
+          title: '规则集管理'
+        }
       },
       {
         path: '/setting/flyability-rules',
-        name: 'FlyabilityRuleManagement',
-        component: () => import('@/pages/Admin/FlyabilityRuleManagement.vue'),
-        meta: {
-          title: '适飞规则集'
-        }
+        redirect: { path: '/setting/rule-sets', query: { tab: 'flyability' } }
       },
       {
         path: '/setting/risk-rules',
-        name: 'RiskRuleManagement',
-        component: () => import('@/pages/Admin/RiskRuleManagement.vue'),
-        meta: {
-          title: 'R_met 规则集'
-        }
+        redirect: { path: '/setting/rule-sets', query: { tab: 'flyability' } }
       },
       {
         path: '/setting/warning-rules',
-        name: 'WarningRuleManagement',
-        component: () => import('@/pages/Admin/WarningRuleManagement.vue'),
-        meta: {
-          title: '预警规则集'
-        }
+        redirect: { path: '/setting/rule-sets', query: { tab: 'warning' } }
       },
       {
         path: '/setting/no-fly-zones',

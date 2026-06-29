@@ -1,4 +1,5 @@
 import { resolveRouteList, resolveRouteDetails } from '@/services/regionCatalog.js';
+import { smoothRoutePositions } from '@/cesium/entities/routes/routeSmoothing.js';
 
 const ROUTE_LINE = '#7c1d1d';
 const ROUTE_GLOW = '#b45309';
@@ -150,20 +151,24 @@ export class RouteLayer {
 
   #renderRoute(route) {
     const waypoints = buildWaypoints(route);
-    const positions = enhanceWaypoints(waypoints);
-    if (positions.length < 2) return false;
+    const cornerPositions = enhanceWaypoints(waypoints);
+    if (cornerPositions.length < 2) return false;
+
+    const { positions, legIndices } = smoothRoutePositions(cornerPositions);
 
     const routeId = route.routeId || route.id;
     const dangers = Array.isArray(route.dangers) ? route.dangers : [];
     const group = { entities: [], positions: positions.slice() };
 
     for (let i = 0; i < positions.length - 1; i++) {
-      const danger = dangers[i] ?? dangers[Math.min(i, dangers.length - 1)] ?? 7;
+      const danger = dangers[legIndices[i]] ?? dangers[Math.min(legIndices[i], dangers.length - 1)] ?? 7;
       const entity = this.viewer.entities.add({
         id: 'route_' + routeId + '_seg_' + i,
         polyline: {
           positions: [positions[i], positions[i + 1]],
           width: 7,
+          arcType: Cesium.ArcType.NONE,
+          perPositionHeight: true,
           material: new Cesium.PolylineGlowMaterialProperty({
             glowPower: 0.15,
             color: dangerColor(danger),

@@ -3,11 +3,7 @@
     <section class="admin-panel">
       <div class="admin-panel__header">
         <div class="route-mgmt__intro">
-          <h2 class="admin-panel__title">航路管理</h2>
-          <p class="admin-panel__desc">
-            管理各 Region 航路数据，供大屏总览与航路下钻使用
-            <span v-if="regionId" class="route-mgmt__count">· 当前 {{ routes.length }} 条</span>
-          </p>
+         
         </div>
         <div class="admin-toolbar route-mgmt__toolbar">
           <el-select

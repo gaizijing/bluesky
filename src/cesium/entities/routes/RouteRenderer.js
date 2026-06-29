@@ -1,6 +1,7 @@
 // src/cesium/entities/routes/RouteRenderer.js
 import * as Cesium from 'cesium'
 import { DangerLevel } from './DangerLevel'
+import { smoothRoutePositions } from './routeSmoothing'
 
 export class RouteRenderer {
   constructor(viewer) {
@@ -18,6 +19,8 @@ export class RouteRenderer {
       polyline: {
         positions: positions,
         width: 5,
+        arcType: Cesium.ArcType.NONE,
+        perPositionHeight: true,
         material: this.dangerLevel.getColorByDangerLevel(danger),
         depthFailMaterial: this.dangerLevel.getColorByDangerLevel(danger),
         clampToGround: false
@@ -120,39 +123,41 @@ export class RouteRenderer {
       { ...endPoint, height: 0 } // 终点地面
     );
 
-    // 转换航点为Cesium坐标
-    const positions = enhancedWaypoints.map(waypoint =>
+    // 转换航点为 Cesium 坐标
+    const cornerPositions = enhancedWaypoints.map((waypoint) =>
       Cesium.Cartesian3.fromDegrees(
         waypoint.longitude,
         waypoint.latitude,
         waypoint.height
       )
     )
-    
-    // 创建航线分段
+
+    const { positions, legIndices } = smoothRoutePositions(cornerPositions)
+
+    // 创建航线分段（样条插值后仍按原始航段保留风险着色）
     const segmentEntities = []
 
     for (let i = 0; i < positions.length - 1; i++) {
+      const danger = route.dangers?.[legIndices[i]] ?? route.dangers?.[i] ?? 0
       const segment = this.#createRouteSegment(
         route.id,
         i,
         [positions[i], positions[i + 1]],
-        route.dangers?.[i] || 0
+        danger
       )
       segment && segmentEntities.push(segment)
     }
 
-    // 创建起点标签
-    const startLabel = this.#createStartLabel(positions, route);
-
-    // 创建终点标签
-    const endLabel = this.#createEndLabel(positions, route);
+    // 起终点标签仍锚在原始起降位置
+    const startLabel = this.#createStartLabel(cornerPositions, route)
+    const endLabel = this.#createEndLabel(cornerPositions, route)
 
     segmentEntities.push(startLabel, endLabel);
 
     return {
       segments: segmentEntities,
-      positions: positions
+      positions,
+      cornerPositions
     }
   }
 

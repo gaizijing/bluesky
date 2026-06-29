@@ -32,7 +32,7 @@
 
 **缓存来源（二选一）：**
 
-1. **调度任务**（`RiskCacheJob`）：基于和风 API 按 Region 边界格点采样后写入，`rule_version` 不含 `-seed`
+1. **调度任务**（`RiskCacheJob`）：基于 Open-Meteo API 按 Region 边界格点采样后写入，`rule_version` 不含 `-seed`
 2. **Flyway 种子**（V4/V22）：公式生成的演示格点，`rule_version` 含 `RS001-v1-seed`
 
 开发环境若未执行调度重算，默认读到的是种子数据。触发真实采样：

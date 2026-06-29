@@ -24,7 +24,7 @@ function getTurbulenceLevel(value) {
 function getWindLevel(value) {
   if (value < 12) return '微风'
   if (value < 20) return '轻风'
-  if (value < 29) return '和风'
+  if (value < 29) return '4级风'
   if (value < 40) return '清风'
   if (value < 52) return '强风'
   if (value < 62) return '疾风'

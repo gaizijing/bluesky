@@ -1,11 +1,12 @@
 <template>
   <RuleSetCrudPanel
+    :embedded="embedded"
     title="预警规则集"
-    description="配置 L1/L2 预警触发规则；L2 可启用 LLM 解读（需后端 LLM 配置）"
+    description="配置 l1Rules：气象因子满足条件时触发对应等级预警"
     publish-hint="发布后将在下一时间桶生效，新预警按最新规则评估。"
     :default-rules="DEFAULT_RULES"
     :field-docs="FIELD_DOCS"
-    show-llm-column
+    :format-rules="formatWarningRules"
     :api="api"
   />
 </template>
@@ -18,24 +19,87 @@ import {
   updateWarningRuleSet,
   publishWarningRuleSet,
   deleteWarningRuleSet,
-  enableWarningRuleLlm,
 } from '@/api/v2/warningRuleSet';
+
+defineProps({
+  embedded: { type: Boolean, default: false },
+});
 
 const DEFAULT_RULES = {
   l1Rules: [
-    { factor: 'windSpeedMs', operator: 'gte', threshold: 10, level: 'YELLOW' },
-    { factor: 'visibilityKm', operator: 'lte', threshold: 2, level: 'YELLOW' },
-  ],
-  l2Rules: [
-    { factor: 'windSpeedMs', operator: 'gte', threshold: 12, level: 'RED', enableLlm: true },
+    { factor: 'windSpeedMs', operator: 'gte', threshold: 10, level: 'medium' },
+    { factor: 'visibilityKm', operator: 'lte', threshold: 2, level: 'medium' },
+    { factor: 'windSpeedMs', operator: 'gte', threshold: 12, level: 'high' },
   ],
 };
 
 const FIELD_DOCS = [
-  { key: 'l1Rules', desc: '一般预警规则列表' },
-  { key: 'l2Rules', desc: '严重预警规则，可设 enableLlm: true' },
-  { key: 'factor', desc: 'windSpeedMs / visibilityKm / precipMmH 等' },
+  {
+    key: 'l1Rules[].factor',
+    desc: 'windSpeedMs 风速、visibilityKm 能见度、precipMmH 降水、windShearMs 风切变',
+  },
+  { key: 'l1Rules[].operator', desc: 'gte（≥）或 lte（≤）' },
+  { key: 'l1Rules[].threshold', desc: '触发阈值' },
+  { key: 'l1Rules[].level', desc: 'low / medium / high' },
 ];
+
+const LEGACY_TYPE_FACTOR = {
+  WIND: 'windSpeedMs',
+  VISIBILITY: 'visibilityKm',
+  PRECIP: 'precipMmH',
+  RAIN: 'precipMmH',
+  WIND_SHEAR: 'windShearMs',
+  WINDSHEAR: 'windShearMs',
+};
+
+function normalizeLevel(raw) {
+  const level = String(raw || 'medium').trim().toLowerCase();
+  if (level === 'red' || level === 'high') return 'high';
+  if (level === 'yellow' || level === 'medium') return 'medium';
+  if (level === 'green' || level === 'low') return 'low';
+  return level;
+}
+
+function coerceRuleRow(rule) {
+  return {
+    factor: String(rule.factor || '').trim(),
+    operator: rule.operator ? String(rule.operator).trim() : 'gte',
+    threshold: rule.threshold,
+    level: normalizeLevel(rule.level),
+  };
+}
+
+/** 查看/编辑时统一展示 l1Rules 新格式（兼容旧 rules / l2Rules） */
+function formatWarningRules(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return { l1Rules: [] };
+  }
+  if (Array.isArray(raw.l1Rules) && raw.l1Rules.length) {
+    return { l1Rules: raw.l1Rules.map(coerceRuleRow) };
+  }
+
+  const l1Rules = [];
+
+  if (Array.isArray(raw.rules)) {
+    for (const rule of raw.rules) {
+      const type = String(rule.type || '').trim().toUpperCase();
+      l1Rules.push({
+        factor: LEGACY_TYPE_FACTOR[type] || 'windSpeedMs',
+        operator: 'gte',
+        threshold: rule.threshold,
+        level: 'high',
+      });
+    }
+  }
+
+  if (Array.isArray(raw.l2Rules)) {
+    for (const rule of raw.l2Rules) {
+      l1Rules.push({ ...coerceRuleRow(rule), level: 'high' });
+    }
+  }
+
+  return l1Rules.length ? { l1Rules } : DEFAULT_RULES;
+}
 
 const api = {
   list: fetchWarningRuleSets,
@@ -43,6 +107,5 @@ const api = {
   update: updateWarningRuleSet,
   publish: publishWarningRuleSet,
   delete: deleteWarningRuleSet,
-  enableLlm: enableWarningRuleLlm,
 };
 </script>

@@ -27,7 +27,7 @@ export async function fetchWeatherRealtime(landingPointId, time) {
   return request.get('/weather/realtime', { pointId: landingPointId, time });
 }
 
-/** 大屏实时天气面板字段（由 V2 响应映射，非旧版和风字段名兼容层） */
+/** 大屏实时天气面板字段（由 V2 响应映射） */
 export function toRealtimePanelFields(payload) {
   if (!payload || payload.error) {
     throw new Error(payload?.message || '获取实时天气失败');

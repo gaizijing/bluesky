@@ -2,11 +2,11 @@ import { flyabilityColor } from './flyabilityLevel';
 
 /** 与后端 FlyabilityCalculator / 管理端默认规则一致 */
 export const DEFAULT_FLYABILITY_RULES = {
-  windSpeedMs: { yellow: 8, red: 12 },
-  visibilityKm: { yellow: 3, red: 1 },
-  precipMmH: { yellow: 2, red: 5 },
-  temperatureC: { min: -10, max: 40 },
-  cloudBaseM: { yellow: 300, red: 150 },
+  windSpeedMs: { medium: 8, high: 12 },
+  visibilityKm: { medium: 3, low: 1 },
+  precipMmH: { medium: 2, high: 5 },
+  temperatureC: { low: -10, high: 40 },
+  cloudBaseM: { medium: 300, low: 150 },
 };
 
 function toNum(value) {
@@ -14,25 +14,38 @@ function toNum(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-function evaluateRangeFactor(value, rule, direction) {
-  if (value == null || !rule) return 'GREEN';
-  const yellow = toNum(rule.yellow) ?? 0;
-  const red = toNum(rule.red) ?? 0;
-  if (direction === 'higher') {
-    if (red > 0 && value >= red) return 'RED';
-    if (yellow > 0 && value >= yellow) return 'YELLOW';
-  } else {
-    if (red > 0 && value <= red) return 'RED';
-    if (yellow > 0 && value <= yellow) return 'YELLOW';
+function pickThreshold(rule, keys) {
+  if (!rule) return null;
+  for (const key of keys) {
+    const n = toNum(rule[key]);
+    if (n != null) return n;
   }
+  return null;
+}
+
+function evaluateHigherWorse(value, rule) {
+  if (value == null || !rule) return 'GREEN';
+  const medium = pickThreshold(rule, ['medium', 'yellow']) ?? 0;
+  const high = pickThreshold(rule, ['high', 'red']) ?? 0;
+  if (high > 0 && value >= high) return 'RED';
+  if (medium > 0 && value >= medium) return 'YELLOW';
+  return 'GREEN';
+}
+
+function evaluateLowerWorse(value, rule) {
+  if (value == null || !rule) return 'GREEN';
+  const medium = pickThreshold(rule, ['medium', 'yellow']) ?? 0;
+  const low = pickThreshold(rule, ['low', 'red']) ?? 0;
+  if (low > 0 && value <= low) return 'RED';
+  if (medium > 0 && value <= medium) return 'YELLOW';
   return 'GREEN';
 }
 
 function evaluateTempFactor(value, rule) {
   if (value == null || !rule) return 'GREEN';
-  const min = toNum(rule.min) ?? 0;
-  const max = toNum(rule.max) ?? 0;
-  if ((min !== 0 || max !== 0) && (value < min || value > max)) return 'RED';
+  const low = pickThreshold(rule, ['low', 'min']) ?? 0;
+  const high = pickThreshold(rule, ['high', 'max']) ?? 0;
+  if ((low !== 0 || high !== 0) && (value < low || value > high)) return 'RED';
   return 'GREEN';
 }
 
@@ -40,9 +53,9 @@ function evaluateTempFactor(value, rule) {
 export function evaluateWeatherFlyability(weather, rules = DEFAULT_FLYABILITY_RULES) {
   return {
     temperatureC: evaluateTempFactor(toNum(weather?.temperature), rules.temperatureC),
-    windSpeedMs: evaluateRangeFactor(toNum(weather?.windSpeed), rules.windSpeedMs, 'higher'),
-    visibilityKm: evaluateRangeFactor(toNum(weather?.visibility), rules.visibilityKm, 'lower'),
-    precipMmH: evaluateRangeFactor(toNum(weather?.precipitation), rules.precipMmH, 'higher'),
+    windSpeedMs: evaluateHigherWorse(toNum(weather?.windSpeed), rules.windSpeedMs),
+    visibilityKm: evaluateLowerWorse(toNum(weather?.visibility), rules.visibilityKm),
+    precipMmH: evaluateHigherWorse(toNum(weather?.precipitation), rules.precipMmH),
   };
 }
 

@@ -75,17 +75,7 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/tianditu-proxy/, ''),
           secure: true,
         },
-        // 和风天气API代理（只代理特定的天气API请求）
-        '/api/weather/now': {
-          target: 'https://devapi.qweather.com/v7',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/weather/, ''),
-          secure: false,
-          headers: {
-            'Access-Control-Allow-Origin': '*'
-          }
-        },
-        // 通用API代理
+        // 通用 API 代理
         [env.VITE_API_BASE_URL]: {
           target: 'http://localhost:8080',
           changeOrigin: true,

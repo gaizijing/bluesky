@@ -3,9 +3,7 @@
     <section class="admin-panel">
       <div class="admin-panel__header">
         <div>
-          <h2 class="admin-panel__title">禁飞区管理</h2>
-          <p class="admin-panel__desc">按 Region 维护禁飞区多边形，支持 GeoJSON FeatureCollection 批量导入</p>
-        </div>
+         </div>
         <div class="admin-toolbar">
           <el-select v-model="regionId" placeholder="选择 Region" style="width: 180px" @change="loadZones">
             <el-option

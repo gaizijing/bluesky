@@ -1,8 +1,8 @@
 <template>
-  <div class="admin-page">
+  <div :class="embedded ? 'rule-set-panel-embedded' : 'admin-page'">
     <section class="admin-panel">
-      <div class="admin-panel__header">
-        <div>
+      <div class="admin-panel__header" :class="{ 'admin-panel__header--embedded': embedded }">
+        <div v-if="!embedded">
           <h2 class="admin-panel__title">{{ title }}</h2>
           <p class="admin-panel__desc">{{ description }}</p>
         </div>
@@ -141,6 +141,7 @@ import { Plus, Refresh } from '@element-plus/icons-vue';
 import { formatDate } from '@/utils/dateUtils';
 
 const props = defineProps({
+  embedded: { type: Boolean, default: false },
   title: { type: String, required: true },
   description: { type: String, default: '' },
   publishHint: {
@@ -149,6 +150,7 @@ const props = defineProps({
   },
   defaultRules: { type: Object, required: true },
   fieldDocs: { type: Array, default: () => [] },
+  formatRules: { type: Function, default: null },
   showLlmColumn: { type: Boolean, default: false },
   api: { type: Object, required: true },
 });
@@ -203,8 +205,13 @@ function openCreate() {
   editDialogVisible.value = true;
 }
 
+function displayRules(rules) {
+  const raw = rules && typeof rules === 'object' ? rules : {};
+  return props.formatRules ? props.formatRules(raw) : raw;
+}
+
 function openView(row) {
-  const rules = row.rules || {};
+  const rules = displayRules(row.rules);
   viewDetail.value = {
     ...row,
     rulesJsonPretty: JSON.stringify(rules, null, 2),
@@ -218,7 +225,7 @@ function openEdit(row) {
   editingId.value = row.ruleSetId;
   form.value = {
     name: row.name,
-    rulesJson: JSON.stringify(row.rules || {}, null, 2),
+    rulesJson: JSON.stringify(displayRules(row.rules), null, 2),
     enableLlm: Boolean(row.enableLlm),
   };
   editDialogVisible.value = true;
@@ -314,6 +321,16 @@ onMounted(loadList);
 </script>
 
 <style scoped lang="scss">
+.rule-set-panel-embedded {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-panel__header--embedded {
+  justify-content: flex-end;
+}
+
 .rule-view-hero {
   padding: 24px 28px;
   border-bottom: 1px solid rgba(135, 211, 255, 0.14);

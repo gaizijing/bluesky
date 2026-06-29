@@ -1,38 +1,11 @@
 <template>
   <div class="admin-page">
-    <section class="admin-stats">
-      <div class="admin-stat-card">
-        <span class="admin-stat-card__label">TOTAL USERS</span>
-        <strong class="admin-stat-card__value">{{ stats.total }}</strong>
-        <span class="admin-stat-card__meta">当前系统已登记的用户账户总数</span>
-      </div>
-
-      <div class="admin-stat-card">
-        <span class="admin-stat-card__label">ACTIVE USERS</span>
-        <strong class="admin-stat-card__value">{{ stats.activeCount }}</strong>
-        <span class="admin-stat-card__meta">状态正常，可直接登录和执行业务操作</span>
-      </div>
-
-      <div class="admin-stat-card">
-        <span class="admin-stat-card__label">LOCKED USERS</span>
-        <strong class="admin-stat-card__value">{{ stats.lockedCount }}</strong>
-        <span class="admin-stat-card__meta">已锁定账号，需要管理员重新调整状态</span>
-      </div>
-
-      <div class="admin-stat-card">
-        <span class="admin-stat-card__label">ADMIN ACCOUNTS</span>
-        <strong class="admin-stat-card__value">{{ stats.adminCount }}</strong>
-        <span class="admin-stat-card__meta">具备后台管理权限的管理员账户数量</span>
-      </div>
-    </section>
+   
 
     <section class="admin-panel">
       <div class="admin-panel__header">
         <div>
-          <h2 class="admin-panel__title">用户台账</h2>
-          <p class="admin-panel__desc">
-            当前显示 {{ visibleUsers.length }} / {{ users.length }} 位用户
-          </p>
+        
         </div>
 
         <div class="admin-toolbar admin-toolbar--users">

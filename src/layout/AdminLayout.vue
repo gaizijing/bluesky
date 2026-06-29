@@ -72,7 +72,6 @@ import {
   Upload,
   User,
   VideoCamera,
-  Warning,
   MapLocation
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -92,22 +91,10 @@ const menuItems = [
     icon: MapLocation
   },
   {
-    path: '/setting/flyability-rules',
-    title: '适飞规则集',
-    description: 'P1 适飞规则 JSON 与发布管理',
+    path: '/setting/rule-sets',
+    title: '规则集管理',
+    description: '适飞阈值与预警规则',
     icon: DataAnalysis
-  },
-  {
-    path: '/setting/risk-rules',
-    title: 'R_met 规则集',
-    description: '风险热力图因子权重与阈值',
-    icon: Histogram
-  },
-  {
-    path: '/setting/warning-rules',
-    title: '预警规则集',
-    description: 'L1/L2 预警规则与 LLM 开关',
-    icon: Warning
   },
   {
     path: '/setting/no-fly-zones',
@@ -121,12 +108,7 @@ const menuItems = [
     description: 'GeoJSON 导入、列表与删除',
     icon: Upload
   },
-  {
-    path: '/setting/scheduler',
-    title: '调度运维',
-    description: 'P2 缓存重算、清理与健康检查',
-    icon: Cpu
-  },
+
   {
     path: '/setting/user',
     title: '用户管理',
@@ -145,18 +127,7 @@ const menuItems = [
     description: '站点坐标、类型状态与业务覆盖',
     icon: LocationInformation
   },
-  {
-    path: '/setting/device',
-    title: '设备管理',
-    description: '设备台账、在线状态与点位绑定维护',
-    icon: Cpu
-  },
-  {
-    path: '/setting/device-monitoring',
-    title: '设备监测看板',
-    description: '设备在线率、告警统计与 42h 历史监测图表',
-    icon: Monitor
-  },
+  
   {
     path: '/setting/camera',
     title: '摄像头管理',
@@ -167,9 +138,7 @@ const menuItems = [
 
 const routeDescriptions = {
   '/setting/regions': '维护 Region 边界、白膜 tileset 路径与相机 mapLift；大屏切换区域时读取此处配置。',
-  '/setting/flyability-rules': '管理适飞阈值 JSON，发布后 Dashboard 适飞矩阵引用最新版本。',
-  '/setting/risk-rules': '管理 R_met 因子权重，发布后风险热力图在下一时间桶更新。',
-  '/setting/warning-rules': '配置 L1/L2 预警规则，支持已发布规则集启用 LLM 解读。',
+  '/setting/rule-sets': '适飞 Tab 维护阈值与 R_met 权重；预警 Tab 配置 l1Rules（high/medium/low）。',
   '/setting/no-fly-zones': '按 Region 维护禁飞多边形，支持 GeoJSON FeatureCollection 批量导入。',
   '/setting/route-import': '导入 GeoJSON 航路、查看已导入列表，支持单条或按 Region 批量删除。',
   '/setting/user': '集中维护用户资料、角色权限和账号状态，保证后台访问边界清晰可控。',

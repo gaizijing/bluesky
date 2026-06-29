@@ -1,6 +1,6 @@
 /**
  * API 统一出口：实现已拆分至 domain 模块与 api/v2/*。
- * 旧 @/api 引用保持兼容，V1 路径（和风、heatmap/geo、citywide 等）已移除。
+ * 旧 @/api 引用保持兼容，V1 路径（heatmap/geo、citywide 等）已移除。
  */
 export { resolveRegionId, readRegionIdFromStorage, setCurrentRegionId as setRegionIdInStorage } from './regionContext';
 

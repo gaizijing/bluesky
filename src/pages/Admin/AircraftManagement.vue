@@ -6,7 +6,6 @@
     <section class="admin-panel">
       <div class="admin-panel__header">
         <div>
-          <h2 class="admin-panel__title">飞行器台账</h2>
       
         </div>
         <div class="admin-toolbar">

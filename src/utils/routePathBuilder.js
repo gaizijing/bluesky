@@ -377,7 +377,7 @@ function expandWindAlongByIndex(samples, indices, totalLen) {
 /**
  * 沿航迹获取风况序列（供垂直剖面色标等）。
  * 使用 POST /weather/by-coords/batch 一次提交最多 {@link WIND_ALONG_MAX_BATCH_POINTS} 个采样点，
- * 服务端对 4 位小数经纬度去重后再调和风；前端将结果插值回与 path 等长的数组。
+ * 服务端对 4 位小数经纬度去重后再调 Open-Meteo；前端将结果插值回与 path 等长的数组。
  *
  * @param {Array<{lon:number,lat:number,alt?:number}>} path
  * @returns {Promise<Array<{ windSpeed:number, windDir:number, bumpiness:number }>>}
